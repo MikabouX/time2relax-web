@@ -18,36 +18,26 @@ Les données restent dans le navigateur (localStorage). Réglages → « Fichier
 et réimporte l'historique au même format que l'appli Android
 (`date;heure;type;durée_en_secondes`).
 
-## Compte en ligne (facultatif)
+## Historique en ligne (facultatif), sous un nom d'utilisateur
 
-Sans compte, tout fonctionne en local. Avec un compte, l'historique est gardé sur un serveur
-([Supabase](https://supabase.com), offre gratuite) : la session reste ouverte d'un jour à l'autre,
-et l'historique se retrouve si le navigateur est vidé ou sur un autre ordinateur.
+Sans nom d'utilisateur, tout fonctionne en local. Avec un nom, l'historique est aussi gardé sur un
+serveur ([Supabase](https://supabase.com), offre gratuite) : on le retrouve en tapant le même nom sur un
+autre appareil, ou après avoir vidé le navigateur. **Il n'y a pas de mot de passe** : toute personne
+qui tape le même nom voit et peut modifier le même historique (à choisir : un nom que personne
+d'autre n'utilise, par exemple `prénom-nom-1234`). Rien n'est affiché ni listé sans connaître le nom.
 
 1. Crée un projet gratuit sur supabase.com (région Europe).
-2. *SQL Editor* → colle le contenu de `supabase/schema.sql` → *Run*. Chaque utilisateur ne voit
-   que ses propres lignes (sécurité par ligne).
-3. *Project Settings → API* : copie l'**URL du projet** et la clé **publique** (« publishable » ou « anon »).
-   Ne copie jamais la clé « secret » / « service_role ».
+2. *SQL Editor* → colle le contenu de `supabase/schema.sql` → *Run*. Cela crée la table et trois
+   fonctions (`t2r_list`, `t2r_save`, `t2r_delete`) ; la table elle-même n'est pas accessible
+   directement.
+3. *Project Settings → API Keys* : copie l'**URL du projet** et la clé **publique** (« publishable » ou
+   « anon »). Ne copie jamais la clé « secret » / « service_role ».
 4. Renseigne-les dans `config.js` :
    ```js
    window.T2R_CONFIG = { supabaseUrl: 'https://xxxx.supabase.co', supabaseKey: 'sb_publishable_…' };
    ```
-5. (Optionnel) *Authentication → Providers → Email* : désactiver « Confirm email » pour ne pas
-   dépendre de l'envoi d'e-mails.
 
-### Mot de passe oublié
-
-Le bouton « Mot de passe oublié ? » envoie un e-mail avec un lien ; le lien rouvre la page, qui
-demande un nouveau mot de passe. Deux réglages Supabase sont nécessaires :
-
-1. *Authentication → URL Configuration* : mettre l'adresse de la page (ex.
-   `https://mikaboux.github.io/time2relax-web/`) dans **Site URL** et dans **Redirect URLs**.
-   Sans cela, le lien de l'e-mail mène à `localhost`.
-2. **Envoi des e-mails.** Le service par défaut de Supabase ne livre qu'aux adresses des membres de
-   l'organisation Supabase (et au plus 2 messages par heure) : il suffit pour le propriétaire, pas
-   pour des collègues. Pour eux, configurer un serveur SMTP dans *Authentication → Emails → SMTP
-   Settings* (par exemple Brevo ou Resend, offres gratuites).
+Aucun e-mail n'est collecté ni envoyé : les réglages « Authentication » de Supabase ne servent pas.
 
 ### Garder le projet actif
 
@@ -60,7 +50,7 @@ réactiver dans l'onglet *Actions*.
 ## Tests
 
 `node tests/e2e.js` lance Chromium (Playwright) : chrono, alertes, historique (ajout, modification,
-suppression), mode nuit, vidage, import/export, néerlandais, compte, mot de passe oublié et synchronisation (serveur simulé).
+suppression), mode nuit, vidage, import/export, néerlandais, nom d'utilisateur et synchronisation (serveur simulé).
 
 ## Fichiers
 
@@ -70,6 +60,6 @@ suppression), mode nuit, vidage, import/export, néerlandais, compte, mot de pas
 | `i18n.js` | textes français / néerlandais |
 | `store.js` | stockage local, journée de travail (mode nuit), import/export |
 | `timer.js` | chrono, minuteur, alertes, sons, notifications |
-| `sync.js` | compte, mot de passe oublié et synchronisation (sans bibliothèque) |
+| `sync.js` | nom d'utilisateur et synchronisation (sans bibliothèque) |
 | `ui.js`, `main.js` | écrans et démarrage |
 | `sw.js`, `manifest.webmanifest` | utilisation hors-ligne et installation comme appli |

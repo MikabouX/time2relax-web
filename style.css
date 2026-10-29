@@ -254,7 +254,6 @@ h1, h2, p { margin: 0; }
 .row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .acct-form { display: flex; flex-direction: column; gap: 10px; }
 .acct-form .row { margin-top: 2px; }
-.acct-form .btn.text.forgot { align-self: flex-start; padding-left: 4px; }
 .acct-line { display: flex; align-items: center; gap: 8px; }
 .acct-line .ico { color: var(--primary); }
 .acct-msg { min-height: 1.2em; }

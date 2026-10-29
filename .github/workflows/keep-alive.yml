@@ -1,5 +1,5 @@
 # Garde le projet Supabase (offre gratuite) actif : il est mis en pause après 7 jours sans activité.
-# Chaque jour, quelques lectures sont envoyées à la base avec la clé publique de config.js.
+# Chaque jour, quelques lectures sont envoyées à la base (fonction t2r_list) avec la clé publique de config.js.
 # Lancement à la main : onglet « Actions » du dépôt → « Garder Supabase actif » → « Run workflow ».
 name: Garder Supabase actif
 
@@ -25,8 +25,9 @@ jobs:
             exit 0
           fi
           for i in 1 2 3; do
-            code=$(curl -sS -o /tmp/reponse.txt -w '%{http_code}' --max-time 30 \
-              "$URL/rest/v1/breaks?select=id&limit=1" -H "apikey: $KEY")
+            code=$(curl -sS -o /tmp/reponse.txt -w '%{http_code}' --max-time 30 -X POST \
+              "$URL/rest/v1/rpc/t2r_list" -H "apikey: $KEY" -H "Content-Type: application/json" \
+              -d '{"p_username":"__keepalive__"}')
             echo "Essai $i : HTTP $code"
             if [ "$code" != "200" ]; then
               echo "Réponse du serveur :"

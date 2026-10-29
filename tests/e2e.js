@@ -406,14 +406,11 @@ async function main() {
     }
 
     /* ------------------------------------------------------------ F. compte + synchronisation (serveur simulé) */
-    console.log('F. Compte et synchronisation (Supabase simulé)');
+    console.log("F. Nom d'utilisateur et synchronisation (Supabase simulé)");
     await syncTests(browser);
 
     console.log('H. Synchronisation des ajouts et modifications');
     await editSyncTests(browser);
-
-    console.log('I. Mot de passe oublié');
-    await recoveryTests(browser);
   } finally {
     await browser.close();
     server.kill();
@@ -422,231 +419,198 @@ async function main() {
   process.exit(failed ? 1 : 0);
 }
 
-/* ---------- Faux Supabase en mémoire ---------- */
+/* ---------- Faux Supabase en mémoire : les trois fonctions SQL, par nom d'utilisateur ---------- */
 function makeMockSupabase() {
-  const db = { users: new Map(), tokens: new Map(), refresh: new Map(), rows: [], log: [], recoveries: [] };
+  const db = { rows: [], log: [], delayPost: 0 };
   const cors = {
     'access-control-allow-origin': '*',
     'access-control-allow-headers': 'apikey, authorization, content-type, prefer, x-client-info',
     'access-control-allow-methods': 'GET,POST,PATCH,DELETE,OPTIONS',
   };
-  let counter = 0;
-  const issue = (user, expiresIn) => {
-    counter += 1;
-    const access = `access-${counter}`;
-    const refresh = `refresh-${counter}`;
-    db.tokens.set(access, user.id);
-    db.refresh.set(refresh, user.id);
-    return { access_token: access, token_type: 'bearer', expires_in: expiresIn, refresh_token: refresh, user: { id: user.id, email: user.email } };
-  };
-  db.expiresIn = 3600;
+  db.of = (name) => db.rows.filter((r) => r.username === name);
   db.handler = async (route) => {
     const req = route.request();
     const url = new URL(req.url());
     const json = (status, body) => route.fulfill({ status, headers: { ...cors, 'content-type': 'application/json' }, body: body === undefined ? '' : JSON.stringify(body) });
     if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
-    const body = req.postData() ? JSON.parse(req.postData()) : null;
-    const h = req.headers();
     db.log.push(`${req.method()} ${url.pathname}${url.search}`);
-    if (!h.apikey) return json(401, { message: 'No API key found in request' });
+    if (!req.headers().apikey) return json(401, { message: 'No API key found in request' });
+    const m = /^\/rest\/v1\/rpc\/(t2r_list|t2r_save|t2r_delete)$/.exec(url.pathname);
+    if (!m || req.method() !== 'POST') return json(404, { message: 'not found' });
+    const body = req.postData() ? JSON.parse(req.postData()) : {};
+    const who = String(body.p_username || '').trim().toLowerCase();
+    if (who.length < 2 || who.length > 40) return json(400, { code: 'P0001', message: "nom d'utilisateur invalide" });
 
-    if (url.pathname === '/auth/v1/signup') {
-      if ([...db.users.values()].some((u) => u.email === body.email)) return json(422, { code: 422, error_code: 'user_already_exists', msg: 'User already registered' });
-      const user = { id: `00000000-0000-4000-8000-${String(db.users.size + 1).padStart(12, '0')}`, email: body.email, password: body.password };
-      db.users.set(user.id, user);
-      return json(200, issue(user, db.expiresIn));
+    if (m[1] === 't2r_list') {
+      const mine = db.of(who).sort((a, b) => (a.date + a.time + a.id).localeCompare(b.date + b.time + b.id));
+      const limit = Number(url.searchParams.get('limit') || 1000);
+      const offset = Number(url.searchParams.get('offset') || 0);
+      return json(200, mine.slice(offset, offset + limit).map(({ id, date, time, type, seconds }) => ({ id, date, time, type, seconds })));
     }
-    if (url.pathname === '/auth/v1/token' && url.searchParams.get('grant_type') === 'password') {
-      const user = [...db.users.values()].find((u) => u.email === body.email && u.password === body.password);
-      if (!user) return json(400, { code: 400, error_code: 'invalid_credentials', msg: 'Invalid login credentials' });
-      return json(200, issue(user, db.expiresIn));
-    }
-    if (url.pathname === '/auth/v1/token' && url.searchParams.get('grant_type') === 'refresh_token') {
-      const uid = db.refresh.get(body.refresh_token);
-      if (!uid) return json(400, { code: 400, error_code: 'refresh_token_not_found', msg: 'Invalid Refresh Token: Refresh Token Not Found' });
-      db.refresh.delete(body.refresh_token); // rotation, comme le vrai serveur
-      return json(200, issue(db.users.get(uid), db.expiresIn));
-    }
-    if (url.pathname === '/auth/v1/logout') return route.fulfill({ status: 204, headers: cors });
-    if (url.pathname === '/auth/v1/recover') {
-      db.recoveries.push({ email: body.email, redirect: url.searchParams.get('redirect_to') });
-      return json(200, {}); // même réponse que le compte existe ou non
-    }
-    if (url.pathname === '/auth/v1/user' && req.method() === 'PUT') {
-      const uid = db.tokens.get((h.authorization || '').replace('Bearer ', ''));
-      if (!uid) return json(401, { code: 401, error_code: 'bad_jwt', msg: 'invalid JWT: unable to parse or verify signature, token is expired' });
-      const user = db.users.get(uid);
-      if (body.password === user.password) return json(422, { code: 422, error_code: 'same_password', msg: 'New password should be different from the old password.' });
-      if (String(body.password).length < 6) return json(422, { code: 422, error_code: 'weak_password', msg: 'Password should be at least 6 characters.' });
-      user.password = body.password;
-      return json(200, { id: user.id, email: user.email });
-    }
-
-    if (url.pathname === '/rest/v1/breaks') {
-      const auth = (h.authorization || '').replace('Bearer ', '');
-      const uid = db.tokens.get(auth);
-      if (!uid) return json(401, { code: 'PGRST301', message: 'JWT expired or invalid' });
-      if (req.method() === 'GET') {
-        const mine = db.rows.filter((r) => r.user_id === uid).sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
-        const limit = Number(url.searchParams.get('limit') || 1000);
-        const offset = Number(url.searchParams.get('offset') || 0);
-        return json(200, mine.slice(offset, offset + limit).map(({ id, date, time, type, seconds }) => ({ id, date, time, type, seconds })));
+    if (m[1] === 't2r_save') {
+      if (db.delayPost) await new Promise((r) => setTimeout(r, db.delayPost)); // serveur lent (test de modification pendant l'envoi)
+      for (const r of body.p_rows) {
+        if (!/^\d{2}:\d{2}$/.test(r.time) || !['break', 'lunch'].includes(r.type)) return json(400, { code: '23514', message: 'check constraint' });
+        const i = db.rows.findIndex((x) => x.id === r.id);
+        if (i < 0) db.rows.push({ ...r, username: who });
+        else if (db.rows[i].username === who) db.rows[i] = { ...r, username: who }; // l'entrée d'un autre nom n'est jamais touchée
       }
-      if (req.method() === 'POST') {
-        if (db.delayPost) await new Promise((r) => setTimeout(r, db.delayPost)); // serveur lent (test de modification pendant l'envoi)
-        if (url.searchParams.get('on_conflict') !== 'id' || !/merge-duplicates/.test(h.prefer || '')) return json(409, { message: 'duplicate key' });
-        for (const r of body) {
-          if (!/^\d{2}:\d{2}$/.test(r.time) || !['break', 'lunch'].includes(r.type)) return json(400, { message: 'check constraint' });
-          const i = db.rows.findIndex((x) => x.id === r.id);
-          if (i >= 0) { if (db.rows[i].user_id !== uid) return json(403, { message: 'RLS' }); db.rows[i] = { ...r, user_id: uid }; } else db.rows.push({ ...r, user_id: uid });
-        }
-        return route.fulfill({ status: 201, headers: cors });
-      }
-      if (req.method() === 'DELETE') {
-        const m = /^in\.\((.*)\)$/.exec(url.searchParams.get('id') || '');
-        const ids = m ? m[1].split(',') : [];
-        db.rows = db.rows.filter((r) => !(r.user_id === uid && ids.includes(r.id)));
-        return route.fulfill({ status: 204, headers: cors });
-      }
+      return route.fulfill({ status: 204, headers: cors });
     }
-    return json(404, { message: 'not found' });
+    db.rows = db.rows.filter((r) => !(r.username === who && body.p_ids.includes(r.id)));
+    return route.fulfill({ status: 204, headers: cors });
   };
   return db;
 }
 
-async function syncTests(browser) {
-  const db = makeMockSupabase();
-  db.expiresIn = 30; // jetons très courts : chaque appel doit passer par le renouvellement
-  const cfg = "window.T2R_CONFIG = { supabaseUrl: 'https://mock.supabase.test', supabaseKey: 'sb_publishable_test' };";
-  const open = async (startIso) => {
-    const context = await browser.newContext({ timezoneId: 'Europe/Brussels', locale: 'fr-BE', viewport: { width: 420, height: 900 } });
-    await context.addInitScript(initScript(startIso));
-    await context.route('**/config.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript', body: cfg }));
-    await context.route('https://mock.supabase.test/**', db.handler);
-    const page = await context.newPage();
-    const errors = [];
-    page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
-    page.on('console', (m) => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) errors.push(`console: ${m.text()}`); });
-    await page.goto(BASE);
-    return { page, context, errors };
-  };
-  const waitIdle = (page) => page.waitForFunction(() => !window.t2r.state.sync.busy && !document.querySelector('#syncStatus')?.textContent.includes('Synchronisation'), null, { timeout: 8000 });
+const CFG = "window.T2R_CONFIG = { supabaseUrl: 'https://mock.supabase.test', supabaseKey: 'sb_publishable_test' };";
 
-  // Poste 1 : un break fait hors connexion, puis création du compte
-  const a = await open('2026-10-29T10:00:00+01:00');
-  await a.page.getByRole('button', { name: 'Continuer' }).click();
-  await a.page.locator('.start').click();
-  await advance(a.page, 61000);
-  await a.page.locator('.start').click();
-  await a.page.getByRole('button', { name: 'Réglages' }).click();
-  check(await a.page.locator('#acctCard').isVisible(), 'carte « Compte » visible quand la synchro est configurée');
-
-  await a.page.locator('#acctEmail').fill('moi@example.com');
-  await a.page.locator('#acctPass').fill('123');
-  await a.page.getByRole('button', { name: 'Se connecter' }).click();
-  check((await text(a.page, '#acctMsg')).includes('6 caractères'), 'mot de passe trop court refusé');
-  await a.page.locator('#acctPass').fill('motdepasse');
-  await a.page.getByRole('button', { name: 'Se connecter' }).click();
-  await a.page.waitForFunction(() => document.getElementById('acctMsg').textContent.includes('incorrect'), null, { timeout: 8000 });
-  check(true, 'compte inconnu : message clair');
-  await a.page.getByRole('button', { name: 'Créer un compte' }).click();
-  await a.page.waitForSelector('#syncStatus');
-  await waitIdle(a.page);
-  check((await text(a.page, '#acctCard')).includes('Connecté : moi@example.com'), 'compte créé et connecté');
-  eq(db.rows.length, 1, "l'entrée faite avant la connexion est envoyée au serveur");
-  check(db.log.some((l) => l.includes('on_conflict=id')), 'envoi par « upsert » (pas de doublon possible)');
-  check((await text(a.page, '#syncStatus')).startsWith('Dernière synchro'), 'état de synchro affiché');
-
-  // Nouveau break, supprimé ensuite
-  await a.page.getByRole('button', { name: 'Retour' }).click();
-  await a.page.locator('.start').click();
-  await advance(a.page, 125000);
-  await a.page.locator('.start').click();
-  await a.page.waitForFunction(() => window.t2r.state.entries.every((e) => e.synced), null, { timeout: 8000 });
-  eq(db.rows.length, 2, 'deuxième entrée synchronisée automatiquement');
-  check(db.log.some((l) => l.includes('grant_type=refresh_token')), 'jeton renouvelé automatiquement (session qui reste ouverte)');
-
-  // Poste 2 (autre navigateur) : connexion et récupération de l'historique
-  const b = await open('2026-10-30T09:00:00+01:00');
-  await b.page.getByRole('button', { name: 'Continuer' }).click();
-  await b.page.getByRole('button', { name: 'Réglages' }).click();
-  await b.page.locator('#acctEmail').fill('moi@example.com');
-  await b.page.locator('#acctPass').fill('mauvais-mdp');
-  await b.page.getByRole('button', { name: 'Se connecter' }).click();
-  await b.page.waitForFunction(() => document.getElementById('acctMsg').textContent.includes('incorrect'), null, { timeout: 8000 });
-  check(true, 'mauvais mot de passe refusé');
-  await b.page.locator('#acctPass').fill('motdepasse');
-  await b.page.getByRole('button', { name: 'Se connecter' }).click();
-  await b.page.waitForFunction(() => window.t2r.state.entries.length === 2, null, { timeout: 8000 });
-  check(true, "le second poste retrouve les 2 entrées du compte");
-
-  // Suppression sur le poste 2, vue sur le poste 1 après resynchronisation
-  await b.page.getByRole('button', { name: 'Retour' }).click();
-  await b.page.getByRole('button', { name: 'Historique' }).click();
-  await b.page.locator('.entry').first().getByRole('button', { name: 'Supprimer' }).click();
-  await b.page.waitForFunction(() => window.t2r.state.deleted.length === 0, null, { timeout: 8000 });
-  eq(db.rows.length, 1, 'suppression répercutée sur le serveur');
-  await a.page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
-  await a.page.reload();
-  await a.page.waitForFunction(() => window.t2r.state.entries.length === 1 && !window.t2r.state.sync.busy, null, { timeout: 8000 });
-  check(true, 'le poste 1 voit la suppression après rechargement (session toujours ouverte)');
-
-  // Annulation d'une suppression déjà envoyée : l'entrée est renvoyée
-  await b.page.locator('.toast-action').click().catch(() => {});
-  await b.page.waitForTimeout(100);
-
-  // Déconnexion : l'historique local est effacé mais reste au compte
-  await a.page.getByRole('button', { name: 'Réglages' }).click();
-  await a.page.getByRole('button', { name: 'Se déconnecter' }).click();
-  await a.page.locator('.dlg').getByRole('button', { name: 'Se déconnecter' }).click();
-  await a.page.waitForSelector('#acctEmail');
-  eq(await a.page.evaluate(() => window.t2r.state.entries.length), 0, 'déconnexion : historique local effacé');
-  await a.page.locator('#acctEmail').fill('moi@example.com');
-  await a.page.locator('#acctPass').fill('motdepasse');
-  await a.page.getByRole('button', { name: 'Se connecter' }).click();
-  await a.page.waitForFunction(() => window.t2r.state.entries.length >= 1, null, { timeout: 8000 });
-  check(true, "reconnexion : l'historique revient depuis le compte");
-
-  // Session expirée : le serveur oublie les jetons de renouvellement
-  db.refresh.clear();
-  await advance(a.page, 120000); // le jeton (30 s) est périmé : il faut le renouveler
-  await a.page.reload();
-  await a.page.waitForFunction(() => window.t2r.state.session === null, null, { timeout: 8000 });
-  await a.page.getByRole('button', { name: 'Réglages' }).click();
-  await a.page.waitForSelector('#acctEmail', { timeout: 8000 });
-  check((await text(a.page, '#acctMsg')).includes('Session expirée'), 'session expirée : invitation à se reconnecter');
-  check((await a.page.evaluate(() => window.t2r.state.entries.length)) >= 1, "l'historique local n'est pas perdu quand la session expire");
-
-  // Serveur injoignable
-  const c = await open('2026-10-30T09:00:00+01:00');
-  await c.page.getByRole('button', { name: 'Continuer' }).click();
-  await c.context.route('https://mock.supabase.test/**', (r) => r.abort());
-  await c.page.getByRole('button', { name: 'Réglages' }).click();
-  await c.page.locator('#acctEmail').fill('moi@example.com');
-  await c.page.locator('#acctPass').fill('motdepasse');
-  await c.page.getByRole('button', { name: 'Se connecter' }).click();
-  await c.page.waitForFunction(() => document.getElementById('acctMsg').textContent.includes('Hors ligne'), null, { timeout: 8000 });
-  check(true, 'hors ligne : message clair, la page reste utilisable');
-
-  for (const x of [a, b, c]) {
-    check(x.errors.length === 0, `aucune erreur console (${x.errors.join(' | ')})`);
-    await x.context.close();
-  }
-}
-
-/** Ajout et modification d'entrées avec un compte : une seule ligne côté serveur, même pendant un envoi lent. */
-async function editSyncTests(browser) {
-  const db = makeMockSupabase();
-  const cfg = "window.T2R_CONFIG = { supabaseUrl: 'https://mock.supabase.test', supabaseKey: 'sb_publishable_test' };";
+async function openWithMock(browser, db, startIso) {
   const context = await browser.newContext({ timezoneId: 'Europe/Brussels', locale: 'fr-BE', viewport: { width: 420, height: 900 } });
-  await context.addInitScript(initScript('2026-10-29T10:00:00+01:00'));
-  await context.route('**/config.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript', body: cfg }));
+  await context.addInitScript(initScript(startIso));
+  await context.route('**/config.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript', body: CFG }));
   await context.route('https://mock.supabase.test/**', db.handler);
   const page = await context.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
   page.on('console', (m) => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) errors.push(`console: ${m.text()}`); });
   await page.goto(BASE);
+  return { page, context, errors };
+}
+
+/** Réglages → nom d'utilisateur → « Se connecter ». */
+async function signInAs(page, name) {
+  await page.locator('#acctName').fill(name);
+  await page.getByRole('button', { name: 'Se connecter' }).click();
+}
+
+const allSynced = (page) => page.waitForFunction(() => {
+  const s = window.t2r.state;
+  return !s.sync.busy && s.sync.last !== null && s.entries.every((e) => e.synced) && s.deleted.length === 0;
+}, null, { timeout: 10000 });
+
+async function syncTests(browser) {
+  const db = makeMockSupabase();
+  const open = (iso) => openWithMock(browser, db, iso);
+
+  // Poste 1 : un break fait hors connexion, puis choix du nom d'utilisateur
+  const a = await open('2026-10-29T10:00:00+01:00');
+  await a.page.getByRole('button', { name: 'Continuer' }).click();
+  await a.page.locator('.start').click();
+  await advance(a.page, 61000);
+  await a.page.locator('.start').click();
+  await a.page.getByRole('button', { name: 'Réglages' }).click();
+  check(await a.page.locator('#acctCard').isVisible(), "carte « Nom d'utilisateur » visible quand la synchro est configurée");
+  eq(await a.page.locator('input[type=password], input[type=email]').count(), 0, 'ni mot de passe ni e-mail à saisir');
+
+  await signInAs(a.page, 'a');
+  check((await text(a.page, '#acctMsg')).includes('2 à 40'), 'nom trop court refusé');
+  await signInAs(a.page, '  Michaël-1234  ');
+  await a.page.waitForSelector('#syncStatus');
+  await allSynced(a.page);
+  check((await text(a.page, '#acctCard')).includes('Connecté : michaël-1234'), 'connecté : le nom est nettoyé (espaces, majuscules)');
+  eq(db.of('michaël-1234').length, 1, "l'entrée faite avant la connexion est envoyée sous ce nom");
+  check(db.log.some((l) => l.includes('/rpc/t2r_save')), 'envoi par la fonction « t2r_save » (pas de doublon possible)');
+  check((await text(a.page, '#syncStatus')).startsWith('Dernière synchro'), 'état de synchro affiché');
+
+  // Nouveau break : envoyé tout seul
+  await a.page.getByRole('button', { name: 'Retour' }).click();
+  await a.page.locator('.start').click();
+  await advance(a.page, 125000);
+  await a.page.locator('.start').click();
+  await allSynced(a.page);
+  eq(db.of('michaël-1234').length, 2, 'deuxième entrée synchronisée automatiquement');
+
+  // La session reste ouverte après un rechargement
+  await a.page.reload();
+  eq(await a.page.evaluate(() => window.t2r.state.session && window.t2r.state.session.username), 'michaël-1234', 'session conservée après rechargement');
+
+  // Poste 2 (autre navigateur) : même nom, écrit avec des majuscules
+  const b = await open('2026-10-30T09:00:00+01:00');
+  await b.page.getByRole('button', { name: 'Continuer' }).click();
+  await b.page.getByRole('button', { name: 'Réglages' }).click();
+  await signInAs(b.page, 'MICHAËL-1234');
+  await b.page.waitForFunction(() => window.t2r.state.entries.length === 2, null, { timeout: 8000 });
+  check(true, 'le second poste retrouve les 2 entrées avec le même nom (majuscules sans importance)');
+
+  // Poste 3 : un autre nom ne voit rien de tout cela
+  const c = await open('2026-10-30T09:00:00+01:00');
+  await c.page.getByRole('button', { name: 'Continuer' }).click();
+  await c.page.locator('.start').click();
+  await advance(c.page, 90000);
+  await c.page.locator('.start').click();
+  await c.page.getByRole('button', { name: 'Réglages' }).click();
+  await signInAs(c.page, 'collègue-42');
+  await allSynced(c.page);
+  eq(db.of('collègue-42').length, 1, 'autre nom : son historique est séparé');
+  eq(db.of('michaël-1234').length, 2, "l'historique du premier nom n'a pas bougé");
+  eq(await c.page.evaluate(() => window.t2r.state.entries.length), 1, "autre nom : ne voit pas les entrées de l'autre");
+  // une entrée d'un autre nom ne peut pas être écrasée, même avec son identifiant
+  const victim = db.of('michaël-1234')[0];
+  await c.page.evaluate(async ([id]) => {
+    await fetch('https://mock.supabase.test/rest/v1/rpc/t2r_save', {
+      method: 'POST',
+      headers: { apikey: 'sb_publishable_test', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ p_username: 'collègue-42', p_rows: [{ id, date: '2000-01-01', time: '00:00', type: 'break', seconds: 1 }] }),
+    });
+  }, [victim.id]);
+  check(db.of('michaël-1234').some((r) => r.id === victim.id && r.seconds !== 1), "l'entrée d'un autre nom n'est pas écrasée");
+
+  // Suppression sur le poste 2, vue sur le poste 1 après rechargement
+  await b.page.getByRole('button', { name: 'Retour' }).click();
+  await b.page.getByRole('button', { name: 'Historique' }).click();
+  await b.page.locator('.entry').first().getByRole('button', { name: 'Supprimer' }).click();
+  await allSynced(b.page);
+  eq(db.of('michaël-1234').length, 1, 'suppression répercutée sur le serveur');
+  await a.page.reload();
+  await a.page.waitForFunction(() => window.t2r.state.entries.length === 1 && !window.t2r.state.sync.busy, null, { timeout: 8000 });
+  check(true, 'le poste 1 voit la suppression après rechargement');
+
+  // Déconnexion : l'historique local est effacé mais reste enregistré sous le nom
+  await a.page.getByRole('button', { name: 'Réglages' }).click();
+  await a.page.getByRole('button', { name: 'Se déconnecter' }).click();
+  await a.page.locator('.dlg').getByRole('button', { name: 'Se déconnecter' }).click();
+  await a.page.waitForSelector('#acctName');
+  eq(await a.page.evaluate(() => window.t2r.state.entries.length), 0, 'déconnexion : historique local effacé');
+  eq(await a.page.evaluate(() => window.t2r.state.session), null, 'déconnexion : session fermée');
+  await signInAs(a.page, 'michaël-1234');
+  await a.page.waitForFunction(() => window.t2r.state.entries.length === 1, null, { timeout: 8000 });
+  check(true, "reconnexion avec le même nom : l'historique revient");
+
+  // Ancienne session (compte e-mail) : abandonnée, l'historique du navigateur est renvoyé sous le nouveau nom
+  const d = await open('2026-10-29T10:00:00+01:00');
+  await d.page.evaluate(() => {
+    localStorage.setItem('t2r.prefs', JSON.stringify({ setupDone: true }));
+    localStorage.setItem('t2r.session', JSON.stringify({ access_token: 'x', refresh_token: 'y', email: 'ancien@example.com', user_id: 'u' }));
+    const mk = (time, i) => ({ id: `00000000-0000-4000-8000-00000000000${i}`, date: '2026-10-28', time, type: 'break', seconds: 600, synced: true });
+    localStorage.setItem('t2r.entries', JSON.stringify([mk('09:00', 1), mk('11:00', 2), mk('15:00', 3)]));
+  });
+  await d.page.reload();
+  eq(await d.page.evaluate(() => window.t2r.state.session), null, "ancienne session (e-mail) abandonnée");
+  await d.page.getByRole('button', { name: 'Réglages' }).click();
+  await signInAs(d.page, 'migration-1');
+  await allSynced(d.page);
+  eq(db.of('migration-1').length, 3, "l'historique déjà présent dans le navigateur est envoyé sous le nouveau nom");
+
+  // Serveur injoignable
+  const e = await open('2026-10-30T09:00:00+01:00');
+  await e.page.getByRole('button', { name: 'Continuer' }).click();
+  await e.context.route('https://mock.supabase.test/**', (r) => r.abort());
+  await e.page.getByRole('button', { name: 'Réglages' }).click();
+  await signInAs(e.page, 'hors-ligne-1');
+  await e.page.waitForFunction(() => document.getElementById('syncStatus') && document.getElementById('syncStatus').textContent.includes('Hors ligne'), null, { timeout: 8000 });
+  check(true, 'hors ligne : message clair, la page reste utilisable');
+
+  for (const x of [a, b, c, d, e]) {
+    check(x.errors.length === 0, `aucune erreur console (${x.errors.join(' | ')})`);
+    await x.context.close();
+  }
+}
+
+/** Ajout et modification d'entrées en ligne : une seule ligne côté serveur, même pendant un envoi lent. */
+async function editSyncTests(browser) {
+  const db = makeMockSupabase();
+  const { page, context, errors } = await openWithMock(browser, db, '2026-10-29T10:00:00+01:00');
   const waitFor = async (fn, ms = 10000) => {
     const t0 = Date.now();
     while (!fn()) {
@@ -654,7 +618,7 @@ async function editSyncTests(browser) {
       await new Promise((r) => setTimeout(r, 50));
     }
   };
-  const posts = () => db.log.filter((l) => l.startsWith('POST /rest/v1/breaks')).length;
+  const posts = () => db.log.filter((l) => l.includes('/rpc/t2r_save')).length;
   const settled = (n, seconds) => page.waitForFunction(([count, secs]) => {
     const s = window.t2r.state;
     return !s.sync.busy && s.entries.length === count && s.entries.every((e) => e.synced) && (secs === null || s.entries[0].seconds === secs);
@@ -669,9 +633,7 @@ async function editSyncTests(browser) {
 
   await page.getByRole('button', { name: 'Continuer' }).click();
   await page.getByRole('button', { name: 'Réglages' }).click();
-  await page.locator('#acctEmail').fill('moi@example.com');
-  await page.locator('#acctPass').fill('motdepasse');
-  await page.getByRole('button', { name: 'Créer un compte' }).click();
+  await signInAs(page, 'modif-test');
   await page.waitForSelector('#syncStatus');
   await page.waitForFunction(() => !window.t2r.state.sync.busy && window.t2r.state.sync.last);
   await page.getByRole('button', { name: 'Retour' }).click();
@@ -685,7 +647,8 @@ async function editSyncTests(browser) {
   await dlg.getByRole('button', { name: 'Enregistrer' }).click();
   await dlg.waitFor({ state: 'detached' });
   await settled(1, 600);
-  check(db.rows.length === 1 && db.rows[0].seconds === 600 && db.rows[0].time === '09:15' && db.rows[0].date === '2026-10-29', 'entrée ajoutée à la main : envoyée au serveur');
+  const row = db.of('modif-test')[0];
+  check(db.rows.length === 1 && row.seconds === 600 && row.time === '09:15' && row.date === '2026-10-29', 'entrée ajoutée à la main : envoyée au serveur');
 
   // modification : la ligne du serveur est mise à jour, sans doublon
   await editFirst(20);
@@ -704,119 +667,20 @@ async function editSyncTests(browser) {
   check(new Set(ids).size === ids.length && ids.length === 1, 'pas de doublon local après une modification pendant la synchro');
   check(db.rows.length === 1 && db.rows[0].seconds === 2700, 'modification faite pendant un envoi : renvoyée juste après (serveur à 45 min)');
 
-  check(errors.length === 0, `aucune erreur console (${errors.join(' | ')})`);
-  await context.close();
-}
-
-/** « Mot de passe oublié » : demande par e-mail, retour du lien, nouveau mot de passe. */
-async function recoveryTests(browser) {
-  const db = makeMockSupabase();
-  const cfg = "window.T2R_CONFIG = { supabaseUrl: 'https://mock.supabase.test', supabaseKey: 'sb_publishable_test' };";
-  const context = await browser.newContext({ timezoneId: 'Europe/Brussels', locale: 'fr-BE', viewport: { width: 420, height: 900 } });
-  await context.addInitScript(initScript('2026-10-29T10:00:00+01:00'));
-  await context.route('**/config.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript', body: cfg }));
-  await context.route('https://mock.supabase.test/**', db.handler);
-  const page = await context.newPage();
-  const errors = [];
-  page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
-  page.on('console', (m) => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) errors.push(`console: ${m.text()}`); });
-
-  // un compte existant, avec un break déjà envoyé
-  await page.goto(BASE);
-  await page.getByRole('button', { name: 'Continuer' }).click();
-  await page.getByRole('button', { name: 'Réglages' }).click();
-  await page.locator('#acctEmail').fill('moi@example.com');
-  await page.locator('#acctPass').fill('ancienmdp');
-  await page.getByRole('button', { name: 'Créer un compte' }).click();
-  await page.waitForSelector('#syncStatus');
+  // déconnexion pendant un envoi lent : l'historique ne « revient » pas après la déconnexion
+  db.delayPost = 1200;
+  const before2 = posts();
+  await editFirst(50);
+  await waitFor(() => posts() > before2);
   await page.getByRole('button', { name: 'Retour' }).click();
-  await page.locator('.start').click();
-  await advance(page, 61000);
-  await page.locator('.start').click();
-  await page.waitForFunction(() => window.t2r.state.entries.length === 1 && window.t2r.state.entries[0].synced, null, { timeout: 8000 });
   await page.getByRole('button', { name: 'Réglages' }).click();
   await page.getByRole('button', { name: 'Se déconnecter' }).click();
   await page.locator('.dlg').getByRole('button', { name: 'Se déconnecter' }).click();
-  await page.waitForSelector('#acctEmail');
-
-  // 1. demande du lien
-  await page.locator('#acctEmail').fill('moi@example.com');
-  await page.getByRole('button', { name: 'Mot de passe oublié' }).click();
-  eq(await page.locator('#acctEmail').inputValue(), 'moi@example.com', "l'adresse déjà tapée est reprise");
-  await page.locator('#acctEmail').fill('pas-une-adresse');
-  await page.getByRole('button', { name: 'Envoyer le lien' }).click();
-  check(db.recoveries.length === 0 && await page.locator('#acctEmail').evaluate((el) => !el.checkValidity()), "adresse mal écrite : refusée par le navigateur, rien n'est envoyé");
-  await page.locator('#acctEmail').fill('');
-  await page.getByRole('button', { name: 'Envoyer le lien' }).click();
-  check((await text(page, '#acctMsg')).includes('adresse e-mail') && db.recoveries.length === 0, 'adresse vide refusée avec un message');
-  await page.locator('#acctEmail').fill('moi@example.com');
-  await page.getByRole('button', { name: 'Envoyer le lien' }).click();
-  await page.waitForFunction(() => document.getElementById('acctMsg').textContent.includes('e-mail vient d'));
-  eq(db.recoveries.length, 1, 'une demande envoyée au serveur');
-  check(db.recoveries[0].email === 'moi@example.com' && db.recoveries[0].redirect === BASE, `adresse de retour = la page elle-même (${db.recoveries[0].redirect})`);
-  check(!(await text(page, '#acctMsg')).includes('existe pas'), "le message ne révèle pas si l'adresse a un compte");
-  await page.getByRole('button', { name: 'Retour à la connexion' }).click();
-  check(await page.locator('#acctPass').isVisible(), 'retour au formulaire de connexion');
-
-  // 2. clic sur le lien reçu par e-mail : la page s'ouvre avec les jetons après le #
-  const user = [...db.users.values()][0];
-  db.tokens.set('rec-token-1', user.id);
-  db.refresh.set('rec-refresh-1', user.id);
-  await page.goto(`${BASE}?lien=1#access_token=rec-token-1&refresh_token=rec-refresh-1&expires_in=3600&token_type=bearer&type=recovery`);
-  await page.waitForSelector('#newPass');
-  eq(new URL(page.url()).hash, '', "les jetons sont retirés de l'adresse aussitôt");
-  check((await text(page, '#acctCard')).includes('nouveau mot de passe'), 'formulaire « nouveau mot de passe »');
-  await page.locator('#newPass').fill('abc');
-  await page.locator('#newPass2').fill('abc');
-  await page.getByRole('button', { name: 'Enregistrer' }).click();
-  check((await text(page, '#acctMsg')).includes('trop court'), 'mot de passe trop court refusé');
-  await page.locator('#newPass').fill('nouveaumdp');
-  await page.locator('#newPass2').fill('autrechose');
-  await page.getByRole('button', { name: 'Enregistrer' }).click();
-  check((await text(page, '#acctMsg')).includes('pas identiques'), 'deux saisies différentes refusées');
-  await page.locator('#newPass2').fill('nouveaumdp');
-  await page.getByRole('button', { name: 'Enregistrer' }).click();
-  await page.waitForFunction(() => document.getElementById('acctCard').textContent.includes('Connecté : moi@example.com'), null, { timeout: 8000 });
-  eq(user.password, 'nouveaumdp', 'le mot de passe est changé sur le serveur');
-  check((await text(page, '#toast')).includes('Mot de passe modifié'), 'message de confirmation');
-  await page.waitForFunction(() => window.t2r.state.entries.length === 1, null, { timeout: 8000 });
-  check(true, "connecté directement : l'historique du compte est récupéré");
-
-  // 3. l'ancien mot de passe ne marche plus, le nouveau oui
-  await page.getByRole('button', { name: 'Se déconnecter' }).click();
-  await page.locator('.dlg').getByRole('button', { name: 'Se déconnecter' }).click();
-  await page.waitForSelector('#acctEmail');
-  await page.locator('#acctEmail').fill('moi@example.com');
-  await page.locator('#acctPass').fill('ancienmdp');
-  await page.getByRole('button', { name: 'Se connecter', exact: true }).click();
-  await page.waitForFunction(() => document.getElementById('acctMsg').textContent.includes('incorrect'), null, { timeout: 8000 });
-  await page.locator('#acctPass').fill('nouveaumdp');
-  await page.getByRole('button', { name: 'Se connecter', exact: true }).click();
-  await page.waitForFunction(() => window.t2r.state.session !== null, null, { timeout: 8000 });
-  check(true, 'ancien mot de passe refusé, nouveau accepté');
-
-  // 4. lien déjà utilisé / expiré (erreur renvoyée dans l'adresse) et jeton refusé
-  await page.getByRole('button', { name: 'Se déconnecter' }).click();
-  await page.locator('.dlg').getByRole('button', { name: 'Se déconnecter' }).click();
-  await page.waitForSelector('#acctEmail');
-  await page.goto(`${BASE}?lien=2#error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid+or+has+expired`);
-  await page.waitForSelector('#acctMsg');
-  check((await text(page, '#acctMsg')).includes('expiré'), 'lien expiré : message clair');
-  eq(new URL(page.url()).hash, '', "adresse nettoyée aussi en cas d'erreur");
-  await page.goto(`${BASE}?lien=3#access_token=jeton-inconnu&refresh_token=x&expires_in=3600&type=recovery`);
-  await page.waitForSelector('#newPass');
-  await page.locator('#newPass').fill('encoreunautre');
-  await page.locator('#newPass2').fill('encoreunautre');
-  await page.getByRole('button', { name: 'Enregistrer' }).click();
-  await page.waitForFunction(() => document.getElementById('acctMsg') && document.getElementById('acctMsg').textContent.includes('expiré'), null, { timeout: 8000 });
-  check(true, 'jeton refusé par le serveur : retour à la connexion avec un message');
-  await page.waitForFunction(() => !document.getElementById('newPass'));
-
-  // 5. néerlandais
-  await page.evaluate(() => { localStorage.setItem('t2r.prefs', JSON.stringify({ ...JSON.parse(localStorage.getItem('t2r.prefs')), lang: 'nl' })); });
-  await page.goto(BASE);
-  await page.getByRole('button', { name: 'Instellingen' }).click();
-  check(await page.getByRole('button', { name: 'Wachtwoord vergeten?' }).isVisible(), 'néerlandais : « Wachtwoord vergeten? »');
+  await page.waitForSelector('#acctName');
+  await page.waitForTimeout(2000); // le temps que l'envoi lent se termine
+  db.delayPost = 0;
+  eq(await page.evaluate(() => window.t2r.state.entries.length), 0, "déconnecté pendant une synchro : l'historique n'est pas ré-affiché");
+  eq(await page.evaluate(() => window.t2r.state.session), null, 'toujours déconnecté');
 
   check(errors.length === 0, `aucune erreur console (${errors.join(' | ')})`);
   await context.close();
