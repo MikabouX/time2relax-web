@@ -411,6 +411,9 @@ async function main() {
 
     console.log('H. Synchronisation des ajouts et modifications');
     await editSyncTests(browser);
+
+    console.log('I. Mot de passe oublié');
+    await recoveryTests(browser);
   } finally {
     await browser.close();
     server.kill();
@@ -421,7 +424,7 @@ async function main() {
 
 /* ---------- Faux Supabase en mémoire ---------- */
 function makeMockSupabase() {
-  const db = { users: new Map(), tokens: new Map(), refresh: new Map(), rows: [], log: [] };
+  const db = { users: new Map(), tokens: new Map(), refresh: new Map(), rows: [], log: [], recoveries: [] };
   const cors = {
     'access-control-allow-origin': '*',
     'access-control-allow-headers': 'apikey, authorization, content-type, prefer, x-client-info',
@@ -465,6 +468,19 @@ function makeMockSupabase() {
       return json(200, issue(db.users.get(uid), db.expiresIn));
     }
     if (url.pathname === '/auth/v1/logout') return route.fulfill({ status: 204, headers: cors });
+    if (url.pathname === '/auth/v1/recover') {
+      db.recoveries.push({ email: body.email, redirect: url.searchParams.get('redirect_to') });
+      return json(200, {}); // même réponse que le compte existe ou non
+    }
+    if (url.pathname === '/auth/v1/user' && req.method() === 'PUT') {
+      const uid = db.tokens.get((h.authorization || '').replace('Bearer ', ''));
+      if (!uid) return json(401, { code: 401, error_code: 'bad_jwt', msg: 'invalid JWT: unable to parse or verify signature, token is expired' });
+      const user = db.users.get(uid);
+      if (body.password === user.password) return json(422, { code: 422, error_code: 'same_password', msg: 'New password should be different from the old password.' });
+      if (String(body.password).length < 6) return json(422, { code: 422, error_code: 'weak_password', msg: 'Password should be at least 6 characters.' });
+      user.password = body.password;
+      return json(200, { id: user.id, email: user.email });
+    }
 
     if (url.pathname === '/rest/v1/breaks') {
       const auth = (h.authorization || '').replace('Bearer ', '');
@@ -687,6 +703,120 @@ async function editSyncTests(browser) {
   const ids = await page.evaluate(() => window.t2r.state.entries.map((e) => e.id));
   check(new Set(ids).size === ids.length && ids.length === 1, 'pas de doublon local après une modification pendant la synchro');
   check(db.rows.length === 1 && db.rows[0].seconds === 2700, 'modification faite pendant un envoi : renvoyée juste après (serveur à 45 min)');
+
+  check(errors.length === 0, `aucune erreur console (${errors.join(' | ')})`);
+  await context.close();
+}
+
+/** « Mot de passe oublié » : demande par e-mail, retour du lien, nouveau mot de passe. */
+async function recoveryTests(browser) {
+  const db = makeMockSupabase();
+  const cfg = "window.T2R_CONFIG = { supabaseUrl: 'https://mock.supabase.test', supabaseKey: 'sb_publishable_test' };";
+  const context = await browser.newContext({ timezoneId: 'Europe/Brussels', locale: 'fr-BE', viewport: { width: 420, height: 900 } });
+  await context.addInitScript(initScript('2026-10-29T10:00:00+01:00'));
+  await context.route('**/config.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript', body: cfg }));
+  await context.route('https://mock.supabase.test/**', db.handler);
+  const page = await context.newPage();
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
+  page.on('console', (m) => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) errors.push(`console: ${m.text()}`); });
+
+  // un compte existant, avec un break déjà envoyé
+  await page.goto(BASE);
+  await page.getByRole('button', { name: 'Continuer' }).click();
+  await page.getByRole('button', { name: 'Réglages' }).click();
+  await page.locator('#acctEmail').fill('moi@example.com');
+  await page.locator('#acctPass').fill('ancienmdp');
+  await page.getByRole('button', { name: 'Créer un compte' }).click();
+  await page.waitForSelector('#syncStatus');
+  await page.getByRole('button', { name: 'Retour' }).click();
+  await page.locator('.start').click();
+  await advance(page, 61000);
+  await page.locator('.start').click();
+  await page.waitForFunction(() => window.t2r.state.entries.length === 1 && window.t2r.state.entries[0].synced, null, { timeout: 8000 });
+  await page.getByRole('button', { name: 'Réglages' }).click();
+  await page.getByRole('button', { name: 'Se déconnecter' }).click();
+  await page.locator('.dlg').getByRole('button', { name: 'Se déconnecter' }).click();
+  await page.waitForSelector('#acctEmail');
+
+  // 1. demande du lien
+  await page.locator('#acctEmail').fill('moi@example.com');
+  await page.getByRole('button', { name: 'Mot de passe oublié' }).click();
+  eq(await page.locator('#acctEmail').inputValue(), 'moi@example.com', "l'adresse déjà tapée est reprise");
+  await page.locator('#acctEmail').fill('pas-une-adresse');
+  await page.getByRole('button', { name: 'Envoyer le lien' }).click();
+  check(db.recoveries.length === 0 && await page.locator('#acctEmail').evaluate((el) => !el.checkValidity()), "adresse mal écrite : refusée par le navigateur, rien n'est envoyé");
+  await page.locator('#acctEmail').fill('');
+  await page.getByRole('button', { name: 'Envoyer le lien' }).click();
+  check((await text(page, '#acctMsg')).includes('adresse e-mail') && db.recoveries.length === 0, 'adresse vide refusée avec un message');
+  await page.locator('#acctEmail').fill('moi@example.com');
+  await page.getByRole('button', { name: 'Envoyer le lien' }).click();
+  await page.waitForFunction(() => document.getElementById('acctMsg').textContent.includes('e-mail vient d'));
+  eq(db.recoveries.length, 1, 'une demande envoyée au serveur');
+  check(db.recoveries[0].email === 'moi@example.com' && db.recoveries[0].redirect === BASE, `adresse de retour = la page elle-même (${db.recoveries[0].redirect})`);
+  check(!(await text(page, '#acctMsg')).includes('existe pas'), "le message ne révèle pas si l'adresse a un compte");
+  await page.getByRole('button', { name: 'Retour à la connexion' }).click();
+  check(await page.locator('#acctPass').isVisible(), 'retour au formulaire de connexion');
+
+  // 2. clic sur le lien reçu par e-mail : la page s'ouvre avec les jetons après le #
+  const user = [...db.users.values()][0];
+  db.tokens.set('rec-token-1', user.id);
+  db.refresh.set('rec-refresh-1', user.id);
+  await page.goto(`${BASE}?lien=1#access_token=rec-token-1&refresh_token=rec-refresh-1&expires_in=3600&token_type=bearer&type=recovery`);
+  await page.waitForSelector('#newPass');
+  eq(new URL(page.url()).hash, '', "les jetons sont retirés de l'adresse aussitôt");
+  check((await text(page, '#acctCard')).includes('nouveau mot de passe'), 'formulaire « nouveau mot de passe »');
+  await page.locator('#newPass').fill('abc');
+  await page.locator('#newPass2').fill('abc');
+  await page.getByRole('button', { name: 'Enregistrer' }).click();
+  check((await text(page, '#acctMsg')).includes('trop court'), 'mot de passe trop court refusé');
+  await page.locator('#newPass').fill('nouveaumdp');
+  await page.locator('#newPass2').fill('autrechose');
+  await page.getByRole('button', { name: 'Enregistrer' }).click();
+  check((await text(page, '#acctMsg')).includes('pas identiques'), 'deux saisies différentes refusées');
+  await page.locator('#newPass2').fill('nouveaumdp');
+  await page.getByRole('button', { name: 'Enregistrer' }).click();
+  await page.waitForFunction(() => document.getElementById('acctCard').textContent.includes('Connecté : moi@example.com'), null, { timeout: 8000 });
+  eq(user.password, 'nouveaumdp', 'le mot de passe est changé sur le serveur');
+  check((await text(page, '#toast')).includes('Mot de passe modifié'), 'message de confirmation');
+  await page.waitForFunction(() => window.t2r.state.entries.length === 1, null, { timeout: 8000 });
+  check(true, "connecté directement : l'historique du compte est récupéré");
+
+  // 3. l'ancien mot de passe ne marche plus, le nouveau oui
+  await page.getByRole('button', { name: 'Se déconnecter' }).click();
+  await page.locator('.dlg').getByRole('button', { name: 'Se déconnecter' }).click();
+  await page.waitForSelector('#acctEmail');
+  await page.locator('#acctEmail').fill('moi@example.com');
+  await page.locator('#acctPass').fill('ancienmdp');
+  await page.getByRole('button', { name: 'Se connecter', exact: true }).click();
+  await page.waitForFunction(() => document.getElementById('acctMsg').textContent.includes('incorrect'), null, { timeout: 8000 });
+  await page.locator('#acctPass').fill('nouveaumdp');
+  await page.getByRole('button', { name: 'Se connecter', exact: true }).click();
+  await page.waitForFunction(() => window.t2r.state.session !== null, null, { timeout: 8000 });
+  check(true, 'ancien mot de passe refusé, nouveau accepté');
+
+  // 4. lien déjà utilisé / expiré (erreur renvoyée dans l'adresse) et jeton refusé
+  await page.getByRole('button', { name: 'Se déconnecter' }).click();
+  await page.locator('.dlg').getByRole('button', { name: 'Se déconnecter' }).click();
+  await page.waitForSelector('#acctEmail');
+  await page.goto(`${BASE}?lien=2#error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid+or+has+expired`);
+  await page.waitForSelector('#acctMsg');
+  check((await text(page, '#acctMsg')).includes('expiré'), 'lien expiré : message clair');
+  eq(new URL(page.url()).hash, '', "adresse nettoyée aussi en cas d'erreur");
+  await page.goto(`${BASE}?lien=3#access_token=jeton-inconnu&refresh_token=x&expires_in=3600&type=recovery`);
+  await page.waitForSelector('#newPass');
+  await page.locator('#newPass').fill('encoreunautre');
+  await page.locator('#newPass2').fill('encoreunautre');
+  await page.getByRole('button', { name: 'Enregistrer' }).click();
+  await page.waitForFunction(() => document.getElementById('acctMsg') && document.getElementById('acctMsg').textContent.includes('expiré'), null, { timeout: 8000 });
+  check(true, 'jeton refusé par le serveur : retour à la connexion avec un message');
+  await page.waitForFunction(() => !document.getElementById('newPass'));
+
+  // 5. néerlandais
+  await page.evaluate(() => { localStorage.setItem('t2r.prefs', JSON.stringify({ ...JSON.parse(localStorage.getItem('t2r.prefs')), lang: 'nl' })); });
+  await page.goto(BASE);
+  await page.getByRole('button', { name: 'Instellingen' }).click();
+  check(await page.getByRole('button', { name: 'Wachtwoord vergeten?' }).isVisible(), 'néerlandais : « Wachtwoord vergeten? »');
 
   check(errors.length === 0, `aucune erreur console (${errors.join(' | ')})`);
   await context.close();

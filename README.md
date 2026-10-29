@@ -36,12 +36,31 @@ et l'historique se retrouve si le navigateur est vidé ou sur un autre ordinateu
 5. (Optionnel) *Authentication → Providers → Email* : désactiver « Confirm email » pour ne pas
    dépendre de l'envoi d'e-mails.
 
-Un projet gratuit est mis en pause par Supabase après une semaine sans activité.
+### Mot de passe oublié
+
+Le bouton « Mot de passe oublié ? » envoie un e-mail avec un lien ; le lien rouvre la page, qui
+demande un nouveau mot de passe. Deux réglages Supabase sont nécessaires :
+
+1. *Authentication → URL Configuration* : mettre l'adresse de la page (ex.
+   `https://mikaboux.github.io/time2relax-web/`) dans **Site URL** et dans **Redirect URLs**.
+   Sans cela, le lien de l'e-mail mène à `localhost`.
+2. **Envoi des e-mails.** Le service par défaut de Supabase ne livre qu'aux adresses des membres de
+   l'organisation Supabase (et au plus 2 messages par heure) : il suffit pour le propriétaire, pas
+   pour des collègues. Pour eux, configurer un serveur SMTP dans *Authentication → Emails → SMTP
+   Settings* (par exemple Brevo ou Resend, offres gratuites).
+
+### Garder le projet actif
+
+Un projet gratuit est mis en pause par Supabase après une semaine sans activité. La tâche
+`.github/workflows/keep-alive.yml` interroge la base une fois par jour avec la clé publique de
+`config.js`. Elle peut être lancée à la main (onglet *Actions* du dépôt). GitHub désactive les tâches
+planifiées d'un dépôt public sans aucune modification depuis 60 jours : il suffit alors de la
+réactiver dans l'onglet *Actions*.
 
 ## Tests
 
 `node tests/e2e.js` lance Chromium (Playwright) : chrono, alertes, historique (ajout, modification,
-suppression), mode nuit, vidage, import/export, néerlandais, compte et synchronisation (serveur simulé).
+suppression), mode nuit, vidage, import/export, néerlandais, compte, mot de passe oublié et synchronisation (serveur simulé).
 
 ## Fichiers
 
@@ -51,6 +70,6 @@ suppression), mode nuit, vidage, import/export, néerlandais, compte et synchron
 | `i18n.js` | textes français / néerlandais |
 | `store.js` | stockage local, journée de travail (mode nuit), import/export |
 | `timer.js` | chrono, minuteur, alertes, sons, notifications |
-| `sync.js` | compte et synchronisation (sans bibliothèque) |
+| `sync.js` | compte, mot de passe oublié et synchronisation (sans bibliothèque) |
 | `ui.js`, `main.js` | écrans et démarrage |
 | `sw.js`, `manifest.webmanifest` | utilisation hors-ligne et installation comme appli |

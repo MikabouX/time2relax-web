@@ -69,6 +69,7 @@ const S = {
   run: store.get('t2r.run', null),
   ui: Object.assign({ type: 'break', useTimer: false, pauseMinutes: 15 }, store.get('t2r.ui', {})),
   session: store.get('t2r.session', null),
+  recovery: null, // jetons reçus par le lien « mot de passe oublié » (gardés en mémoire seulement)
   sync: { busy: false, last: store.get('t2r.lastSync', null), error: '' },
 };
 

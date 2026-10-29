@@ -15,6 +15,17 @@
   }
   if (S.session && !S.session.refresh_token) S.session = null;
 
+  // Retour du lien « mot de passe oublié » : les jetons arrivent dans l'adresse (après le #), on les retire aussitôt.
+  if (syncEnabled()) {
+    const back = readAuthHash();
+    if (back) {
+      try { history.replaceState(null, '', location.pathname + location.search); } catch (_) { /* file:// restreint */ }
+      if (back.recovery) S.recovery = back.recovery;
+      else acctNotice = t('err_recovery_expired');
+      S.view = 'settings';
+    }
+  }
+
   if (!S.prefs.setupDone) S.view = 'settings';
   try { history.replaceState({ v: S.view, d: 0 }, ''); } catch (_) { /* file:// restreint */ }
 

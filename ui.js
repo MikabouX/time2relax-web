@@ -788,6 +788,7 @@ async function resetAll() {
   S.deleted = [];
   S.run = null;
   S.session = null;
+  S.recovery = null;
   S.ui = { type: 'break', useTimer: false, pauseMinutes: 15 };
   S.sync = { busy: false, last: null, error: '' };
   S.view = 'settings';
@@ -811,7 +812,87 @@ function syncStatusText() {
   return pending > 0 ? `${text} · ${t('sync_pending', { n: pending })}` : text;
 }
 
+let acctMode = 'in'; // 'in' : connexion ; 'forgot' : « mot de passe oublié »
+let acctNotice = ''; // message à montrer sur la carte de connexion (lien expiré…)
+let lastEmail = ''; // l'adresse tapée, reprise d'un écran à l'autre
+
+function refreshAcct() {
+  const old = document.getElementById('acctCard');
+  if (old) old.replaceWith(accountCard());
+}
+
+function recoveryErrorText(err) {
+  if (err.offline) return t('sync_offline');
+  if (err.status === 429 || err.code === 'over_email_send_rate_limit') return t('err_too_many');
+  if (err.code === 'email_address_not_authorized') return t('err_mail_not_ready');
+  return t('sync_error', { msg: err.message });
+}
+
+/** « Mot de passe oublié » : on envoie un lien par e-mail. */
+function forgotCard() {
+  const email = h('input', {
+    type: 'email', class: 'field', id: 'acctEmail', autocomplete: 'username', placeholder: t('email'), 'aria-label': t('email'),
+    value: lastEmail, on: { input: (e) => { lastEmail = e.target.value; } },
+  });
+  const msg = h('p', { class: 'small acct-msg', id: 'acctMsg', role: 'status' });
+  const send = async () => {
+    const e = email.value.trim();
+    if (!e.includes('@')) { msg.textContent = t('err_email'); return; }
+    msg.textContent = t('sync_busy');
+    try {
+      await sendRecovery(e);
+      msg.textContent = t('forgot_sent');
+    } catch (err) {
+      msg.textContent = recoveryErrorText(err);
+    }
+  };
+  return h('div', { class: 'card pad', id: 'acctCard' },
+    h('form', { class: 'acct-form', on: { submit: (ev) => { ev.preventDefault(); send(); } } },
+      h('div', { class: 'strong' }, t('forgot_title')),
+      h('p', { class: 'small muted' }, t('forgot_intro')),
+      email, msg,
+      h('div', { class: 'row' },
+        h('button', { type: 'submit', class: 'btn filled' }, t('forgot_send')),
+        h('button', { type: 'button', class: 'btn text', on: { click: () => { acctMode = 'in'; refreshAcct(); } } }, t('forgot_back')))));
+}
+
+/** Retour du lien reçu par e-mail : choix du nouveau mot de passe. */
+function recoveryCard() {
+  const p1 = h('input', { type: 'password', class: 'field', id: 'newPass', autocomplete: 'new-password', placeholder: t('new_pass'), 'aria-label': t('new_pass') });
+  const p2 = h('input', { type: 'password', class: 'field', id: 'newPass2', autocomplete: 'new-password', placeholder: t('new_pass2'), 'aria-label': t('new_pass2') });
+  const msg = h('p', { class: 'small acct-msg', id: 'acctMsg', role: 'status' });
+  const save = async () => {
+    if (p1.value.length < 6) { msg.textContent = t('err_pass_short'); return; }
+    if (p1.value !== p2.value) { msg.textContent = t('err_pass_match'); return; }
+    msg.textContent = t('sync_busy');
+    try {
+      await finishRecovery(S.recovery, p1.value);
+    } catch (err) {
+      if (err.offline) msg.textContent = t('sync_offline');
+      else if (err.code === 'same_password') msg.textContent = t('err_pass_same');
+      else if (err.code === 'weak_password') msg.textContent = t('sync_error', { msg: err.message });
+      else if (err.status === 401 || err.status === 403) { S.recovery = null; acctNotice = t('err_recovery_expired'); refreshAcct(); }
+      else msg.textContent = t('sync_error', { msg: err.message });
+      return;
+    }
+    S.recovery = null;
+    acctMode = 'in';
+    S.sync.error = '';
+    toast(t('pass_changed'));
+    refreshAcct();
+    syncNow();
+  };
+  return h('div', { class: 'card pad', id: 'acctCard' },
+    h('form', { class: 'acct-form', on: { submit: (ev) => { ev.preventDefault(); save(); } } },
+      h('div', { class: 'strong' }, t('new_pass_title')),
+      p1, p2, msg,
+      h('div', { class: 'row' },
+        h('button', { type: 'submit', class: 'btn filled' }, t('new_pass_save')),
+        h('button', { type: 'button', class: 'btn text', on: { click: () => { S.recovery = null; refreshAcct(); } } }, t('cancel')))));
+}
+
 function accountCard() {
+  if (S.recovery) return recoveryCard();
   if (S.session) {
     return h('div', { class: 'card pad', id: 'acctCard' },
       h('div', { class: 'strong acct-line' }, icon('cloud', 20), t('signed_as', { email: S.session.email })),
@@ -820,11 +901,16 @@ function accountCard() {
         h('button', { type: 'button', class: 'btn tonal', disabled: S.sync.busy, on: { click: () => syncNow() } }, t('sync_now')),
         h('button', { type: 'button', class: 'btn text', on: { click: doSignOut } }, t('sign_out'))));
   }
-  const email = h('input', { type: 'email', class: 'field', id: 'acctEmail', autocomplete: 'username', placeholder: t('email'), 'aria-label': t('email') });
+  if (acctMode === 'forgot') return forgotCard();
+  const email = h('input', {
+    type: 'email', class: 'field', id: 'acctEmail', autocomplete: 'username', placeholder: t('email'), 'aria-label': t('email'),
+    value: lastEmail, on: { input: (e) => { lastEmail = e.target.value; } },
+  });
   const pass = h('input', { type: 'password', class: 'field', id: 'acctPass', autocomplete: 'current-password', placeholder: t('password'), 'aria-label': t('password') });
-  const msg = h('p', { class: 'small acct-msg', id: 'acctMsg', role: 'status' }, S.sync.error === 'expired' ? t('sync_expired') : '');
+  const msg = h('p', { class: 'small acct-msg', id: 'acctMsg', role: 'status' }, acctNotice || (S.sync.error === 'expired' ? t('sync_expired') : ''));
 
   const attempt = async (mode) => {
+    acctNotice = '';
     const e = email.value.trim();
     const p = pass.value;
     if (!e.includes('@') || p.length < 6) { msg.textContent = t('err_fields'); return; }
@@ -850,7 +936,8 @@ function accountCard() {
     email, pass, msg,
     h('div', { class: 'row' },
       h('button', { type: 'submit', class: 'btn filled' }, t('sign_in')),
-      h('button', { type: 'button', class: 'btn tonal', on: { click: () => attempt('up') } }, t('sign_up'))));
+      h('button', { type: 'button', class: 'btn tonal', on: { click: () => attempt('up') } }, t('sign_up'))),
+    h('button', { type: 'button', class: 'btn text forgot', on: { click: () => { acctNotice = ''; acctMode = 'forgot'; refreshAcct(); } } }, t('forgot_link')));
   return h('div', { class: 'card pad', id: 'acctCard' }, form);
 }
 

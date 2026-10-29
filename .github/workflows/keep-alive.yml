@@ -1,0 +1,39 @@
+# Garde le projet Supabase (offre gratuite) actif : il est mis en pause après 7 jours sans activité.
+# Chaque jour, quelques lectures sont envoyées à la base avec la clé publique de config.js.
+# Lancement à la main : onglet « Actions » du dépôt → « Garder Supabase actif » → « Run workflow ».
+name: Garder Supabase actif
+
+on:
+  schedule:
+    - cron: '23 6 * * *' # tous les jours, 06:23 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Interroger la base
+        run: |
+          URL=$(sed -n "s/.*supabaseUrl: '\([^']*\)'.*/\1/p" config.js)
+          KEY=$(sed -n "s/.*supabaseKey: '\([^']*\)'.*/\1/p" config.js)
+          if [ -z "$URL" ] || [ -z "$KEY" ]; then
+            echo "config.js ne contient ni adresse ni clé : rien à faire."
+            exit 0
+          fi
+          for i in 1 2 3; do
+            code=$(curl -sS -o /tmp/reponse.txt -w '%{http_code}' --max-time 30 \
+              "$URL/rest/v1/breaks?select=id&limit=1" -H "apikey: $KEY")
+            echo "Essai $i : HTTP $code"
+            if [ "$code" != "200" ]; then
+              echo "Réponse du serveur :"
+              head -c 400 /tmp/reponse.txt
+              echo
+              exit 1
+            fi
+            sleep 3
+          done
+          echo "Projet Supabase joignable : activité enregistrée."

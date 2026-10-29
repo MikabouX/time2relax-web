@@ -109,6 +109,46 @@ async function rest(method, path, body, extraHeaders) {
   });
 }
 
+/** Envoie l'e-mail « mot de passe oublié » (la réponse est la même que l'adresse ait un compte ou non). */
+async function sendRecovery(email) {
+  const back = /^https?:$/.test(location.protocol) ? `?redirect_to=${encodeURIComponent(location.origin + location.pathname)}` : '';
+  await authRequest(`recover${back}`, { email });
+}
+
+/** Lit l'adresse de la page au retour du lien reçu par e-mail : { recovery } ou { error }, sinon null. */
+function readAuthHash() {
+  const raw = location.hash.startsWith('#') ? location.hash.slice(1) : '';
+  if (!raw.includes('=')) return null;
+  const p = new URLSearchParams(raw);
+  if (p.get('error') || p.get('error_code')) return { error: p.get('error_code') || p.get('error') };
+  if (p.get('type') === 'recovery' && p.get('access_token')) {
+    return {
+      recovery: {
+        access_token: p.get('access_token'),
+        refresh_token: p.get('refresh_token') || '',
+        expires_in: Number(p.get('expires_in')) || 3600,
+      },
+    };
+  }
+  return null;
+}
+
+/** Choisit le nouveau mot de passe avec le jeton du lien, puis ouvre la session. */
+async function finishRecovery(rec, password) {
+  const user = await sbFetch(`${SB.url}/auth/v1/user`, {
+    method: 'PUT',
+    headers: { apikey: SB.key, Authorization: `Bearer ${rec.access_token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password }),
+  });
+  if (S.session && S.session.user_id && user && user.id && S.session.user_id !== user.id) {
+    // Le lien appartient à un autre compte que celui resté ouvert ici : on n'envoie pas son historique à l'autre.
+    S.entries = [];
+    S.deleted = [];
+    saveEntries();
+  }
+  setSession({ access_token: rec.access_token, refresh_token: rec.refresh_token, expires_in: rec.expires_in, user });
+}
+
 async function signOut() {
   try {
     const token = S.session && S.session.access_token;
