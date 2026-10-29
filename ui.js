@@ -96,7 +96,7 @@ function hideToast() {
   if (box) box.classList.remove('show');
 }
 
-function toast(message, action) {
+function toast(message, action, ms) {
   const box = document.getElementById('toast');
   if (!box) return;
   box.replaceChildren(h('span', {}, message));
@@ -105,7 +105,7 @@ function toast(message, action) {
   }
   box.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(hideToast, action ? 8000 : 3500);
+  toastTimer = setTimeout(hideToast, ms || (action ? 8000 : 3500));
 }
 
 function openDialog(build) {
@@ -662,6 +662,7 @@ function settingsView() {
     h('p', { class: 'small muted note' }, t('order_note')),
 
     sectionTitle(t('sec_history')),
+    confirmStopCard(),
     nightCard(),
     h('div', { class: 'card pad' },
       h('div', { class: 'strong' }, t('backup_title')),
@@ -746,6 +747,23 @@ function deleteShop(i) {
   else if (i < S.prefs.shopIndex) S.prefs.shopIndex -= 1;
   savePrefs();
   render();
+}
+
+function confirmStopCard() {
+  const box = h('input', {
+    type: 'checkbox',
+    class: 'switch',
+    role: 'switch',
+    checked: S.prefs.confirmStop,
+    'aria-label': t('confirm_stop_title'),
+    on: { change: (e) => { S.prefs.confirmStop = e.target.checked; savePrefs(); } },
+  });
+  return h('div', { class: 'card' },
+    h('label', { class: 'switch-row pad' },
+      h('span', { class: 'grow' },
+        h('span', { class: 'strong block' }, t('confirm_stop_title')),
+        h('span', { class: 'small muted block' }, t('confirm_stop_note'))),
+      box));
 }
 
 function nightCard() {

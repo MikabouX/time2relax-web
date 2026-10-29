@@ -411,6 +411,9 @@ async function main() {
 
     console.log('H. Synchronisation des ajouts et modifications');
     await editSyncTests(browser);
+
+    console.log('I. Arrêt par erreur : Reprendre et confirmation');
+    await stopTests(browser);
   } finally {
     await browser.close();
     server.kill();
@@ -683,6 +686,77 @@ async function editSyncTests(browser) {
   db.delayPost = 0;
   eq(await page.evaluate(() => window.t2r.state.entries.length), 0, "déconnecté pendant une synchro : l'historique n'est pas ré-affiché");
   eq(await page.evaluate(() => window.t2r.state.session), null, 'toujours déconnecté');
+
+  check(errors.length === 0, `aucune erreur console (${errors.join(' | ')})`);
+  await context.close();
+}
+
+/** Un arrêt par erreur se rattrape (« Reprendre »), et la confirmation est facultative. */
+async function stopTests(browser) {
+  const db = makeMockSupabase();
+  const { page, context, errors } = await openWithMock(browser, db, '2026-10-29T10:00:00+01:00');
+  await page.getByRole('button', { name: 'Continuer' }).click();
+  await page.getByRole('button', { name: 'Réglages' }).click();
+  await signInAs(page, 'reprise-test');
+  await page.waitForFunction(() => !window.t2r.state.sync.busy && window.t2r.state.sync.last);
+  await page.getByRole('button', { name: 'Retour' }).click();
+  const entries = () => page.evaluate(() => window.t2r.state.entries);
+  const settled = () => page.waitForFunction(() => {
+    const s = window.t2r.state;
+    return !s.sync.busy && s.entries.every((e) => e.synced) && s.deleted.length === 0;
+  }, null, { timeout: 10000 });
+
+  // Un break de 3 minutes arrêté « par erreur »
+  await page.locator('.start').click();
+  const runId = await page.evaluate(() => window.t2r.state.run.id);
+  check(/^[0-9a-f-]{36}$/.test(runId), 'le chrono a un identifiant');
+  await advance(page, 180000);
+  await page.locator('.start').click();
+  check((await text(page, '#toast')).includes('Break enregistré : 03:00'), 'message « Break enregistré : 03:00 »');
+  check(await page.locator('#toast .toast-action', { hasText: 'Reprendre' }).isVisible(), "bouton « Reprendre » proposé dans le message");
+  let list = await entries();
+  check(list.length === 1 && list[0].id === runId && list[0].seconds === 180, "l'entrée porte l'identifiant du chrono");
+  await settled();
+  eq(db.of('reprise-test').length, 1, "l'entrée est déjà en ligne");
+
+  // 30 secondes plus tard : Reprendre
+  await advance(page, 30000);
+  await page.locator('#toast .toast-action').click();
+  check(await page.locator('.start.stop').isVisible(), 'le chrono tourne de nouveau');
+  eq(await text(page, '#ringBig'), '03:30', "il reprend avec son heure de départ d'origine (les 30 s d'arrêt comptent)");
+  eq((await entries()).length, 0, "l'entrée enregistrée par erreur est retirée");
+  await settled();
+  eq(db.of('reprise-test').length, 0, "…et retirée aussi en ligne");
+  eq(await page.evaluate(() => window.t2r.state.run.id), runId, 'même chrono (même identifiant)');
+
+  // Vrai arrêt : une seule entrée, avec le temps total
+  await advance(page, 90000);
+  await page.locator('.start').click();
+  list = await entries();
+  // (l'horloge de la page continue d'avancer en vrai pendant le test : quelques secondes de marge)
+  check(list.length === 1 && list[0].seconds >= 300 && list[0].seconds < 330 && list[0].id === runId, 'arrêt définitif : une seule entrée d\'environ 05:00, avec le temps total');
+  await settled();
+  check(db.of('reprise-test').length === 1 && db.of('reprise-test')[0].seconds === list[0].seconds, 'une seule ligne en ligne, même durée');
+
+  // Option « Confirmer avant de terminer »
+  await page.getByRole('button', { name: 'Réglages' }).click();
+  await page.locator('.switch-row', { hasText: 'Confirmer avant de terminer' }).click();
+  eq(await page.evaluate(() => window.t2r.state.prefs.confirmStop), true, 'option de confirmation activée');
+  await page.getByRole('button', { name: 'Retour' }).click();
+  await page.locator('.start').click();
+  await advance(page, 60000);
+  await page.locator('.start').click();
+  const dlg = page.locator('.dlg');
+  check((await dlg.innerText()).includes('Terminer le break ?') && (await dlg.innerText()).includes('01:00 écoulées'), 'fenêtre de confirmation avec le temps écoulé');
+  await dlg.getByRole('button', { name: 'Annuler' }).click();
+  await dlg.waitFor({ state: 'detached' });
+  check(await page.locator('.start.stop').isVisible(), '« Annuler » : le chrono continue');
+  eq((await entries()).length, 1, 'rien enregistré');
+  await page.locator('.start').click();
+  await dlg.getByRole('button', { name: 'Terminer' }).click();
+  await dlg.waitFor({ state: 'detached' });
+  eq((await entries()).length, 2, '« Terminer » : le break est enregistré');
+  check((await text(page, '#toast')).includes('Break enregistré'), 'message de confirmation après la fin');
 
   check(errors.length === 0, `aucune erreur console (${errors.join(' | ')})`);
   await context.close();

@@ -166,7 +166,7 @@ function updateTitle() {
 
 function beginRun() {
   const type = S.ui.type;
-  S.run = { start: Date.now(), type, planned: plannedFor(type) };
+  S.run = { id: uid(), start: Date.now(), type, planned: plannedFor(type) };
   saveRun();
   resetAlerts(false);
   ensureAudio();
@@ -175,24 +175,51 @@ function beginRun() {
   render();
 }
 
-function endRun() {
+async function endRun() {
   const r = S.run;
   if (!r) return;
+  if (S.prefs.confirmStop) {
+    const elapsed = Math.max(0, Math.floor((Date.now() - r.start) / 1000));
+    const ok = await confirmDialog({
+      title: t('stop_confirm_title', { type: typeLabel(r.type).toLowerCase(), Type: typeLabel(r.type) }),
+      body: t('stop_confirm_body', { dur: formatDuration(elapsed) }),
+      ok: t('stop_confirm_ok'),
+    });
+    if (!ok || S.run !== r) return; // « Annuler » : le chrono continue (ou il a déjà été terminé entre-temps)
+  }
   // Plafonné à 24 h (limite du serveur) : un chrono oublié pendant des jours ne doit pas bloquer la synchro.
   const seconds = Math.min(86400, Math.max(0, Math.floor((Date.now() - r.start) / 1000)));
   const s = new Date(r.start);
-  addEntry({
-    id: uid(),
+  // L'entrée porte l'identifiant du chrono : le terminer deux fois (ou depuis deux appareils) n'en crée qu'une.
+  const entry = {
+    id: r.id || uid(),
     date: dayKey(s),
     time: `${two(s.getHours())}:${two(s.getMinutes())}`,
     type: r.type,
     seconds,
     synced: false,
-  });
+  };
+  addEntry(entry);
   S.run = null;
   saveRun();
   stopTicker();
   render();
-  toast(t('saved_entry', { Type: typeLabel(r.type), dur: formatDuration(seconds) }));
+  // Un arrêt par erreur se rattrape : « Reprendre » annule l'enregistrement et relance le chrono là où il en était.
+  toast(t('saved_entry', { Type: typeLabel(r.type), dur: formatDuration(seconds) }),
+    { label: t('resume'), fn: () => resumeRun(entry.id, r) }, 15000);
+  scheduleSync();
+}
+
+/** Annule le dernier arrêt : l'entrée est retirée et le chrono repart avec son heure de départ d'origine. */
+function resumeRun(entryId, run) {
+  if (S.run) { toast(t('resume_busy')); return; }
+  removeEntries([entryId]);
+  S.run = run;
+  saveRun();
+  resetAlerts(true);
+  ensureAudio();
+  startTicker();
+  render();
+  toast(t('resumed', { Type: typeLabel(run.type) }));
   scheduleSync();
 }

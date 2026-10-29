@@ -47,6 +47,7 @@ function defaultPrefs() {
     shopIndex: 0,
     nightMode: false,
     nightCutoff: 12,
+    confirmStop: false,
     setupDone: false,
   };
 }
