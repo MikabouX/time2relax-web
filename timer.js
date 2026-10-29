@@ -178,7 +178,8 @@ function beginRun() {
 function endRun() {
   const r = S.run;
   if (!r) return;
-  const seconds = Math.max(0, Math.floor((Date.now() - r.start) / 1000));
+  // Plafonné à 24 h (limite du serveur) : un chrono oublié pendant des jours ne doit pas bloquer la synchro.
+  const seconds = Math.min(86400, Math.max(0, Math.floor((Date.now() - r.start) / 1000)));
   const s = new Date(r.start);
   addEntry({
     id: uid(),

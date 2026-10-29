@@ -450,7 +450,7 @@ function makeMockSupabase() {
     if (m[1] === 't2r_save') {
       if (db.delayPost) await new Promise((r) => setTimeout(r, db.delayPost)); // serveur lent (test de modification pendant l'envoi)
       for (const r of body.p_rows) {
-        if (!/^\d{2}:\d{2}$/.test(r.time) || !['break', 'lunch'].includes(r.type)) return json(400, { code: '23514', message: 'check constraint' });
+        if (!/^\d{2}:\d{2}$/.test(r.time) || !['break', 'lunch'].includes(r.type) || !(r.seconds >= 0 && r.seconds <= 86400)) return json(400, { code: '23514', message: 'check constraint' });
         const i = db.rows.findIndex((x) => x.id === r.id);
         if (i < 0) db.rows.push({ ...r, username: who });
         else if (db.rows[i].username === who) db.rows[i] = { ...r, username: who }; // l'entrée d'un autre nom n'est jamais touchée
@@ -583,14 +583,16 @@ async function syncTests(browser) {
     localStorage.setItem('t2r.prefs', JSON.stringify({ setupDone: true }));
     localStorage.setItem('t2r.session', JSON.stringify({ access_token: 'x', refresh_token: 'y', email: 'ancien@example.com', user_id: 'u' }));
     const mk = (time, i) => ({ id: `00000000-0000-4000-8000-00000000000${i}`, date: '2026-10-28', time, type: 'break', seconds: 600, synced: true });
-    localStorage.setItem('t2r.entries', JSON.stringify([mk('09:00', 1), mk('11:00', 2), mk('15:00', 3)]));
+    // la 4e est un ancien chrono oublié pendant des jours : plus de 24 h, refusé tel quel par le serveur
+    localStorage.setItem('t2r.entries', JSON.stringify([mk('09:00', 1), mk('11:00', 2), mk('15:00', 3), { ...mk('17:00', 4), seconds: 200000 }]));
   });
   await d.page.reload();
   eq(await d.page.evaluate(() => window.t2r.state.session), null, "ancienne session (e-mail) abandonnée");
   await d.page.getByRole('button', { name: 'Réglages' }).click();
   await signInAs(d.page, 'migration-1');
   await allSynced(d.page);
-  eq(db.of('migration-1').length, 3, "l'historique déjà présent dans le navigateur est envoyé sous le nouveau nom");
+  eq(db.of('migration-1').length, 4, "l'historique déjà présent dans le navigateur est envoyé sous le nouveau nom");
+  eq(Math.max(...db.of('migration-1').map((r) => r.seconds)), 86400, 'une durée de plus de 24 h est ramenée à 24 h (limite du serveur) au lieu de bloquer la synchro');
 
   // Serveur injoignable
   const e = await open('2026-10-30T09:00:00+01:00');

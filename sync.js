@@ -96,6 +96,8 @@ async function syncNow() {
     }
     // 2. nouvelles entrées et modifications (« upsert » côté serveur : renvoyer deux fois la même est sans danger)
     const pending = S.entries.filter((e) => !e.synced);
+    // Le serveur refuse plus de 24 h (anciennes entrées d'un chrono oublié) : on ramène à 24 h.
+    pending.forEach((e) => { if (e.seconds > 86400) e.seconds = 86400; });
     for (let i = 0; i < pending.length; i += 200) {
       const part = pending.slice(i, i + 200);
       const rows = part.map((e) => ({ id: e.id, date: e.date, time: e.time, type: e.type, seconds: e.seconds }));
