@@ -1,0 +1,795 @@
+'use strict';
+
+/* ---------- Petits utilitaires DOM (jamais d'innerHTML avec du texte saisi) ---------- */
+
+function h(tag, props, ...kids) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(props || {})) {
+    if (v === false || v === null || v === undefined) continue;
+    if (k === 'class') e.className = v;
+    else if (k === 'on') Object.entries(v).forEach(([ev, fn]) => e.addEventListener(ev, fn));
+    else if (k === 'value') e.value = v;
+    else if (k === 'checked') e.checked = !!v;
+    else if (v === true) e.setAttribute(k, '');
+    else e.setAttribute(k, v);
+  }
+  for (const kid of kids.flat(Infinity)) {
+    if (kid === null || kid === undefined || kid === false) continue;
+    e.append(kid.nodeType ? kid : document.createTextNode(String(kid)));
+  }
+  return e;
+}
+
+// Icônes (Material Design) : chemins fixes écrits ici, jamais construits à partir de texte saisi.
+const ICONS = {
+  arrow_back: 'M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z',
+  more_vert: 'M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z',
+  history: 'M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z',
+  settings: 'M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z',
+  coffee: 'M18.5 3H6c-1.1 0-2 .9-2 2v5.71c0 3.83 2.95 7.18 6.78 7.29 3.96.12 7.22-3.06 7.22-7v-1h.5c1.93 0 3.5-1.57 3.5-3.5S20.43 3 18.5 3zM16 5v3H6V5h10zm2.5 3H18V5h.5c.83 0 1.5.67 1.5 1.5S19.33 8 18.5 8zM4 19h16v2H4z',
+  restaurant: 'M11 9H9V2H7v7H5V2H3v7c0 2.12 1.66 3.84 3.75 3.97V22h2.5v-9.03C11.34 12.84 13 11.12 13 9V2h-2v7zm5-3v8h2.5v8H21V2c-2.76 0-5 2.24-5 4z',
+  play: 'M8 5v14l11-7z',
+  stop: 'M6 6h12v12H6z',
+  directions: 'M21.71 11.29l-9-9a.996.996 0 0 0-1.41 0l-9 9a.996.996 0 0 0 0 1.41l9 9c.39.39 1.02.39 1.41 0l9-9a.996.996 0 0 0 0-1.41zM14 14.5V12h-4v3H8v-4c0-.55.45-1 1-1h5V7.5l3.5 3.5-3.5 3.5z',
+  bag: 'M18 6h-2c0-2.21-1.79-4-4-4S8 3.79 8 6H6c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-8 4c0 .55-.45 1-1 1s-1-.45-1-1V8h2v2zm2-6c1.1 0 2 .9 2 2h-4c0-1.1.9-2 2-2zm4 6c0 .55-.45 1-1 1s-1-.45-1-1V8h2v2z',
+  timer: 'M15 1H9v2h6V1zm-4 13h2V8h-2v6zm8.03-6.61l1.42-1.42c-.43-.51-.9-.99-1.41-1.41l-1.42 1.42C16.07 4.74 14.12 4 12 4c-4.97 0-9 4.03-9 9s4.02 9 9 9 9-4.03 9-9c0-2.12-.74-4.07-1.97-5.61zM12 20c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z',
+  schedule: 'M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z',
+  add: 'M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z',
+  edit: 'M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.996.996 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z',
+  delete: 'M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM8 9h8v10H8V9zm7.5-5l-1-1h-5l-1 1H5v2h14V4z',
+  delete_sweep: 'M15 16h4v2h-4zm0-8h7v2h-7zm0 4h6v2h-6zM3 18c0 1.1.9 2 2 2h6c1.1 0 2-.9 2-2V8H3v10zM14 5h-3l-1-1H6L5 5H2v2h12z',
+  delete_forever: 'M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zm2.46-7.12l1.41-1.41L12 12.59l2.12-2.12 1.41 1.41L13.41 14l2.12 2.12-1.41 1.41L12 15.41l-2.12 2.12-1.41-1.41L10.59 14l-2.13-2.12zM15.5 4l-1-1h-5l-1 1H5v2h14V4z',
+  warning: 'M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z',
+  home: 'M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z',
+  business: 'M12 7V3H2v18h20V7H12zM6 19H4v-2h2v2zm0-4H4v-2h2v2zm0-4H4V9h2v2zm0-4H4V5h2v2zm4 12H8v-2h2v2zm0-4H8v-2h2v2zm0-4H8V9h2v2zm0-4H8V5h2v2zm10 12h-8v-2h2v-2h-2v-2h2v-2h-2V9h8v10zm-2-8h-2v2h2v-2zm0 4h-2v2h2v-2z',
+  expand_more: 'M16.59 8.59L12 13.17 7.41 8.59 6 10l6 6 6-6z',
+  radio: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z',
+  check_circle: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z',
+  download: 'M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z',
+  upload: 'M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z',
+  cloud: 'M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z',
+};
+
+function icon(name, size) {
+  const px = size || 24;
+  const span = h('span', { class: 'ico', 'aria-hidden': 'true' });
+  span.innerHTML = `<svg viewBox="0 0 24 24" width="${px}" height="${px}" fill="currentColor"><path d="${ICONS[name] || ''}"/></svg>`;
+  return span;
+}
+
+const $app = document.getElementById('app');
+
+/** Adresse sûre pour un lien : uniquement http(s). */
+const safeUrl = (u) => (/^https?:\/\//i.test(String(u)) ? u : 'about:blank');
+
+/* ---------- Navigation (le bouton « précédent » du navigateur fonctionne) ---------- */
+
+let navDepth = 0;
+
+function go(view, push = true) {
+  if (S.view === view) return;
+  S.view = view;
+  if (push) navDepth += 1;
+  try {
+    // Sans « push », on remplace l'entrée courante : le bouton précédent reste cohérent.
+    if (push) history.pushState({ v: view, d: navDepth }, '');
+    else history.replaceState({ v: view, d: navDepth }, '');
+  } catch (_) { /* file:// restreint */ }
+  window.scrollTo(0, 0);
+  render();
+}
+
+function goBack() {
+  if (navDepth > 0) history.back();
+  else go('home', false);
+}
+
+window.addEventListener('popstate', (e) => {
+  navDepth = (e.state && e.state.d) || 0;
+  S.view = (e.state && e.state.v) || 'home';
+  render();
+});
+
+/* ---------- Message en bas d'écran, boîtes de dialogue ---------- */
+
+let toastTimer = null;
+
+function hideToast() {
+  const box = document.getElementById('toast');
+  if (box) box.classList.remove('show');
+}
+
+function toast(message, action) {
+  const box = document.getElementById('toast');
+  if (!box) return;
+  box.replaceChildren(h('span', {}, message));
+  if (action) {
+    box.append(h('button', { type: 'button', class: 'toast-action', on: { click: () => { hideToast(); action.fn(); } } }, action.label));
+  }
+  box.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(hideToast, action ? 8000 : 3500);
+}
+
+function openDialog(build) {
+  return new Promise((resolve) => {
+    const dlg = h('dialog', { class: 'dlg' });
+    const close = (value) => { dlg.close(); dlg.remove(); resolve(value); };
+    dlg.addEventListener('cancel', (e) => { e.preventDefault(); close(null); });
+    build(dlg, close);
+    document.body.append(dlg);
+    dlg.showModal();
+  });
+}
+
+function confirmDialog({ title, body, ok, danger }) {
+  return openDialog((dlg, close) => {
+    dlg.append(
+      icon('warning', 28),
+      h('h2', {}, title),
+      h('p', { class: 'dlg-body' }, body),
+      h('div', { class: 'dlg-actions' },
+        h('button', { type: 'button', class: 'btn text', on: { click: () => close(false) } }, t('cancel')),
+        h('button', { type: 'button', class: `btn filled${danger ? ' danger' : ''}`, on: { click: () => close(true) } }, ok)),
+    );
+  }).then((v) => v === true);
+}
+
+function shopDialog(initial) {
+  return openDialog((dlg, close) => {
+    const name = h('input', { type: 'text', class: 'field', value: initial ? initial.name : '', placeholder: t('shop_name'), 'aria-label': t('shop_name') });
+    const url = h('input', { type: 'url', class: 'field', value: initial ? initial.url : 'https://', placeholder: t('shop_link'), 'aria-label': t('shop_link') });
+    const submit = () => {
+      const n = name.value.trim();
+      let u = url.value.trim();
+      if (!n || !u || u === 'https://') return;
+      if (!/^https?:\/\//i.test(u)) u = `https://${u}`;
+      close({ name: n, url: u });
+    };
+    dlg.append(
+      h('h2', {}, initial ? t('shop_edit_title') : t('shop_add_title')),
+      h('div', { class: 'dlg-fields' }, name, url),
+      h('div', { class: 'dlg-actions' },
+        h('button', { type: 'button', class: 'btn text', on: { click: () => close(null) } }, t('cancel')),
+        h('button', { type: 'button', class: 'btn filled', on: { click: submit } }, t('ok'))),
+    );
+    [name, url].forEach((el) => el.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); }));
+  });
+}
+
+function pickShopDialog() {
+  return openDialog((dlg, close) => {
+    dlg.append(
+      h('h2', {}, t('pick_shop_title')),
+      h('div', { class: 'pick-list' }, S.prefs.shops.map((s, i) => h('button', {
+        type: 'button',
+        class: 'pick-item',
+        on: { click: () => close(i) },
+      }, icon(i === S.prefs.shopIndex ? 'check_circle' : 'radio', 22), h('span', {}, s.name)))),
+      h('div', { class: 'dlg-actions' }, h('button', { type: 'button', class: 'btn text', on: { click: () => close(null) } }, t('cancel'))),
+    );
+  });
+}
+
+/* ---------- Dessin de la page ---------- */
+
+function render() {
+  document.documentElement.lang = LANG;
+  let page;
+  if (S.view === 'history') page = historyView();
+  else if (S.view === 'settings') page = settingsView();
+  else page = homeView();
+  $app.replaceChildren(page);
+  if (S.view === 'home') updateRing(true);
+  updateTitle();
+}
+
+/** Appelé par la synchro quand son état change. */
+function onSyncChange() {
+  if (S.view === 'settings') {
+    const old = document.getElementById('acctCard');
+    if (old) old.replaceWith(accountCard());
+  } else {
+    render();
+  }
+}
+
+const iconBtn = (name, label, onClick, cls) => h('button', {
+  type: 'button', class: `icon-btn ${cls || ''}`, title: label, 'aria-label': label, on: { click: onClick },
+}, icon(name, 22));
+
+const chip = (label, selected, onClick) => h('button', {
+  type: 'button', class: `chip${selected ? ' on' : ''}`, 'aria-pressed': String(!!selected), on: { click: onClick },
+}, label);
+
+/* ---------- Accueil ---------- */
+
+const RING = 220;
+const STROKE = 13;
+const RADIUS = (RING - STROKE) / 2;
+const CIRC = 2 * Math.PI * RADIUS;
+
+function homeView() {
+  return h('div', { class: 'page' },
+    h('header', { class: 'top' },
+      h('div', { class: 'grow' },
+        h('div', { class: 'muted small' }, greeting()),
+        h('div', { class: 'date' }, capitalize(dateLong(new Date())))),
+      iconBtn('history', t('history'), () => go('history')),
+      iconBtn('settings', t('settings'), () => go('settings'))),
+    todayCard(),
+    typeSelector(),
+    ringBlock(),
+    h('div', { class: 'options' }, S.run ? runningInfo() : timerOptions()),
+    startButton(),
+    tilesRow());
+}
+
+function statBlock(iconName, label, agg) {
+  return h('div', { class: 'stat' },
+    h('span', { class: 'stat-ico' }, icon(iconName, 18)),
+    h('div', { class: 'stat-txt' },
+      h('div', { class: 'stat-label' }, agg.n === 0 ? label : `${label} · ${agg.n}`),
+      h('div', { class: 'stat-val' }, agg.n === 0 ? '—' : humanDuration(agg.s))));
+}
+
+function todayCard() {
+  const key = todayKey();
+  const tot = dayTotals(S.entries.filter((e) => workDay(e) === key));
+  return h('section', { class: 'today', id: 'todayCard' },
+    statBlock('coffee', t('stat_breaks'), tot.b),
+    h('div', { class: 'vsep' }),
+    statBlock('restaurant', t('stat_lunch'), tot.l));
+}
+
+function typeSelector() {
+  const running = !!S.run;
+  const current = running ? S.run.type : S.ui.type;
+  const seg = (value, label, ic) => h('button', {
+    type: 'button',
+    class: `seg${current === value ? ' on' : ''}`,
+    disabled: running,
+    on: { click: () => { S.ui.type = value; saveUi(); render(); } },
+  }, icon(ic, 20), h('span', {}, label));
+  return h('div', { class: `segs${running ? ' dim' : ''}` },
+    seg('break', t('type_break'), 'coffee'),
+    seg('lunch', t('type_lunch'), 'restaurant'));
+}
+
+function ringBlock() {
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('viewBox', `0 0 ${RING} ${RING}`);
+  svg.setAttribute('class', 'ring-svg');
+  const circle = (cls) => {
+    const c = document.createElementNS(ns, 'circle');
+    c.setAttribute('cx', RING / 2);
+    c.setAttribute('cy', RING / 2);
+    c.setAttribute('r', RADIUS);
+    c.setAttribute('fill', 'none');
+    c.setAttribute('stroke-width', STROKE);
+    c.setAttribute('class', cls);
+    return c;
+  };
+  const arc = circle('ring-arc');
+  arc.id = 'ringArc';
+  arc.setAttribute('stroke-linecap', 'round');
+  arc.setAttribute('stroke-dasharray', CIRC);
+  arc.setAttribute('transform', `rotate(-90 ${RING / 2} ${RING / 2})`);
+  svg.append(circle('ring-track'), arc);
+  const type = S.run ? S.run.type : S.ui.type;
+  return h('div', { class: 'ring', role: 'timer', 'aria-live': 'off' },
+    svg,
+    h('div', { class: 'ring-in' },
+      h('span', { id: 'ringIco', class: 'ring-ico' }, icon(type === 'lunch' ? 'restaurant' : 'coffee', 24)),
+      h('div', { id: 'ringBig', class: 'ring-big' }),
+      h('div', { id: 'ringCap', class: 'ring-cap' })));
+}
+
+/** Met à jour l'anneau et les chiffres, sans reconstruire la page. */
+function updateRing(initial) {
+  const arc = document.getElementById('ringArc');
+  if (!arc) return;
+  const st = ringState();
+  arc.classList.toggle('animate', !initial && st.hasTimer);
+  arc.style.strokeDashoffset = String(CIRC * (1 - st.progress));
+  arc.style.stroke = st.color;
+  arc.style.opacity = st.progress > 0 ? '1' : '0';
+  const alert = st.over || st.lastMinute;
+  const big = document.getElementById('ringBig');
+  const cap = document.getElementById('ringCap');
+  const ico = document.getElementById('ringIco');
+  if (big.textContent !== st.big) big.textContent = st.big;
+  if (cap.textContent !== st.cap) cap.textContent = st.cap;
+  big.style.color = alert ? st.color : '';
+  cap.style.color = alert ? st.color : '';
+  ico.style.color = st.color;
+}
+
+function runningInfo() {
+  const r = S.run;
+  const hm = (ms) => { const d = new Date(ms); return `${two(d.getHours())}:${two(d.getMinutes())}`; };
+  const line = r.planned > 0
+    ? t('run_timer', { start: hm(r.start), end: hm(r.start + r.planned * 1000) })
+    : t('run_nolimit', { start: hm(r.start) });
+  return h('div', { class: 'card info' }, icon('schedule', 20), h('span', {}, line));
+}
+
+function timerOptions() {
+  const lunch = S.ui.type === 'lunch';
+  const sub = lunch
+    ? t('lunch_fixed', { m: LUNCH_MINUTES })
+    : (S.ui.useTimer ? t('break_duration') : t('stopwatch_only'));
+  const box = h('input', {
+    type: 'checkbox',
+    class: 'switch',
+    role: 'switch',
+    checked: S.ui.useTimer,
+    'aria-label': t('timer_switch'),
+    on: {
+      change: (e) => {
+        S.ui.useTimer = e.target.checked;
+        saveUi();
+        if (S.ui.useTimer) { requestNotifPermission(); ensureAudio(); }
+        render();
+      },
+    },
+  });
+  const chips = lunch
+    ? [h('span', { class: 'chip on static' }, `${LUNCH_MINUTES} min`)]
+    : PAUSE_CHOICES.map((m) => chip(`${m} min`, S.ui.pauseMinutes === m, () => {
+      S.ui.pauseMinutes = m;
+      saveUi();
+      render();
+    }));
+  return h('div', { class: 'card timer-opts' },
+    h('label', { class: 'switch-row' },
+      icon('timer', 24),
+      h('span', { class: 'grow' },
+        h('span', { class: 'strong block' }, t('timer_switch')),
+        h('span', { class: 'small muted block' }, sub)),
+      box),
+    S.ui.useTimer ? h('div', { class: 'chips scroll' }, chips) : null);
+}
+
+function startButton() {
+  const running = !!S.run;
+  const name = typeLabel(running ? S.run.type : S.ui.type);
+  const vars = { type: name.toLowerCase(), Type: name };
+  return h('button', {
+    type: 'button',
+    class: `start${running ? ' stop' : ''}`,
+    on: { click: running ? endRun : beginRun },
+  }, icon(running ? 'stop' : 'play', 26), h('span', {}, t(running ? 'stop_btn' : 'start_btn', vars)));
+}
+
+const navName = () => (S.prefs.navApp === 'gmaps' ? 'Google Maps' : 'Waze');
+
+function routeUrl(addr) {
+  const q = encodeURIComponent(addr);
+  if (S.prefs.navApp === 'gmaps') {
+    return addr ? `https://www.google.com/maps/dir/?api=1&destination=${q}` : 'https://www.google.com/maps';
+  }
+  return addr ? `https://waze.com/ul?q=${q}&navigate=yes` : 'https://www.waze.com/live-map';
+}
+
+function tilesRow() {
+  const via = navName();
+  const link = (cls, href, ic, label, caption) => h('a', {
+    class: cls, href: safeUrl(href), target: '_blank', rel: 'noopener noreferrer',
+  }, icon(ic, 26), h('span', { class: 'tile-label' }, label), h('span', { class: 'tile-cap' }, caption));
+  const tiles = [];
+  const { homeAddr, workAddr } = S.prefs;
+  if (homeAddr) tiles.push(link('tile route', routeUrl(homeAddr), 'directions', t('to_home'), t('via', { app: via })));
+  if (workAddr) tiles.push(link('tile route', routeUrl(workAddr), 'directions', t('to_work'), t('via', { app: via })));
+  if (!homeAddr || !workAddr) tiles.push(link('tile route', routeUrl(''), 'directions', t('route'), t('with_app', { app: via })));
+  const shop = S.prefs.shops[S.prefs.shopIndex];
+  tiles.push(h('div', { class: 'tile-wrap' },
+    link('tile', shop.url, 'bag', t('order'), shop.name),
+    S.prefs.shops.length > 1
+      ? h('button', { type: 'button', class: 'tile-pick', title: t('pick_shop'), 'aria-label': t('pick_shop'), on: { click: choseShop } }, icon('expand_more', 18))
+      : null));
+  return h('div', { class: 'tiles' }, tiles);
+}
+
+async function choseShop() {
+  const i = await pickShopDialog();
+  if (i === null || i === undefined) return;
+  S.prefs.shopIndex = i;
+  savePrefs();
+  render();
+}
+
+/* ---------- Historique ---------- */
+
+function historyView() {
+  const entries = S.entries.slice().reverse();
+  const byDay = new Map();
+  entries.forEach((e) => {
+    const k = workDay(e);
+    if (!byDay.has(k)) byDay.set(k, []);
+    byDay.get(k).push(e);
+  });
+
+  const menu = h('div', { class: 'menu', id: 'histMenu', hidden: true },
+    menuItem('download', t('menu_export'), doExport),
+    menuItem('upload', t('menu_import'), pickImportFile),
+    h('hr', {}),
+    menuItem('delete_sweep', t('menu_clear_old'), () => clearHistory(true)),
+    menuItem('delete_forever', t('menu_clear_all'), () => clearHistory(false)));
+
+  const body = entries.length === 0
+    ? h('div', { class: 'empty' }, icon('history', 56), h('p', {}, t('history_empty')))
+    : [...byDay.entries()].map(([key, list]) => dayBlock(key, list));
+
+  return h('div', { class: 'page' },
+    h('header', { class: 'top' },
+      iconBtn('arrow_back', t('back'), goBack),
+      h('h1', { class: 'grow' }, t('history')),
+      h('div', { class: 'menu-wrap' }, iconBtn('more_vert', t('more'), toggleMenu), menu)),
+    body);
+}
+
+function menuItem(ic, label, fn) {
+  return h('button', { type: 'button', class: 'menu-item', on: { click: () => { closeMenu(); fn(); } } }, icon(ic, 20), h('span', {}, label));
+}
+
+function closeMenu() {
+  const m = document.getElementById('histMenu');
+  if (m) m.hidden = true;
+  document.removeEventListener('click', onDocClick, true);
+}
+
+function onDocClick(e) {
+  const m = document.getElementById('histMenu');
+  if (m && !m.contains(e.target) && !e.target.closest('.menu-wrap')) closeMenu();
+}
+
+function toggleMenu() {
+  const m = document.getElementById('histMenu');
+  if (!m) return;
+  if (m.hidden) {
+    m.hidden = false;
+    document.addEventListener('click', onDocClick, true);
+  } else {
+    closeMenu();
+  }
+}
+
+function dayBlock(key, list) {
+  const tot = dayTotals(list);
+  const totalChip = (ic, text, cls) => h('span', { class: `chip-total ${cls}` }, icon(ic, 14), text);
+  return h('section', { class: 'day' },
+    h('div', { class: 'day-head' },
+      h('span', { class: 'grow day-name' }, dayLabel(key)),
+      tot.b.n ? totalChip('coffee', humanDuration(tot.b.s), 'brk') : null,
+      tot.l.n ? totalChip('restaurant', humanDuration(tot.l.s), 'lun') : null),
+    list.map(entryRow));
+}
+
+function entryRow(e) {
+  const lunch = e.type === 'lunch';
+  return h('div', { class: 'entry' },
+    h('span', { class: `avatar ${lunch ? 'lun' : 'brk'}` }, icon(lunch ? 'restaurant' : 'coffee', 20)),
+    h('div', { class: 'grow' },
+      h('div', { class: 'strong' }, typeLabel(e.type)),
+      h('div', { class: 'small muted' }, t('at_time', { time: e.time }))),
+    h('span', { class: 'dur' }, formatDuration(e.seconds)),
+    iconBtn('delete', t('delete'), () => deleteEntry(e)));
+}
+
+function undoAction(removed) {
+  return {
+    label: t('undo'),
+    fn: () => { restoreEntries(removed); render(); scheduleSync(); },
+  };
+}
+
+function deleteEntry(e) {
+  const removed = removeEntries([e.id]);
+  render();
+  toast(t('deleted_entry', { Type: typeLabel(e.type) }), undoAction(removed));
+  scheduleSync();
+}
+
+/** Vide l'historique : tout, ou tout sauf la journée en cours (qui tient compte du mode nuit). */
+async function clearHistory(keepCurrentDay) {
+  const key = todayKey();
+  const doomed = S.entries.filter((e) => !keepCurrentDay || workDay(e) !== key);
+  const kept = S.entries.length - doomed.length;
+  if (doomed.length === 0) { toast(t('nothing_to_delete')); return; }
+  const parts = [];
+  if (keepCurrentDay) {
+    parts.push(t('clear_old_counts', { n: doomed.length, kept }));
+    if (S.prefs.nightMode) {
+      parts.push(t('clear_night_note', { day: dateLong(parseDay(key)), at: `${two(S.prefs.nightCutoff)}:00` }));
+    }
+  } else {
+    parts.push(t('clear_all_body', { n: doomed.length }));
+  }
+  if (syncEnabled() && S.session) parts.push(t('clear_account_note'));
+  const ok = await confirmDialog({
+    title: t(keepCurrentDay ? 'clear_old_title' : 'clear_all_title'),
+    body: parts.join('\n\n'),
+    ok: t('delete'),
+    danger: true,
+  });
+  if (!ok) return;
+  const removed = removeEntries(doomed.map((e) => e.id));
+  render();
+  toast(t('cleared', { n: removed.length }), undoAction(removed));
+  scheduleSync();
+}
+
+function doExport() {
+  const blob = new Blob([entriesToText()], { type: 'text/plain;charset=utf-8' });
+  const a = h('a', { href: URL.createObjectURL(blob), download: 'mes-breaks-historique.txt' });
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  toast(t('export_done'));
+}
+
+function pickImportFile() {
+  const input = h('input', { type: 'file', accept: '.txt,text/plain', hidden: true });
+  input.addEventListener('change', async () => {
+    const file = input.files && input.files[0];
+    input.remove();
+    if (!file) return;
+    const list = parseText(await file.text());
+    if (list.length === 0) { toast(t('import_none')); return; }
+    const { added, skipped } = importEntries(list);
+    render();
+    toast(t('import_result', { added, skipped }));
+    scheduleSync();
+  });
+  document.body.append(input);
+  input.click();
+}
+
+/* ---------- Réglages (enregistrés automatiquement) ---------- */
+
+const sectionTitle = (text) => h('h2', { class: 'sec-title' }, text);
+
+function settingsView() {
+  const first = !S.prefs.setupDone;
+  return h('div', { class: 'page' },
+    h('header', { class: 'top' },
+      first ? null : iconBtn('arrow_back', t('back'), goBack),
+      h('h1', { class: 'grow' }, first ? t('welcome_title') : t('settings'))),
+    h('p', { class: 'small muted note' }, t('settings_auto')),
+    first ? h('div', { class: 'banner' }, t('welcome_body')) : null,
+
+    sectionTitle(t('sec_lang')),
+    langCard(),
+
+    syncEnabled() ? [sectionTitle(t('sec_account')), accountCard()] : null,
+
+    sectionTitle(t('sec_routes')),
+    h('div', { class: 'stack' },
+      addressField(t('addr_home'), 'home', S.prefs.homeAddr, (v) => { S.prefs.homeAddr = v.trim(); savePrefs(); }),
+      addressField(t('addr_work'), 'business', S.prefs.workAddr, (v) => { S.prefs.workAddr = v.trim(); savePrefs(); })),
+    sectionTitle(t('sec_nav')),
+    h('div', { class: 'card pad' },
+      h('div', { class: 'chips' },
+        chip('Waze', S.prefs.navApp === 'waze', () => { S.prefs.navApp = 'waze'; savePrefs(); render(); }),
+        chip('Google Maps', S.prefs.navApp === 'gmaps', () => { S.prefs.navApp = 'gmaps'; savePrefs(); render(); })),
+      h('p', { class: 'small muted' }, t('nav_note'))),
+
+    sectionTitle(t('sec_order')),
+    shopsCard(),
+    h('p', { class: 'small muted note' }, t('order_note')),
+
+    sectionTitle(t('sec_history')),
+    nightCard(),
+    h('div', { class: 'card pad' },
+      h('div', { class: 'strong' }, t('backup_title')),
+      h('p', { class: 'small muted' }, t('backup_note')),
+      h('div', { class: 'row' },
+        h('button', { type: 'button', class: 'btn tonal', on: { click: doExport } }, icon('download', 18), t('btn_export')),
+        h('button', { type: 'button', class: 'btn tonal', on: { click: pickImportFile } }, icon('upload', 18), t('btn_import')))),
+
+    first
+      ? h('button', { type: 'button', class: 'start big', on: { click: () => { S.prefs.setupDone = true; savePrefs(); go('home', false); } } }, t('continue_btn'))
+      : [
+        sectionTitle(t('sec_danger')),
+        h('button', { type: 'button', class: 'btn danger-outline wide', on: { click: resetAll } }, icon('delete_forever', 20), t('reset_btn')),
+        h('p', { class: 'small muted note' }, t('reset_note')),
+      ],
+
+    h('p', { class: 'footer' }, `✦ ${t('footer')}`));
+}
+
+function langCard() {
+  const pick = (code) => () => {
+    LANG = code;
+    S.prefs.lang = code;
+    savePrefs();
+    render();
+  };
+  return h('div', { class: 'card pad' },
+    h('div', { class: 'chips' },
+      chip('Français', LANG === 'fr', pick('fr')),
+      chip('Nederlands', LANG === 'nl', pick('nl'))),
+    h('p', { class: 'small muted' }, t('lang_note')));
+}
+
+function addressField(label, ic, value, onInput) {
+  return h('label', { class: 'field-row' },
+    icon(ic, 20),
+    h('input', { type: 'text', class: 'field', value, placeholder: label, 'aria-label': label, autocomplete: 'street-address', on: { input: (e) => onInput(e.target.value) } }));
+}
+
+function shopsCard() {
+  const shops = S.prefs.shops;
+  const missing = SUGGESTIONS.filter((sg) => !shops.some((x) => x.name === sg.name));
+  return h('div', { class: 'card' },
+    shops.map((s, i) => h('div', { class: 'shop-row' },
+      h('button', {
+        type: 'button',
+        class: 'shop-main',
+        on: { click: () => { S.prefs.shopIndex = i; savePrefs(); render(); } },
+      },
+      icon(i === S.prefs.shopIndex ? 'check_circle' : 'radio', 22),
+      h('span', { class: 'shop-txt' }, h('span', { class: 'strong block' }, s.name), h('span', { class: 'small muted block ellipsis' }, s.url))),
+      iconBtn('edit', t('edit'), () => editShop(i)),
+      shops.length > 1 ? iconBtn('delete', t('delete'), () => deleteShop(i)) : null)),
+    missing.length
+      ? h('div', { class: 'pad' },
+        h('div', { class: 'small muted' }, t('suggestions')),
+        h('div', { class: 'chips' }, missing.map((sg) => h('button', {
+          type: 'button',
+          class: 'chip',
+          on: { click: () => { S.prefs.shops.push({ name: sg.name, url: sg.url }); savePrefs(); render(); } },
+        }, icon('add', 16), sg.name))))
+      : null,
+    h('div', { class: 'pad' }, h('button', { type: 'button', class: 'btn text', on: { click: addShop } }, icon('add', 18), t('add_site'))));
+}
+
+async function addShop() {
+  const shop = await shopDialog(null);
+  if (!shop) return;
+  S.prefs.shops.push(shop);
+  S.prefs.shopIndex = S.prefs.shops.length - 1;
+  savePrefs();
+  render();
+}
+
+async function editShop(i) {
+  const shop = await shopDialog(S.prefs.shops[i]);
+  if (!shop) return;
+  S.prefs.shops[i] = shop;
+  savePrefs();
+  render();
+}
+
+function deleteShop(i) {
+  const shops = S.prefs.shops;
+  if (shops.length <= 1) return;
+  shops.splice(i, 1);
+  if (S.prefs.shopIndex >= shops.length) S.prefs.shopIndex = shops.length - 1;
+  else if (i < S.prefs.shopIndex) S.prefs.shopIndex -= 1;
+  savePrefs();
+  render();
+}
+
+function nightCard() {
+  const box = h('input', {
+    type: 'checkbox',
+    class: 'switch',
+    role: 'switch',
+    checked: S.prefs.nightMode,
+    'aria-label': t('night_title'),
+    on: { change: (e) => { S.prefs.nightMode = e.target.checked; savePrefs(); render(); } },
+  });
+  return h('div', { class: 'card' },
+    h('label', { class: 'switch-row pad' },
+      h('span', { class: 'grow' },
+        h('span', { class: 'strong block' }, t('night_title')),
+        h('span', { class: 'small muted block' }, t('night_note'))),
+      box),
+    S.prefs.nightMode
+      ? h('div', { class: 'pad' },
+        h('div', { class: 'small' }, t('night_changes_at')),
+        h('div', { class: 'chips' }, [6, 8, 10, 12, 14, 16, 18].map((hh) => chip(`${two(hh)}:00`, S.prefs.nightCutoff === hh, () => {
+          S.prefs.nightCutoff = hh;
+          savePrefs();
+          render();
+        }))))
+      : null);
+}
+
+async function resetAll() {
+  const ok = await confirmDialog({ title: t('reset_title'), body: t('reset_body'), ok: t('reset_ok'), danger: true });
+  if (!ok) return;
+  stopTicker();
+  const lang = S.prefs.lang;
+  store.clearAll();
+  S.prefs = loadPrefs();
+  S.prefs.lang = lang;
+  S.prefs.setupDone = false;
+  savePrefs();
+  S.entries = [];
+  S.deleted = [];
+  S.run = null;
+  S.session = null;
+  S.ui = { type: 'break', useTimer: false, pauseMinutes: 15 };
+  S.sync = { busy: false, last: null, error: '' };
+  S.view = 'settings';
+  render();
+}
+
+/* ---------- Compte ---------- */
+
+function syncStatusText() {
+  const s = S.sync;
+  let text;
+  if (s.busy) text = t('sync_busy');
+  else if (s.error === 'offline') text = t('sync_offline');
+  else if (s.error === 'expired') text = t('sync_expired');
+  else if (s.error) text = t('sync_error', { msg: s.error });
+  else if (s.last) {
+    const d = new Date(s.last);
+    text = t('sync_last', { time: `${two(d.getHours())}:${two(d.getMinutes())}` });
+  } else text = t('sync_never');
+  const pending = pendingCount();
+  return pending > 0 ? `${text} · ${t('sync_pending', { n: pending })}` : text;
+}
+
+function accountCard() {
+  if (S.session) {
+    return h('div', { class: 'card pad', id: 'acctCard' },
+      h('div', { class: 'strong acct-line' }, icon('cloud', 20), t('signed_as', { email: S.session.email })),
+      h('p', { class: 'small muted', id: 'syncStatus' }, syncStatusText()),
+      h('div', { class: 'row' },
+        h('button', { type: 'button', class: 'btn tonal', disabled: S.sync.busy, on: { click: () => syncNow() } }, t('sync_now')),
+        h('button', { type: 'button', class: 'btn text', on: { click: doSignOut } }, t('sign_out'))));
+  }
+  const email = h('input', { type: 'email', class: 'field', id: 'acctEmail', autocomplete: 'username', placeholder: t('email'), 'aria-label': t('email') });
+  const pass = h('input', { type: 'password', class: 'field', id: 'acctPass', autocomplete: 'current-password', placeholder: t('password'), 'aria-label': t('password') });
+  const msg = h('p', { class: 'small acct-msg', id: 'acctMsg', role: 'status' }, S.sync.error === 'expired' ? t('sync_expired') : '');
+
+  const attempt = async (mode) => {
+    const e = email.value.trim();
+    const p = pass.value;
+    if (!e.includes('@') || p.length < 6) { msg.textContent = t('err_fields'); return; }
+    msg.textContent = t('sync_busy');
+    try {
+      if (mode === 'up') {
+        const r = await signUp(e, p);
+        if (r === 'confirm') { msg.textContent = t('confirm_mail'); return; }
+      } else {
+        await signIn(e, p);
+      }
+      S.sync.error = '';
+      syncNow(); // redessine la carte (connecté) dès le début de la synchro
+    } catch (err) {
+      if (err.offline) msg.textContent = t('sync_offline');
+      else if (mode === 'in' && (err.code === 'invalid_credentials' || err.status === 400)) msg.textContent = t('err_credentials');
+      else msg.textContent = t('sync_error', { msg: err.message });
+    }
+  };
+
+  const form = h('form', { class: 'acct-form', on: { submit: (ev) => { ev.preventDefault(); attempt('in'); } } },
+    h('p', { class: 'small muted' }, t('acct_intro')),
+    email, pass, msg,
+    h('div', { class: 'row' },
+      h('button', { type: 'submit', class: 'btn filled' }, t('sign_in')),
+      h('button', { type: 'button', class: 'btn tonal', on: { click: () => attempt('up') } }, t('sign_up'))));
+  return h('div', { class: 'card pad', id: 'acctCard' }, form);
+}
+
+async function doSignOut() {
+  await syncNow();
+  const pending = pendingCount();
+  const ok = await confirmDialog({
+    title: t('signout_title'),
+    body: [t('signout_body'), pending > 0 ? t('signout_pending', { n: pending }) : ''].filter(Boolean).join('\n\n'),
+    ok: t('sign_out'),
+    danger: pending > 0,
+  });
+  if (!ok) return;
+  await signOut();
+  render();
+}
