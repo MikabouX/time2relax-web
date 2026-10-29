@@ -176,6 +176,7 @@ function sortEntries() {
 }
 
 function addEntry(e) {
+  S.deleted = S.deleted.filter((id) => id !== e.id); // même identifiant retiré puis remis (« Reprendre » puis arrêt) : la suppression en attente n'a plus lieu d'être
   S.entries.push(e);
   sortEntries();
   saveEntries();

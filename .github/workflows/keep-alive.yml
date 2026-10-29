@@ -1,5 +1,5 @@
 # Garde le projet Supabase (offre gratuite) actif : il est mis en pause après 7 jours sans activité.
-# Chaque jour, quelques lectures sont envoyées à la base (fonction t2r_list) avec la clé publique de config.js.
+# Chaque jour, quelques lectures sont envoyées à la base (fonctions t2r_list et t2r_run_get) avec la clé publique de config.js.
 # Lancement à la main : onglet « Actions » du dépôt → « Garder Supabase actif » → « Run workflow ».
 name: Garder Supabase actif
 
@@ -38,3 +38,12 @@ jobs:
             sleep 3
           done
           echo "Projet Supabase joignable : activité enregistrée."
+          # Chrono partagé : vérifie que la partie « chrono » du SQL a bien été collée (sans faire échouer le test).
+          code=$(curl -sS -o /tmp/chrono.txt -w '%{http_code}' --max-time 30 -X POST \
+            "$URL/rest/v1/rpc/t2r_run_get" -H "apikey: $KEY" -H "Content-Type: application/json" \
+            -d '{"p_username":"__keepalive__"}')
+          if [ "$code" = "200" ]; then
+            echo "::notice::Chrono partagé : fonctions SQL en place (HTTP 200, réponse $(head -c 100 /tmp/chrono.txt))."
+          else
+            echo "::warning::Chrono partagé : fonctions SQL absentes ou en erreur (HTTP $code) : $(head -c 200 /tmp/chrono.txt)"
+          fi

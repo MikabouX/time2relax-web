@@ -309,7 +309,7 @@ function runningInfo() {
   const line = r.planned > 0
     ? t('run_timer', { start: hm(r.start), end: hm(r.start + r.planned * 1000) })
     : t('run_nolimit', { start: hm(r.start) });
-  return h('div', { class: 'card info' }, icon('schedule', 20), h('span', {}, line));
+  return h('div', { class: 'card info' }, icon('schedule', 20), h('span', {}, line, r.pushed ? h('span', { class: 'small muted' }, ` · ${t('run_shared')}`) : null));
 }
 
 function timerOptions() {
@@ -796,6 +796,8 @@ async function resetAll() {
   const ok = await confirmDialog({ title: t('reset_title'), body: t('reset_body'), ok: t('reset_ok'), danger: true });
   if (!ok) return;
   stopTicker();
+  stopRunPolling();
+  resetRunState();
   const lang = S.prefs.lang;
   store.clearAll();
   S.prefs = loadPrefs();

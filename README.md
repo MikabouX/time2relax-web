@@ -27,9 +27,9 @@ qui tape le même nom voit et peut modifier le même historique (à choisir : un
 d'autre n'utilise, par exemple `prénom-nom-1234`). Rien n'est affiché ni listé sans connaître le nom.
 
 1. Crée un projet gratuit sur supabase.com (région Europe).
-2. *SQL Editor* → colle le contenu de `supabase/schema.sql` → *Run*. Cela crée la table et trois
-   fonctions (`t2r_list`, `t2r_save`, `t2r_delete`) ; la table elle-même n'est pas accessible
-   directement.
+2. *SQL Editor* → colle le contenu de `supabase/schema.sql` → *Run*. Cela crée les tables et les
+   fonctions (`t2r_list`, `t2r_save`, `t2r_delete`, et `t2r_run_*` pour le chrono partagé) ; les tables
+   elles-mêmes ne sont pas accessibles directement.
 3. *Project Settings → API Keys* : copie l'**URL du projet** et la clé **publique** (« publishable » ou
    « anon »). Ne copie jamais la clé « secret » / « service_role ».
 4. Renseigne-les dans `config.js` :
@@ -38,6 +38,18 @@ d'autre n'utilise, par exemple `prénom-nom-1234`). Rien n'est affiché ni list�
    ```
 
 Aucun e-mail n'est collecté ni envoyé : les réglages « Authentication » de Supabase ne servent pas.
+
+### Chrono partagé entre appareils
+
+Avec un nom d'utilisateur, le chrono en cours est aussi gardé sur le serveur (un seul par nom) : un
+chrono lancé sur le PC se retrouve sur le téléphone (et inversement), avec le même temps écoulé ;
+l'arrêter sur l'un l'arrête sur l'autre, et le break n'est enregistré qu'une fois. Les appareils
+relisent le chrono toutes les 5 secondes tant que la page (ou l'appli) est ouverte. Le temps est
+calculé par le serveur : les appareils n'ont pas besoin d'avoir la même heure. Un chrono oublié plus
+de 24 h est abandonné. Les alarmes sonnent sur les appareils où la page / l'appli est ouverte (il n'y
+a pas de notification « push » : un téléphone dont l'appli est fermée ne sonne pas).
+Ça demande la partie « Chrono partagé » de `supabase/schema.sql` (une seule fois, sans danger si on
+la colle deux fois) ; sans elle, tout fonctionne comme avant, en local.
 
 ### Garder le projet actif
 

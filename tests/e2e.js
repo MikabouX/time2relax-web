@@ -414,6 +414,9 @@ async function main() {
 
     console.log('I. Arrêt par erreur : Reprendre et confirmation');
     await stopTests(browser);
+
+    console.log('J. Chrono partagé entre appareils');
+    await sharedRunTests(browser);
   } finally {
     await browser.close();
     server.kill();
@@ -424,7 +427,9 @@ async function main() {
 
 /* ---------- Faux Supabase en mémoire : les trois fonctions SQL, par nom d'utilisateur ---------- */
 function makeMockSupabase() {
-  const db = { rows: [], log: [], delayPost: 0 };
+  const db = { rows: [], log: [], delayPost: 0, runs: {}, skew: 0, noRun: false };
+  db.now = () => Date.now() + db.skew; // horloge du « serveur » (avançable)
+  db.advance = (ms) => { db.skew += ms; };
   const cors = {
     'access-control-allow-origin': '*',
     'access-control-allow-headers': 'apikey, authorization, content-type, prefer, x-client-info',
@@ -438,11 +443,35 @@ function makeMockSupabase() {
     if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
     db.log.push(`${req.method()} ${url.pathname}${url.search}`);
     if (!req.headers().apikey) return json(401, { message: 'No API key found in request' });
-    const m = /^\/rest\/v1\/rpc\/(t2r_list|t2r_save|t2r_delete)$/.exec(url.pathname);
+    const m = /^\/rest\/v1\/rpc\/(t2r_list|t2r_save|t2r_delete|t2r_run_get|t2r_run_start|t2r_run_stop)$/.exec(url.pathname);
     if (!m || req.method() !== 'POST') return json(404, { message: 'not found' });
+    if (m[1].startsWith('t2r_run_') && db.noRun) return json(404, { code: 'PGRST202', message: 'Could not find the function public.' + m[1] });
     const body = req.postData() ? JSON.parse(req.postData()) : {};
     const who = String(body.p_username || '').trim().toLowerCase();
     if (who.length < 2 || who.length > 40) return json(400, { code: 'P0001', message: "nom d'utilisateur invalide" });
+
+    if (m[1].startsWith('t2r_run_')) {
+      const day = 86400000;
+      const current = () => {
+        const r = db.runs[who];
+        if (!r) return [];
+        const el = db.now() - r.startedAt;
+        return el >= day ? [] : [{ run_id: r.id, elapsed_ms: el, kind: r.type, planned_s: r.planned }];
+      };
+      if (m[1] === 't2r_run_get') return json(200, current());
+      if (m[1] === 't2r_run_start') {
+        if (!['break', 'lunch'].includes(body.p_type) || !(body.p_planned >= 0 && body.p_planned <= 86400)) return json(400, { code: 'P0001', message: 'chrono invalide' });
+        if (db.runs[who] && db.now() - db.runs[who].startedAt >= day) delete db.runs[who];
+        if (!db.runs[who]) {
+          const el = Math.min(Math.max(Number(body.p_elapsed_ms) || 0, 0), day - 1000);
+          db.runs[who] = { id: body.p_id, startedAt: db.now() - el, type: body.p_type, planned: body.p_planned };
+        }
+        return json(200, current());
+      }
+      const had = !!db.runs[who] && db.runs[who].id === body.p_id;
+      if (had) delete db.runs[who];
+      return json(200, had);
+    }
 
     if (m[1] === 't2r_list') {
       const mine = db.of(who).sort((a, b) => (a.date + a.time + a.id).localeCompare(b.date + b.time + b.id));
@@ -466,19 +495,21 @@ function makeMockSupabase() {
   return db;
 }
 
-const CFG = "window.T2R_CONFIG = { supabaseUrl: 'https://mock.supabase.test', supabaseKey: 'sb_publishable_test' };";
+const cfgFor = (pollMs) => `window.T2R_CONFIG = { supabaseUrl: 'https://mock.supabase.test', supabaseKey: 'sb_publishable_test', pollMs: ${pollMs} };`;
 
-async function openWithMock(browser, db, startIso) {
+// pollMs: 0 = pas de relecture automatique du chrono (les tests la déclenchent à la main, sans hasard)
+async function openWithMock(browser, db, startIso, { pollMs = 0 } = {}) {
   const context = await browser.newContext({ timezoneId: 'Europe/Brussels', locale: 'fr-BE', viewport: { width: 420, height: 900 } });
   await context.addInitScript(initScript(startIso));
-  await context.route('**/config.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript', body: CFG }));
-  await context.route('https://mock.supabase.test/**', db.handler);
+  await context.route('**/config.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript', body: cfgFor(pollMs) }));
+  const dev = { off: false };
+  await context.route('https://mock.supabase.test/**', (r) => (dev.off ? r.abort('internetdisconnected') : db.handler(r)));
   const page = await context.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
   page.on('console', (m) => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) errors.push(`console: ${m.text()}`); });
   await page.goto(BASE);
-  return { page, context, errors };
+  return { page, context, errors, setOffline: (v) => { dev.off = v; } };
 }
 
 /** Réglages → nom d'utilisateur → « Se connecter ». */
@@ -761,5 +792,250 @@ async function stopTests(browser) {
   check(errors.length === 0, `aucune erreur console (${errors.join(' | ')})`);
   await context.close();
 }
+
+/* ---------- J. Chrono partagé ---------- */
+async function joinAs(browser, db, name, opts) {
+  const dev = await openWithMock(browser, db, '2026-10-29T10:00:00+01:00', opts);
+  await dev.page.getByRole('button', { name: 'Continuer' }).click();
+  await dev.page.getByRole('button', { name: 'Réglages' }).click();
+  await signInAs(dev.page, name);
+  await dev.page.waitForFunction(() => !window.t2r.state.sync.busy && window.t2r.state.sync.last);
+  await dev.page.getByRole('button', { name: 'Retour' }).click();
+  return dev;
+}
+const poll = (page) => page.evaluate(() => window.t2r.runPoll());
+const runOn = (page) => page.evaluate(() => window.t2r.state.run && { id: window.t2r.state.run.id, pushed: !!window.t2r.state.run.pushed, type: window.t2r.state.run.type });
+const entriesOn = (page) => page.evaluate(() => window.t2r.state.entries.map((e) => ({ id: e.id, seconds: e.seconds })));
+const settledOn = (page) => page.waitForFunction(() => {
+  const s = window.t2r.state;
+  return !s.sync.busy && s.entries.every((e) => e.synced) && s.deleted.length === 0;
+}, null, { timeout: 10000 });
+const waitRunPushed = (page) => page.waitForFunction(() => window.t2r.state.run && window.t2r.state.run.pushed, null, { timeout: 10000 });
+const waitFor = (fn, ms = 10000) => new Promise((resolve, reject) => {
+  const t0 = Date.now();
+  const loop = () => { if (fn()) resolve(); else if (Date.now() - t0 > ms) reject(new Error('délai dépassé')); else setTimeout(loop, 50); };
+  loop();
+});
+const runCalls = (db) => db.log.filter((l) => l.includes('/rpc/t2r_run_')).length;
+
+async function sharedRunTests(browser) {
+  const db = makeMockSupabase();
+  const a = await joinAs(browser, db, 'duo-test', {});
+  const b = await joinAs(browser, db, '  DUO-test ', {});
+  const other = await joinAs(browser, db, 'quelquun-d-autre', {});
+
+  // 1. Démarrage sur A : le serveur le connaît, B le suit avec le même temps écoulé
+  await a.page.locator('.start').click();
+  await waitRunPushed(a.page);
+  const idA = (await runOn(a.page)).id;
+  eq(db.runs['duo-test'] && db.runs['duo-test'].id, idA, 'chrono annoncé au serveur avec son identifiant');
+  check((await a.page.locator('.card.info').innerText()).includes('partagé avec tes autres appareils'), 'indication « partagé » sur le chrono');
+  db.advance(120000);
+  await advance(a.page, 120000);
+  await poll(b.page);
+  let rb = await runOn(b.page);
+  check(rb && rb.id === idA && rb.pushed && rb.type === 'break', 'B suit le chrono démarré sur A (même identifiant)');
+  const shown = await text(b.page, '#ringBig');
+  check(shown === '02:00' || shown === '02:01' || shown === '02:02', `B affiche le même temps écoulé (${shown})`);
+  check((await text(b.page, '#toast')).includes('démarré sur un autre appareil'), 'B prévient que le chrono vient d’un autre appareil');
+  await poll(other.page);
+  eq(await runOn(other.page), null, 'un autre nom ne voit pas ce chrono');
+
+  // 2. Arrêt sur A : l'entrée est unique, B arrête aussi son chrono et reçoit l'entrée par la synchro
+  await a.page.locator('.start').click();
+  await waitFor(() => !db.runs['duo-test']);
+  check(!db.runs['duo-test'], 'arrêt sur A : le chrono disparaît du serveur');
+  await poll(b.page);
+  eq(await runOn(b.page), null, 'B arrête son chrono');
+  check((await text(b.page, '#toast')).includes('terminé sur un autre appareil'), 'B prévient que le chrono est terminé ailleurs');
+  await settledOn(a.page);
+  await b.page.evaluate(() => window.dispatchEvent(new Event('online')));
+  await b.page.waitForFunction(() => window.t2r.state.entries.length === 1, null, { timeout: 10000 });
+  let eb = await entriesOn(b.page);
+  check(eb.length === 1 && eb[0].id === idA && eb[0].seconds >= 120, 'B reçoit une seule entrée (celle de A), pas de doublon');
+  eq(db.of('duo-test').length, 1, 'une seule ligne en ligne');
+
+  // 3. Démarrage sur B, arrêt depuis A : toujours une seule entrée
+  await b.page.locator('.start').click();
+  await waitRunPushed(b.page);
+  const idB = (await runOn(b.page)).id;
+  await poll(a.page);
+  check((await runOn(a.page) || {}).id === idB, 'A suit le chrono démarré sur B');
+  await advance(a.page, 45000);
+  await a.page.locator('.start').click();
+  await waitFor(() => !db.runs['duo-test']);
+  await poll(b.page);
+  eq(await runOn(b.page), null, 'B arrête son chrono');
+  await settledOn(a.page);
+  await b.page.evaluate(() => window.dispatchEvent(new Event('online')));
+  await b.page.waitForFunction(() => window.t2r.state.entries.length === 2, null, { timeout: 10000 });
+  eq(db.of('duo-test').length, 2, 'deux breaks en tout, chacun une seule fois');
+  check((await entriesOn(a.page)).length === 2 && (await entriesOn(b.page)).length === 2, 'les deux appareils ont les mêmes deux entrées');
+
+  // 4. Démarrage hors connexion : annoncé dès que le réseau revient, puis suivi par B
+  await a.setOffline(true);
+  await a.page.locator('.start').click();
+  const idOff = (await runOn(a.page)).id;
+  eq((await runOn(a.page)).pushed, false, 'hors connexion : le chrono tourne mais n’est pas encore annoncé');
+  await advance(a.page, 90000);
+  await a.setOffline(false);
+  await poll(a.page);
+  await waitRunPushed(a.page);
+  check(db.runs['duo-test'] && db.runs['duo-test'].id === idOff && db.now() - db.runs['duo-test'].startedAt >= 90000, 'annoncé au retour du réseau, avec le temps déjà écoulé');
+  await poll(b.page);
+  rb = await runOn(b.page);
+  check(rb && rb.id === idOff, 'B suit le chrono démarré hors connexion');
+  // B arrête puis A : un seul enregistrement (même identifiant)
+  await b.page.locator('.start').click();
+  await waitFor(() => !db.runs['duo-test']);
+  await poll(a.page);
+  eq(await runOn(a.page), null, 'A arrête son chrono');
+  await settledOn(b.page);
+  await a.page.evaluate(() => window.dispatchEvent(new Event('online')));
+  await a.page.waitForFunction(() => window.t2r.state.entries.length === 3, null, { timeout: 10000 });
+  eq(db.of('duo-test').length, 3, 'trois breaks en tout');
+
+  // 5. Deux chronos lancés presque ensemble : celui du serveur gagne, le nôtre est gardé s'il compte
+  await a.setOffline(true);
+  await a.page.locator('.start').click();
+  const idLoser = (await runOn(a.page)).id;
+  await advance(a.page, 90000);
+  db.runs['duo-test'] = { id: '11111111-2222-4333-8444-555555555555', startedAt: db.now() - 5000, type: 'break', planned: 0 };
+  await a.setOffline(false);
+  await poll(a.page);
+  let ra = await runOn(a.page);
+  check(ra && ra.id === '11111111-2222-4333-8444-555555555555' && ra.pushed, 'A suit le chrono du serveur');
+  check((await entriesOn(a.page)).some((e) => e.id === idLoser && e.seconds >= 90), 'le chrono d’A (plus d’une minute) est enregistré, pas perdu');
+  check((await text(a.page, '#toast')).includes('Un autre chrono était déjà en cours'), 'A est prévenu');
+  await a.page.locator('.start').click();
+  await waitFor(() => !db.runs['duo-test']);
+  await settledOn(a.page);
+  await b.page.evaluate(() => window.dispatchEvent(new Event('online')));
+  await poll(b.page);
+
+  // 5 bis. Moins d'une minute : le chrono local est abandonné sans bruit
+  await a.setOffline(true);
+  await a.page.locator('.start').click();
+  const before = (await entriesOn(a.page)).length;
+  await advance(a.page, 20000);
+  db.runs['duo-test'] = { id: '22222222-2222-4333-8444-555555555555', startedAt: db.now() - 1000, type: 'break', planned: 0 };
+  await a.setOffline(false);
+  await poll(a.page);
+  eq((await runOn(a.page) || {}).id, '22222222-2222-4333-8444-555555555555', 'A suit le chrono du serveur');
+  eq((await entriesOn(a.page)).length, before, 'chrono local de 20 s : abandonné, aucune entrée parasite');
+  await a.page.locator('.start').click();
+  await waitFor(() => !db.runs['duo-test']);
+  await settledOn(a.page);
+
+  // 6. « Reprendre » ré-annonce le chrono, avec son heure de départ d'origine
+  await b.page.evaluate(() => window.dispatchEvent(new Event('online')));
+  await poll(b.page);
+  await a.page.locator('.start').click();
+  await waitRunPushed(a.page);
+  const idR = (await runOn(a.page)).id;
+  await advance(a.page, 180000);
+  await a.page.locator('.start').click();
+  await waitFor(() => !db.runs['duo-test']);
+  await advance(a.page, 30000);
+  await a.page.locator('#toast .toast-action', { hasText: 'Reprendre' }).click();
+  await waitFor(() => db.runs['duo-test']);
+  const elapsedSrv = db.now() - db.runs['duo-test'].startedAt;
+  check(db.runs['duo-test'].id === idR && elapsedSrv >= 210000 && elapsedSrv < 240000, `« Reprendre » : le serveur retrouve le chrono (${Math.round(elapsedSrv / 1000)} s écoulées)`);
+  await poll(b.page);
+  check(((await runOn(b.page)) || {}).id === idR, 'B suit le chrono repris');
+  await a.page.locator('.start').click();
+  await waitFor(() => !db.runs['duo-test']);
+  await poll(b.page);
+  await settledOn(a.page);
+
+  // 6 bis. « Reprendre » alors qu'un autre chrono a démarré entre-temps : celui du serveur gagne, rien n'est perdu
+  await a.page.locator('.start').click();
+  await waitRunPushed(a.page);
+  await advance(a.page, 70000);
+  await a.page.locator('.start').click();
+  await waitFor(() => !db.runs['duo-test']);
+  const nEntries = (await entriesOn(a.page)).length;
+  await poll(b.page); // B n'a rien
+  await b.page.locator('.start').click();
+  await waitRunPushed(b.page);
+  const idBusy = (await runOn(b.page)).id;
+  await a.page.locator('#toast .toast-action', { hasText: 'Reprendre' }).click();
+  await a.page.waitForFunction(() => document.getElementById('toast').innerText.includes('Un autre chrono était déjà en cours'), null, { timeout: 5000 });
+  check(true, 'reprise alors qu’un autre chrono tourne : A en est prévenu');
+  eq((await runOn(a.page) || {}).id, idBusy, 'A suit le chrono de B');
+  eq((await entriesOn(a.page)).length, nEntries, 'l’entrée du chrono repris est conservée (une seule fois)');
+  await b.page.locator('.start').click();
+  await waitFor(() => !db.runs['duo-test']);
+  await poll(a.page);
+  eq(await runOn(a.page), null, 'A arrête son chrono');
+  await settledOn(a.page);
+  await settledOn(b.page);
+
+  // 7. Arrêt hors connexion : le serveur est prévenu plus tard, le chrono n'est pas ré-adopté
+  await a.page.locator('.start').click();
+  await waitRunPushed(a.page);
+  await a.setOffline(true);
+  await advance(a.page, 65000);
+  await a.page.locator('.start').click();
+  eq(await runOn(a.page), null, 'arrêt hors connexion : le chrono s’arrête ici');
+  check(!!db.runs['duo-test'], 'le serveur ne sait pas encore que le chrono est terminé');
+  await a.setOffline(false);
+  await poll(a.page);
+  await waitFor(() => !db.runs['duo-test']);
+  eq(await runOn(a.page), null, 'le chrono terminé ici n’est pas ré-adopté');
+  check(await a.page.evaluate(() => JSON.parse(localStorage.getItem('t2r.stopped') || '[]').length === 0), 'liste « arrêtés ici » vidée une fois le serveur prévenu');
+  await settledOn(a.page);
+  await b.page.evaluate(() => window.dispatchEvent(new Event('online')));
+
+  // 8. SQL pas encore collé : tout marche en local, sans erreur
+  db.noRun = true;
+  const c1 = runCalls(db);
+  await a.page.locator('.start').click();
+  await advance(a.page, 61000);
+  await a.page.locator('.start').click();
+  const nBefore = await entriesOn(a.page);
+  check(nBefore.some((e) => e.seconds >= 61), 'sans les fonctions SQL du chrono : le chrono fonctionne et enregistre en local');
+  await poll(a.page);
+  await poll(a.page);
+  check(runCalls(db) - c1 <= 3, `pas de martèlement du serveur quand les fonctions manquent (${runCalls(db) - c1} appels)`);
+  await settledOn(a.page);
+  db.noRun = false;
+  await advance(a.page, 301000); // 5 minutes plus tard, on réessaie
+  await a.page.locator('.start').click();
+  await waitRunPushed(a.page);
+  check(!!db.runs['duo-test'], 'les fonctions installées : le partage reprend tout seul');
+  await a.page.locator('.start').click();
+  await waitFor(() => !db.runs['duo-test']);
+  await settledOn(a.page);
+
+  // 9. Se déconnecter : le chrono en cours reste ici, il n'est plus relu
+  await a.page.locator('.start').click();
+  await waitRunPushed(a.page);
+  await a.page.getByRole('button', { name: 'Réglages' }).click();
+  await a.page.getByRole('button', { name: 'Se déconnecter' }).click();
+  await a.page.locator('.dlg').getByRole('button', { name: 'Se déconnecter' }).click();
+  await a.page.waitForFunction(() => !window.t2r.state.session, null, { timeout: 5000 });
+  const rOut = await runOn(a.page);
+  check(rOut && rOut.pushed === false, 'déconnecté : le chrono continue ici, sans être partagé');
+
+  check(errors0(a, b, other), `aucune erreur console (${[...a.errors, ...b.errors, ...other.errors].join(' | ')})`);
+  await a.context.close(); await b.context.close(); await other.context.close();
+
+  // 10. Relecture automatique (tâche de fond) : sans rien toucher sur B
+  const db2 = makeMockSupabase();
+  const p = await joinAs(browser, db2, 'auto-test', { pollMs: 300 });
+  const q = await joinAs(browser, db2, 'auto-test', { pollMs: 300 });
+  await p.page.locator('.start').click();
+  await q.page.waitForFunction(() => window.t2r.state.run && window.t2r.state.run.pushed, null, { timeout: 8000 });
+  check(true, 'relecture automatique : B suit le chrono de A sans rien toucher');
+  await p.page.locator('.start').click();
+  await q.page.waitForFunction(() => !window.t2r.state.run, null, { timeout: 8000 });
+  check(true, 'relecture automatique : B arrête son chrono quand A termine');
+  await q.page.waitForFunction(() => window.t2r.state.entries.length === 1, null, { timeout: 10000 });
+  eq(db2.of('auto-test').length, 1, 'une seule entrée en ligne');
+  check(errors0(p, q), `aucune erreur console (${[...p.errors, ...q.errors].join(' | ')})`);
+  await p.context.close(); await q.context.close();
+}
+const errors0 = (...devs) => devs.every((d) => d.errors.length === 0);
 
 main().catch((e) => { console.error(e); process.exit(1); });

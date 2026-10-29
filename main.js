@@ -29,18 +29,18 @@
     startTicker();
   }
 
-  if (syncEnabled() && S.session) syncNow();
+  if (syncEnabled() && S.session) { syncNow(); startRunPolling(); }
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState !== 'visible') return;
     if (S.view === 'home') render(); // recompte la journée si la date a changé pendant la nuit
-    if (syncEnabled() && S.session) syncNow();
+    if (syncEnabled() && S.session) { syncNow(); runPoll(); }
   });
-  window.addEventListener('online', () => { if (syncEnabled() && S.session) syncNow(); });
+  window.addEventListener('online', () => { if (syncEnabled() && S.session) { syncNow(); runPoll(); } });
 
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
     navigator.serviceWorker.register('sw.js').catch(() => { /* hors-ligne indisponible, sans gravité */ });
   }
 
   // Pour les tests automatiques.
-  window.t2r = { tick, state: S, render };
+  window.t2r = { tick, state: S, render, runPoll };
 }());

@@ -39,10 +39,11 @@ async function sbFetch(url, opts) {
 }
 
 /** Appelle une fonction SQL du projet (POST /rest/v1/rpc/<nom>). */
-const rpc = (fn, args, query) => sbFetch(`${SB.url}/rest/v1/rpc/${fn}${query || ''}`, {
+const rpc = (fn, args, query, signal) => sbFetch(`${SB.url}/rest/v1/rpc/${fn}${query || ''}`, {
   method: 'POST',
   headers: { apikey: SB.key, 'Content-Type': 'application/json' },
   body: JSON.stringify(args),
+  signal,
 });
 
 /** Nom d'utilisateur « propre » : espaces nettoyés, sans majuscules (Michaël = michaël). */
@@ -57,10 +58,13 @@ function signIn(name) {
   S.deleted = [];
   S.entries.forEach((e) => { e.synced = false; });
   saveEntries();
+  startRunPolling(); // suit (et annonce) le chrono en cours
 }
 
 /** Ferme la session : l'historique affiché ici est effacé, il reste enregistré sous le nom. */
 function signOut() {
+  stopRunPolling();
+  if (S.run && S.run.pushed) { S.run.pushed = false; saveRun(); } // le chrono ici reste local
   S.session = null;
   store.remove('t2r.session');
   S.entries = [];
@@ -139,4 +143,188 @@ async function syncNow() {
     // Quelque chose a changé pendant la synchro (sans erreur) : on repasse tout de suite après.
     if (!S.sync.error && pendingCount() > 0) scheduleSync();
   }
+}
+
+/* ---------- Chrono partagé : un seul chrono en cours par nom, suivi depuis tous les appareils ----------
+   Le serveur garde le chrono en cours (identifiant, type, durée prévue, temps déjà écoulé, calculé avec
+   SON horloge : les appareils n'ont pas besoin d'avoir la même heure). Chaque appareil connecté le
+   relit toutes les quelques secondes. Si les fonctions « t2r_run_* » n'existent pas encore dans le
+   projet (SQL pas encore collé), tout continue de marcher comme avant, en local. */
+
+const RUN_TIMEOUT = 8000;
+const runApi = { ok: true, retryAt: 0 };
+let runBusy = false;
+let stopped = store.get('t2r.stopped', []); // chronos terminés ici dont le serveur n'est peut-être pas au courant
+if (!Array.isArray(stopped)) stopped = [];
+
+const runSharing = () => syncEnabled() && !!S.session && (runApi.ok || Date.now() >= runApi.retryAt);
+
+/** Appelle une fonction « t2r_run_* » : renvoie la réponse, ou undefined (hors ligne, lent, pas encore installé).
+    Les appels partent l'un après l'autre, dans l'ordre (un « arrêt » ne doit pas doubler un « démarrage » qui le suit). */
+let runQueue = Promise.resolve();
+function runCall(fn, args) {
+  const job = runQueue.then(() => runCallNow(fn, args));
+  runQueue = job.catch(() => {});
+  return job;
+}
+
+async function runCallNow(fn, args) {
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), RUN_TIMEOUT);
+  try {
+    const data = await rpc(fn, { p_username: S.session.username, ...args }, '', ctl.signal);
+    runApi.ok = true;
+    return data;
+  } catch (e) {
+    if (e.status === 404 || e.code === 'PGRST202') { runApi.ok = false; runApi.retryAt = Date.now() + 300000; }
+    return undefined;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+const runOf = (data) => (Array.isArray(data) && data[0] && typeof data[0].run_id === 'string' ? data[0] : null);
+
+async function runGet() {
+  const d = await runCall('t2r_run_get', {});
+  return d === undefined ? undefined : runOf(d);
+}
+
+/** Annonce un chrono au serveur ; renvoie le chrono en vigueur (le nôtre, ou un autre déjà en cours). */
+async function runPush(run) {
+  const d = await runCall('t2r_run_start', {
+    p_id: run.id, p_type: run.type, p_planned: run.planned, p_elapsed_ms: Math.max(0, Date.now() - run.start),
+  });
+  return d === undefined ? undefined : runOf(d);
+}
+
+function markStopped(id) {
+  stopped = stopped.filter((x) => x !== id).concat(id).slice(-20);
+  store.set('t2r.stopped', stopped);
+}
+
+/** Dit au serveur que ce chrono est terminé (réessayé au tour suivant tant qu'il n'a pas répondu). */
+async function runEnd(id) {
+  const d = await runCall('t2r_run_stop', { p_id: id });
+  if (d !== undefined) {
+    stopped = stopped.filter((x) => x !== id);
+    store.set('t2r.stopped', stopped);
+  }
+}
+
+/** Remise à zéro complète (réglages → tout effacer). */
+function resetRunState() {
+  stopped = [];
+  runApi.ok = true;
+  runApi.retryAt = 0;
+}
+
+function forgetStopped(id) {
+  if (!stopped.includes(id)) return;
+  stopped = stopped.filter((x) => x !== id);
+  store.set('t2r.stopped', stopped);
+}
+
+/** Un chrono démarré ailleurs : on le suit ici, avec le même temps écoulé. */
+function adoptRun(row, message) {
+  S.run = {
+    id: row.run_id,
+    start: Date.now() - Math.max(0, row.elapsed_ms),
+    type: row.kind === 'lunch' ? 'lunch' : 'break',
+    planned: row.planned_s,
+    pushed: true,
+  };
+  saveRun();
+  resetAlerts(true);
+  startTicker();
+  render();
+  toast(message || t('run_followed', { Type: typeLabel(S.run.type) }));
+}
+
+/** Le chrono d'ici a été terminé depuis un autre appareil (qui a enregistré l'entrée : elle arrive par la synchro). */
+function endRunElsewhere() {
+  S.run = null;
+  saveRun();
+  stopTicker();
+  render();
+  toast(t('run_ended_elsewhere'));
+  scheduleSync();
+}
+
+/** Deux chronos démarrés presque en même temps : celui du serveur gagne. Le nôtre est gardé s'il compte. */
+function resolveConflict(row) {
+  const mine = S.run;
+  const keep = !!mine && (Date.now() - mine.start) / 1000 >= 60;
+  if (keep) addEntry(entryFromRun(mine));
+  adoptRun(row, keep ? t('run_conflict_saved') : undefined);
+  if (keep) scheduleSync();
+}
+
+/** Le chrono d'ici n'est pas encore connu du serveur : on l'annonce. */
+async function runAnnounce() {
+  const run = S.run;
+  if (!run || !runSharing()) return;
+  const row = await runPush(run);
+  if (row === undefined || !S.run || S.run.id !== run.id) return;
+  if (row && row.run_id === run.id) {
+    run.pushed = true;
+    saveRun();
+    if (S.view === 'home') render();
+  } else if (row) {
+    resolveConflict(row);
+  }
+}
+
+/** Compare le chrono d'ici et celui du serveur. */
+async function runPoll() {
+  if (runBusy || !runSharing()) return;
+  runBusy = true;
+  try {
+    const mine = S.run ? S.run.id : null;
+    const row = await runGet();
+    if (row === undefined) return;
+    if ((S.run ? S.run.id : null) !== mine) return; // le chrono d'ici a changé pendant l'appel : au prochain tour
+    if (row) {
+      if (stopped.includes(row.run_id)) { await runEnd(row.run_id); return; } // terminé ici, le serveur ne le sait pas encore
+      if (!S.run) adoptRun(row);
+      else if (S.run.id === row.run_id) {
+        if (!S.run.pushed) { S.run.pushed = true; saveRun(); if (S.view === 'home') render(); }
+      } else if (S.run.pushed) { endRunElsewhere(); adoptRun(row); } // le nôtre a été terminé ailleurs, un autre a démarré
+      else resolveConflict(row);
+    } else if (S.run) {
+      if (S.run.pushed) endRunElsewhere();
+      else await runAnnounce(); // démarré hors ligne : on l'annonce maintenant
+    }
+  } finally {
+    runBusy = false;
+  }
+}
+
+let pollWorker = null;
+let pollInterval = null;
+
+function stopRunPolling() {
+  if (pollWorker) { pollWorker.terminate(); pollWorker = null; }
+  if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
+}
+
+/** Relit le chrono du serveur toutes les 5 secondes (config.js : pollMs, 0 pour désactiver). */
+function startRunPolling() {
+  stopRunPolling();
+  const ms = Number(window.T2R_CONFIG && window.T2R_CONFIG.pollMs);
+  const every = Number.isFinite(ms) ? ms : 5000;
+  if (!syncEnabled() || !S.session || every <= 0) return;
+  try {
+    // Un Worker n'est pas ralenti quand l'onglet est en arrière-plan.
+    const blob = new Blob([`setInterval(function(){postMessage(0)},${every})`], { type: 'text/javascript' });
+    pollWorker = new Worker(URL.createObjectURL(blob));
+    pollWorker.onmessage = runPoll;
+    pollWorker.onerror = () => {
+      if (pollWorker) { pollWorker.terminate(); pollWorker = null; }
+      if (!pollInterval) pollInterval = setInterval(runPoll, every);
+    };
+  } catch (_) {
+    pollInterval = setInterval(runPoll, every);
+  }
+  runPoll();
 }

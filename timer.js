@@ -166,13 +166,29 @@ function updateTitle() {
 
 function beginRun() {
   const type = S.ui.type;
-  S.run = { id: uid(), start: Date.now(), type, planned: plannedFor(type) };
+  S.run = { id: uid(), start: Date.now(), type, planned: plannedFor(type), pushed: false };
   saveRun();
   resetAlerts(false);
   ensureAudio();
   if (S.run.planned > 0) requestNotifPermission();
   startTicker();
   render();
+  runAnnounce(); // les autres appareils connectés au même nom suivent ce chrono
+}
+
+/** L'entrée d'historique d'un chrono : elle porte son identifiant (le terminer deux fois n'en crée qu'une). */
+function entryFromRun(r) {
+  // Plafonné à 24 h (limite du serveur) : un chrono oublié pendant des jours ne doit pas bloquer la synchro.
+  const seconds = Math.min(86400, Math.max(0, Math.floor((Date.now() - r.start) / 1000)));
+  const s = new Date(r.start);
+  return {
+    id: r.id || uid(),
+    date: dayKey(s),
+    time: `${two(s.getHours())}:${two(s.getMinutes())}`,
+    type: r.type,
+    seconds,
+    synced: false,
+  };
 }
 
 async function endRun() {
@@ -187,32 +203,24 @@ async function endRun() {
     });
     if (!ok || S.run !== r) return; // « Annuler » : le chrono continue (ou il a déjà été terminé entre-temps)
   }
-  // Plafonné à 24 h (limite du serveur) : un chrono oublié pendant des jours ne doit pas bloquer la synchro.
-  const seconds = Math.min(86400, Math.max(0, Math.floor((Date.now() - r.start) / 1000)));
-  const s = new Date(r.start);
-  // L'entrée porte l'identifiant du chrono : le terminer deux fois (ou depuis deux appareils) n'en crée qu'une.
-  const entry = {
-    id: r.id || uid(),
-    date: dayKey(s),
-    time: `${two(s.getHours())}:${two(s.getMinutes())}`,
-    type: r.type,
-    seconds,
-    synced: false,
-  };
+  const entry = entryFromRun(r);
   addEntry(entry);
   S.run = null;
   saveRun();
   stopTicker();
   render();
   // Un arrêt par erreur se rattrape : « Reprendre » annule l'enregistrement et relance le chrono là où il en était.
-  toast(t('saved_entry', { Type: typeLabel(r.type), dur: formatDuration(seconds) }),
+  toast(t('saved_entry', { Type: typeLabel(r.type), dur: formatDuration(entry.seconds) }),
     { label: t('resume'), fn: () => resumeRun(entry.id, r) }, 15000);
   scheduleSync();
+  if (runSharing()) { markStopped(r.id); runEnd(r.id); } // les autres appareils arrêtent aussi leur chrono
 }
 
 /** Annule le dernier arrêt : l'entrée est retirée et le chrono repart avec son heure de départ d'origine. */
 function resumeRun(entryId, run) {
   if (S.run) { toast(t('resume_busy')); return; }
+  forgetStopped(run.id);
+  run.pushed = false; // ré-annoncé juste après (si un autre chrono a démarré entre-temps, celui du serveur gagne)
   removeEntries([entryId]);
   S.run = run;
   saveRun();
@@ -222,4 +230,5 @@ function resumeRun(entryId, run) {
   render();
   toast(t('resumed', { Type: typeLabel(run.type) }));
   scheduleSync();
+  runAnnounce();
 }
