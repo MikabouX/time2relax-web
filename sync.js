@@ -156,7 +156,11 @@ async function syncNow() {
       const part = pending.slice(i, i + 200);
       const rows = part.map((e) => ({ id: e.id, date: e.date, time: e.time, type: e.type, seconds: e.seconds }));
       await rest('POST', 'breaks?on_conflict=id', rows, { Prefer: 'resolution=merge-duplicates,return=minimal' });
-      part.forEach((e) => { e.synced = true; });
+      // Une entrée modifiée pendant l'envoi reste « à envoyer » : on compare avec ce qui est parti.
+      part.forEach((e, idx) => {
+        const r = rows[idx];
+        if (e.date === r.date && e.time === r.time && e.type === r.type && e.seconds === r.seconds) e.synced = true;
+      });
       saveEntries();
     }
     // 3. état du serveur (par pages de 1000)
@@ -167,12 +171,13 @@ async function syncNow() {
       if (page.length < 1000) break;
     }
     const deletedMeanwhile = new Set(S.deleted); // supprimées pendant la synchro, pas encore envoyées
+    const stillLocal = S.entries.filter((e) => !e.synced); // ajoutées ou modifiées pendant la synchro
+    const localIds = new Set(stillLocal.map((e) => e.id));
     const fromServer = all
-      .filter((r) => !deletedMeanwhile.has(r.id))
+      .filter((r) => !deletedMeanwhile.has(r.id) && !localIds.has(r.id))
       .map((r) => ({
         id: r.id, date: r.date, time: String(r.time).slice(0, 5), type: r.type === 'lunch' ? 'lunch' : 'break', seconds: r.seconds, synced: true,
       }));
-    const stillLocal = S.entries.filter((e) => !e.synced); // ajoutées pendant la synchro
     S.entries = fromServer.concat(stillLocal);
     sortEntries();
     saveEntries();
@@ -185,5 +190,7 @@ async function syncNow() {
   } finally {
     S.sync.busy = false;
     onSyncChange();
+    // Quelque chose a changé pendant la synchro (sans erreur) : on repasse tout de suite après.
+    if (!S.sync.error && pendingCount() > 0) scheduleSync();
   }
 }

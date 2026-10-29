@@ -1,8 +1,8 @@
 # Time2Relax — version web (PC)
 
-Chrono de break et de lunch, minuteur avec alertes, historique, itinéraires (Waze / Google Maps),
-commande de repas, mode nuit, français et néerlandais. Même esprit que l'appli Android, dans un
-navigateur : **rien à installer**.
+Chrono de break et de lunch, minuteur avec alertes, historique (avec ajout et modification d'une
+entrée oubliée), commande de repas, mode nuit, français et néerlandais. Même esprit que l'appli
+Android, dans un navigateur : **rien à installer**. (Pas de liens Waze / Google Maps : inutiles sur PC.)
 
 ## Utiliser la page
 
@@ -10,6 +10,9 @@ navigateur : **rien à installer**.
   Généré par `python3 tools/build_standalone.py`.
 - **Adresse web** (GitHub Pages) : la page est servie depuis ce dépôt. Depuis Edge ou Chrome,
   menu ⋯ → « Applications » → « Installer ce site en tant qu'application » (sans droits administrateur).
+
+Historique : le bouton **+** ajoute une entrée oubliée (type, date, heure de début, durée), le crayon
+modifie une entrée existante. En mode nuit, la boîte indique dans quelle journée l'entrée sera rangée.
 
 Les données restent dans le navigateur (localStorage). Réglages → « Fichier de sauvegarde » exporte
 et réimporte l'historique au même format que l'appli Android
@@ -37,8 +40,8 @@ Un projet gratuit est mis en pause par Supabase après une semaine sans activit�
 
 ## Tests
 
-`node tests/e2e.js` lance Chromium (Playwright) : chrono, alertes, historique, mode nuit, vidage,
-import/export, néerlandais, compte et synchronisation (serveur simulé).
+`node tests/e2e.js` lance Chromium (Playwright) : chrono, alertes, historique (ajout, modification,
+suppression), mode nuit, vidage, import/export, néerlandais, compte et synchronisation (serveur simulé).
 
 ## Fichiers
 

@@ -211,7 +211,7 @@ async function main() {
       await page.getByRole('button', { name: 'Terug' }).click();
       check((await text(page, '.date')).toLowerCase().includes('donderdag 29 oktober'), 'date en néerlandais');
       eq(await text(page, '.start'), 'Break starten', 'bouton de démarrage en néerlandais');
-      check((await text(page, '.tiles')).includes('Bestellen'), 'bouton « Bestellen »');
+      check((await text(page, '.tile-wrap')).includes('Bestellen'), 'bouton « Bestellen »');
       await page.locator('.start').click();
       await advance(page, 65000);
       await page.locator('.start').click();
@@ -226,36 +226,42 @@ async function main() {
     console.log('D. Langue du navigateur par défaut');
     {
       const { page, context } = await newPage(browser, { lang: 'nl-BE' });
-      check((await text(page, '.banner')).startsWith('Vul je thuisadres'), 'navigateur en néerlandais : page directement en néerlandais');
+      check((await text(page, '.banner')).startsWith('Kies je taal'), 'navigateur en néerlandais : page directement en néerlandais');
       await context.close();
     }
 
-    /* ------------------------------------------------------------ E. liens et réglages */
-    console.log('E. Itinéraires, commande, réglages');
+    /* ------------------------------------------------------------ E. commande et réglages */
+    console.log('E. Commande de repas, réglages (plus d\'itinéraires)');
     {
-      const { page, context, errors } = await newPage(browser, { setup: () => localStorage.setItem('t2r.prefs', JSON.stringify({ setupDone: true })) });
-      let hrefs = await page.locator('.tiles a').evaluateAll((as) => as.map((a) => a.getAttribute('href')));
-      check(hrefs[0] === 'https://www.waze.com/live-map', "sans adresse : le bouton « Itinéraire » ouvre simplement Waze");
-      check(hrefs[1] === 'https://www.smile-sandwicherie.be/', 'bouton « Commander » vers la sandwicherie par défaut');
+      const { page, context, errors } = await newPage(browser, {
+        // anciens réglages d'itinéraire encore présents dans le navigateur : ils doivent être ignorés
+        setup: () => localStorage.setItem('t2r.prefs', JSON.stringify({ setupDone: true, homeAddr: 'ancienne adresse', navApp: 'gmaps' })),
+      });
+      const hrefsOf = () => page.locator('.tile-wrap a').evaluateAll((as) => as.map((a) => a.getAttribute('href')));
+      let hrefs = await hrefsOf();
+      eq(hrefs.length, 1, "un seul raccourci : « Commander »");
+      eq(hrefs[0], 'https://www.smile-sandwicherie.be/', 'bouton « Commander » vers la sandwicherie par défaut');
+      eq(await page.locator('a[href*="waze"], a[href*="google.com/maps"]').count(), 0, 'aucun lien Waze / Google Maps');
+      const prefs0 = await page.evaluate(() => window.t2r.state.prefs);
+      check(!('homeAddr' in prefs0) && !('workAddr' in prefs0) && !('navApp' in prefs0), "anciens réglages d'itinéraire ignorés");
       await page.getByRole('button', { name: 'Réglages' }).click();
-      await page.getByPlaceholder('Adresse maison (facultatif)').fill('Rue de la Loi 16, Bruxelles');
-      await page.getByPlaceholder('Adresse bureau (facultatif)').fill('Place Rogier 1, Bruxelles');
-      await page.getByRole('button', { name: 'Google Maps' }).click();
+      eq(await page.locator('input[placeholder*="dresse"]').count(), 0, "plus de champs d'adresse dans les réglages");
+      eq(await page.getByRole('button', { name: /Waze|Google Maps/ }).count(), 0, "plus de choix d'application d'itinéraire");
       await page.getByRole('button', { name: 'Takeaway.com' }).click();
       await page.getByRole('button', { name: 'Takeaway.com' }).first().click();
       await page.getByRole('button', { name: 'Terug' }).or(page.getByRole('button', { name: 'Retour' })).click();
-      hrefs = await page.locator('.tiles a').evaluateAll((as) => as.map((a) => a.getAttribute('href')));
-      check(hrefs[0] === 'https://www.google.com/maps/dir/?api=1&destination=Rue%20de%20la%20Loi%2016%2C%20Bruxelles', 'itinéraire maison via Google Maps');
-      check(hrefs[1].endsWith('Place%20Rogier%201%2C%20Bruxelles'), 'itinéraire bureau');
-      check(hrefs[2] === 'https://www.takeaway.com/be/', 'commande vers Takeaway après sélection');
+      hrefs = await hrefsOf();
+      check(hrefs[0] === 'https://www.takeaway.com/be/', 'commande vers Takeaway après sélection');
       await page.getByRole('button', { name: 'Choisir un autre site' }).click();
       await page.locator('.pick-item').first().click();
-      hrefs = await page.locator('.tiles a').evaluateAll((as) => as.map((a) => a.getAttribute('href')));
-      check(hrefs[2] === 'https://www.smile-sandwicherie.be/', 'sélecteur rapide de site de commande');
+      hrefs = await hrefsOf();
+      check(hrefs[0] === 'https://www.smile-sandwicherie.be/', 'sélecteur rapide de site de commande');
+      await page.getByRole('button', { name: 'Choisir un autre site' }).click();
+      await page.locator('.pick-item').nth(1).click();
       // les réglages survivent au rechargement
       await page.reload();
-      hrefs = await page.locator('.tiles a').evaluateAll((as) => as.map((a) => a.getAttribute('href')));
-      check(hrefs.length === 3 && hrefs[0].includes('google.com/maps/dir'), 'réglages conservés après rechargement');
+      hrefs = await hrefsOf();
+      check(hrefs.length === 1 && hrefs[0] === 'https://www.takeaway.com/be/', 'réglages conservés après rechargement');
       // réinitialisation
       await page.getByRole('button', { name: 'Réglages' }).click();
       await page.getByRole('button', { name: 'Réinitialiser cette page' }).click();
@@ -265,9 +271,146 @@ async function main() {
       await context.close();
     }
 
+    /* ------------------------------------------------------------ G. ajouter / modifier une entrée */
+    console.log("G. Ajouter ou modifier une entrée depuis l'historique");
+    {
+      const seedPlain = () => {
+        const mk = (date, time, type, seconds, i) => ({ id: `id-${i}`, date, time, type, seconds, synced: false });
+        localStorage.setItem('t2r.entries', JSON.stringify([mk('2026-10-28', '14:10', 'lunch', 1800, 1), mk('2026-10-29', '08:00', 'break', 600, 2)]));
+        localStorage.setItem('t2r.prefs', JSON.stringify({ setupDone: true }));
+      };
+      const { page, context, errors } = await newPage(browser, { startIso: '2026-10-29T10:00:00+01:00', setup: seedPlain });
+      const dlg = page.locator('.dlg');
+      const vals = () => dlg.evaluate((d) => ({
+        date: d.querySelector('input[type=date]').value,
+        time: d.querySelector('input[type=time]').value,
+        mins: d.querySelectorAll('input[type=number]')[0].value,
+        secs: d.querySelectorAll('input[type=number]')[1].value,
+        type: d.querySelector('.seg.on').innerText.trim(),
+      }));
+      const fill = async ({ date, time, mins, secs }) => {
+        if (date !== undefined) await dlg.locator('input[type=date]').fill(date);
+        if (time !== undefined) await dlg.locator('input[type=time]').fill(time);
+        if (mins !== undefined) await dlg.locator('input[type=number]').nth(0).fill(mins);
+        if (secs !== undefined) await dlg.locator('input[type=number]').nth(1).fill(secs);
+      };
+      const save = () => dlg.getByRole('button', { name: 'Enregistrer' }).click();
+      const count = () => page.locator('.entry').count();
+
+      await page.getByRole('button', { name: 'Historique' }).click();
+      eq(await count(), 2, "2 entrées au départ");
+
+      // --- ajout
+      await page.getByRole('button', { name: 'Ajouter une entrée' }).click();
+      eq(await text(page, '.dlg h2'), 'Ajouter une entrée', "titre de la boîte d'ajout");
+      eq(JSON.stringify(await vals()), JSON.stringify({ date: '2026-10-29', time: '10:00', mins: '15', secs: '0', type: 'Break' }), 'valeurs par défaut : maintenant, 15 minutes, break');
+      await dlg.locator('.seg').nth(1).click();
+      eq((await vals()).mins, '30', 'lunch : durée par défaut 30 minutes');
+      await dlg.locator('.seg').nth(0).click();
+      eq((await vals()).mins, '15', 'retour à break : durée par défaut 15 minutes');
+
+      // --- vérifications de saisie : la boîte reste ouverte avec un message
+      await fill({ mins: '0', secs: '0' });
+      await save();
+      check((await text(page, '.dlg-error')).includes('durée valide'), 'durée nulle refusée');
+      await fill({ mins: '5', date: '2026-10-30' });
+      await save();
+      check((await text(page, '.dlg-error')).includes('pas dans le futur'), 'date future refusée');
+      await fill({ date: '2026-10-29', time: '' });
+      await save();
+      check((await text(page, '.dlg-error')).includes('heure de début'), 'heure vide refusée');
+      await fill({ time: '09:15', secs: '75' });
+      await save();
+      check((await text(page, '.dlg-error')).includes('durée valide'), 'secondes hors limites refusées');
+      check(await dlg.isVisible() && (await count()) === 2, 'la boîte reste ouverte et rien n\'est ajouté tant que la saisie est invalide');
+
+      // --- ajout valide
+      await fill({ mins: '12', secs: '30' });
+      await save();
+      await dlg.waitFor({ state: 'detached' });
+      eq(await count(), 3, 'entrée ajoutée');
+      check((await text(page, '#toast')).includes('Break ajouté : 12:30'), 'message « Break ajouté : 12:30 »');
+      const added = await page.evaluate(() => window.t2r.state.entries.find((e) => e.time === '09:15'));
+      check(added && added.date === '2026-10-29' && added.type === 'break' && added.seconds === 750 && added.synced === false && /^[\w-]{8,}$/.test(added.id), "entrée créée avec date, heure, type, durée (à synchroniser)");
+      check((await page.locator('.entry').first().innerText()).includes('à 09:15'), "l'entrée est rangée à sa place (la plus récente en haut)");
+      await page.getByRole('button', { name: 'Retour' }).click();
+      eq(await text(page, '.stat-label'), 'Breaks · 2', 'accueil : compteur de breaks mis à jour');
+      eq(await text(page, '.stat-val'), '22 min', "accueil : total du jour mis à jour (10 min + 12 min 30 s)");
+      await page.getByRole('button', { name: 'Historique' }).click();
+
+      // --- modification (même identifiant), le type change mais pas la durée saisie
+      await page.locator('.entry').first().getByRole('button', { name: 'Modifier' }).click();
+      eq(await text(page, '.dlg h2'), "Modifier l'entrée", 'titre de la boîte de modification');
+      eq(JSON.stringify(await vals()), JSON.stringify({ date: '2026-10-29', time: '09:15', mins: '12', secs: '30', type: 'Break' }), "la boîte reprend les valeurs de l'entrée");
+      await dlg.locator('.seg').nth(1).click();
+      eq((await vals()).mins, '12', 'changer de type en modification ne touche pas à la durée');
+      await fill({ mins: '20', secs: '0' });
+      await dlg.locator('input[type=number]').nth(1).press('Enter'); // validation au clavier
+      await dlg.waitFor({ state: 'detached' });
+      check((await text(page, '#toast')).includes('Lunch modifié : 20:00'), 'message « Lunch modifié : 20:00 »');
+      eq(await count(), 3, 'pas de doublon après modification');
+      const edited = await page.evaluate((id) => window.t2r.state.entries.filter((e) => e.id === id), added.id);
+      check(edited.length === 1 && edited[0].type === 'lunch' && edited[0].seconds === 1200 && edited[0].synced === false, 'même entrée mise à jour, à resynchroniser');
+
+      // --- changement de date : l'entrée change de jour
+      await page.locator('.entry').first().getByRole('button', { name: 'Modifier' }).click();
+      await fill({ date: '2026-10-27', time: '23:00' });
+      await save();
+      await dlg.waitFor({ state: 'detached' });
+      const heads = await page.locator('.day-name').allInnerTexts();
+      eq(heads.join(' | '), "Aujourd'hui | Hier | Mardi 27 octobre", "l'entrée est passée au bon jour");
+
+      // --- annuler ne change rien
+      await page.locator('.entry').last().getByRole('button', { name: 'Modifier' }).click();
+      await fill({ mins: '99' });
+      await dlg.getByRole('button', { name: 'Annuler' }).click();
+      await dlg.waitFor({ state: 'detached' });
+      eq(await page.evaluate((id) => window.t2r.state.entries.find((e) => e.id === id).seconds, added.id), 1200, 'annuler : rien ne change');
+
+      // --- persistance
+      await page.reload();
+      await page.getByRole('button', { name: 'Historique' }).click();
+      eq(await count(), 3, 'les modifications survivent au rechargement');
+
+      // --- mode nuit : la boîte prévient dans quelle journée tombe l'entrée
+      await page.evaluate(() => { const p = JSON.parse(localStorage.getItem('t2r.prefs')); p.nightMode = true; p.nightCutoff = 12; localStorage.setItem('t2r.prefs', JSON.stringify(p)); });
+      await page.reload();
+      await page.getByRole('button', { name: 'Historique' }).click();
+      await page.getByRole('button', { name: 'Ajouter une entrée' }).click();
+      await fill({ date: '2026-10-29', time: '02:00', mins: '7', secs: '0' });
+      const hint = dlg.locator('[aria-live=polite]');
+      check(await hint.isVisible() && (await hint.innerText()).includes('mercredi 28 octobre'), 'mode nuit : « cette entrée comptera pour la journée du mercredi 28 octobre »');
+      await fill({ time: '13:00' });
+      check(!(await hint.isVisible()), "mode nuit : pas d'avertissement quand la journée est la même");
+      await fill({ time: '02:00' });
+      await save();
+      await dlg.waitFor({ state: 'detached' });
+      const todaySection = page.locator('.day').filter({ hasText: "Aujourd'hui" });
+      check((await todaySection.innerText()).includes('à 02:00'), "mode nuit : l'entrée de 02:00 est rangée dans la journée en cours");
+      check(errors.length === 0, `aucune erreur console (${errors.join(' | ')})`);
+      await context.close();
+    }
+
+    // Historique vide + néerlandais
+    {
+      const { page, context, errors } = await newPage(browser, { lang: 'nl-BE', setup: () => localStorage.setItem('t2r.prefs', JSON.stringify({ setupDone: true })) });
+      await page.getByRole('button', { name: 'Geschiedenis' }).click();
+      await page.locator('.empty .btn').click();
+      eq(await text(page, '.dlg h2'), 'Item toevoegen', 'néerlandais : titre de la boîte');
+      await page.locator('.dlg').getByRole('button', { name: 'Opslaan' }).click();
+      await page.locator('.dlg').waitFor({ state: 'detached' });
+      check((await text(page, '#toast')).includes('Break toegevoegd: 15:00'), "néerlandais : ajout depuis l'historique vide");
+      eq(await page.locator('.entry').count(), 1, 'une entrée créée depuis un historique vide');
+      check(errors.length === 0, `aucune erreur console (${errors.join(' | ')})`);
+      await context.close();
+    }
+
     /* ------------------------------------------------------------ F. compte + synchronisation (serveur simulé) */
     console.log('F. Compte et synchronisation (Supabase simulé)');
     await syncTests(browser);
+
+    console.log('H. Synchronisation des ajouts et modifications');
+    await editSyncTests(browser);
   } finally {
     await browser.close();
     server.kill();
@@ -334,6 +477,7 @@ function makeMockSupabase() {
         return json(200, mine.slice(offset, offset + limit).map(({ id, date, time, type, seconds }) => ({ id, date, time, type, seconds })));
       }
       if (req.method() === 'POST') {
+        if (db.delayPost) await new Promise((r) => setTimeout(r, db.delayPost)); // serveur lent (test de modification pendant l'envoi)
         if (url.searchParams.get('on_conflict') !== 'id' || !/merge-duplicates/.test(h.prefer || '')) return json(409, { message: 'duplicate key' });
         for (const r of body) {
           if (!/^\d{2}:\d{2}$/.test(r.time) || !['break', 'lunch'].includes(r.type)) return json(400, { message: 'check constraint' });
@@ -472,6 +616,80 @@ async function syncTests(browser) {
     check(x.errors.length === 0, `aucune erreur console (${x.errors.join(' | ')})`);
     await x.context.close();
   }
+}
+
+/** Ajout et modification d'entrées avec un compte : une seule ligne côté serveur, même pendant un envoi lent. */
+async function editSyncTests(browser) {
+  const db = makeMockSupabase();
+  const cfg = "window.T2R_CONFIG = { supabaseUrl: 'https://mock.supabase.test', supabaseKey: 'sb_publishable_test' };";
+  const context = await browser.newContext({ timezoneId: 'Europe/Brussels', locale: 'fr-BE', viewport: { width: 420, height: 900 } });
+  await context.addInitScript(initScript('2026-10-29T10:00:00+01:00'));
+  await context.route('**/config.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript', body: cfg }));
+  await context.route('https://mock.supabase.test/**', db.handler);
+  const page = await context.newPage();
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
+  page.on('console', (m) => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) errors.push(`console: ${m.text()}`); });
+  await page.goto(BASE);
+  const waitFor = async (fn, ms = 10000) => {
+    const t0 = Date.now();
+    while (!fn()) {
+      if (Date.now() - t0 > ms) throw new Error('délai dépassé');
+      await new Promise((r) => setTimeout(r, 50));
+    }
+  };
+  const posts = () => db.log.filter((l) => l.startsWith('POST /rest/v1/breaks')).length;
+  const settled = (n, seconds) => page.waitForFunction(([count, secs]) => {
+    const s = window.t2r.state;
+    return !s.sync.busy && s.entries.length === count && s.entries.every((e) => e.synced) && (secs === null || s.entries[0].seconds === secs);
+  }, [n, seconds], { timeout: 12000 });
+  const dlg = page.locator('.dlg');
+  const editFirst = async (mins) => {
+    await page.locator('.entry').first().getByRole('button', { name: 'Modifier' }).click();
+    await dlg.locator('input[type=number]').nth(0).fill(String(mins));
+    await dlg.getByRole('button', { name: 'Enregistrer' }).click();
+    await dlg.waitFor({ state: 'detached' });
+  };
+
+  await page.getByRole('button', { name: 'Continuer' }).click();
+  await page.getByRole('button', { name: 'Réglages' }).click();
+  await page.locator('#acctEmail').fill('moi@example.com');
+  await page.locator('#acctPass').fill('motdepasse');
+  await page.getByRole('button', { name: 'Créer un compte' }).click();
+  await page.waitForSelector('#syncStatus');
+  await page.waitForFunction(() => !window.t2r.state.sync.busy && window.t2r.state.sync.last);
+  await page.getByRole('button', { name: 'Retour' }).click();
+  await page.getByRole('button', { name: 'Historique' }).click();
+
+  // ajout depuis l'historique
+  await page.getByRole('button', { name: 'Ajouter une entrée' }).first().click();
+  await dlg.locator('input[type=date]').fill('2026-10-29');
+  await dlg.locator('input[type=time]').fill('09:15');
+  await dlg.locator('input[type=number]').nth(0).fill('10');
+  await dlg.getByRole('button', { name: 'Enregistrer' }).click();
+  await dlg.waitFor({ state: 'detached' });
+  await settled(1, 600);
+  check(db.rows.length === 1 && db.rows[0].seconds === 600 && db.rows[0].time === '09:15' && db.rows[0].date === '2026-10-29', 'entrée ajoutée à la main : envoyée au serveur');
+
+  // modification : la ligne du serveur est mise à jour, sans doublon
+  await editFirst(20);
+  await settled(1, 1200);
+  check(db.rows.length === 1 && db.rows[0].seconds === 1200, 'entrée modifiée : la ligne du serveur est mise à jour (pas de doublon)');
+
+  // modification pendant un envoi lent : la seconde modification ne doit pas être perdue
+  db.delayPost = 1500;
+  const before = posts();
+  await editFirst(30);
+  await waitFor(() => posts() > before); // l'envoi de « 30 min » est parti, le serveur n'a pas encore répondu
+  await editFirst(45);
+  db.delayPost = 0;
+  await settled(1, 2700);
+  const ids = await page.evaluate(() => window.t2r.state.entries.map((e) => e.id));
+  check(new Set(ids).size === ids.length && ids.length === 1, 'pas de doublon local après une modification pendant la synchro');
+  check(db.rows.length === 1 && db.rows[0].seconds === 2700, 'modification faite pendant un envoi : renvoyée juste après (serveur à 45 min)');
+
+  check(errors.length === 0, `aucune erreur console (${errors.join(' | ')})`);
+  await context.close();
 }
 
 main().catch((e) => { console.error(e); process.exit(1); });

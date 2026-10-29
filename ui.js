@@ -30,7 +30,6 @@ const ICONS = {
   restaurant: 'M11 9H9V2H7v7H5V2H3v7c0 2.12 1.66 3.84 3.75 3.97V22h2.5v-9.03C11.34 12.84 13 11.12 13 9V2h-2v7zm5-3v8h2.5v8H21V2c-2.76 0-5 2.24-5 4z',
   play: 'M8 5v14l11-7z',
   stop: 'M6 6h12v12H6z',
-  directions: 'M21.71 11.29l-9-9a.996.996 0 0 0-1.41 0l-9 9a.996.996 0 0 0 0 1.41l9 9c.39.39 1.02.39 1.41 0l9-9a.996.996 0 0 0 0-1.41zM14 14.5V12h-4v3H8v-4c0-.55.45-1 1-1h5V7.5l3.5 3.5-3.5 3.5z',
   bag: 'M18 6h-2c0-2.21-1.79-4-4-4S8 3.79 8 6H6c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-8 4c0 .55-.45 1-1 1s-1-.45-1-1V8h2v2zm2-6c1.1 0 2 .9 2 2h-4c0-1.1.9-2 2-2zm4 6c0 .55-.45 1-1 1s-1-.45-1-1V8h2v2z',
   timer: 'M15 1H9v2h6V1zm-4 13h2V8h-2v6zm8.03-6.61l1.42-1.42c-.43-.51-.9-.99-1.41-1.41l-1.42 1.42C16.07 4.74 14.12 4 12 4c-4.97 0-9 4.03-9 9s4.02 9 9 9 9-4.03 9-9c0-2.12-.74-4.07-1.97-5.61zM12 20c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z',
   schedule: 'M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z',
@@ -40,8 +39,6 @@ const ICONS = {
   delete_sweep: 'M15 16h4v2h-4zm0-8h7v2h-7zm0 4h6v2h-6zM3 18c0 1.1.9 2 2 2h6c1.1 0 2-.9 2-2V8H3v10zM14 5h-3l-1-1H6L5 5H2v2h12z',
   delete_forever: 'M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zm2.46-7.12l1.41-1.41L12 12.59l2.12-2.12 1.41 1.41L13.41 14l2.12 2.12-1.41 1.41L12 15.41l-2.12 2.12-1.41-1.41L10.59 14l-2.13-2.12zM15.5 4l-1-1h-5l-1 1H5v2h14V4z',
   warning: 'M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z',
-  home: 'M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z',
-  business: 'M12 7V3H2v18h20V7H12zM6 19H4v-2h2v2zm0-4H4v-2h2v2zm0-4H4V9h2v2zm0-4H4V5h2v2zm4 12H8v-2h2v2zm0-4H8v-2h2v2zm0-4H8V9h2v2zm0-4H8V5h2v2zm10 12h-8v-2h2v-2h-2v-2h2v-2h-2V9h8v10zm-2-8h-2v2h2v-2zm0 4h-2v2h2v-2z',
   expand_more: 'M16.59 8.59L12 13.17 7.41 8.59 6 10l6 6 6-6z',
   radio: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z',
   check_circle: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z',
@@ -222,7 +219,7 @@ function homeView() {
     ringBlock(),
     h('div', { class: 'options' }, S.run ? runningInfo() : timerOptions()),
     startButton(),
-    tilesRow());
+    orderTile());
 }
 
 function statBlock(iconName, label, agg) {
@@ -363,33 +360,18 @@ function startButton() {
   }, icon(running ? 'stop' : 'play', 26), h('span', {}, t(running ? 'stop_btn' : 'start_btn', vars)));
 }
 
-const navName = () => (S.prefs.navApp === 'gmaps' ? 'Google Maps' : 'Waze');
-
-function routeUrl(addr) {
-  const q = encodeURIComponent(addr);
-  if (S.prefs.navApp === 'gmaps') {
-    return addr ? `https://www.google.com/maps/dir/?api=1&destination=${q}` : 'https://www.google.com/maps';
-  }
-  return addr ? `https://waze.com/ul?q=${q}&navigate=yes` : 'https://www.waze.com/live-map';
-}
-
-function tilesRow() {
-  const via = navName();
-  const link = (cls, href, ic, label, caption) => h('a', {
-    class: cls, href: safeUrl(href), target: '_blank', rel: 'noopener noreferrer',
-  }, icon(ic, 26), h('span', { class: 'tile-label' }, label), h('span', { class: 'tile-cap' }, caption));
-  const tiles = [];
-  const { homeAddr, workAddr } = S.prefs;
-  if (homeAddr) tiles.push(link('tile route', routeUrl(homeAddr), 'directions', t('to_home'), t('via', { app: via })));
-  if (workAddr) tiles.push(link('tile route', routeUrl(workAddr), 'directions', t('to_work'), t('via', { app: via })));
-  if (!homeAddr || !workAddr) tiles.push(link('tile route', routeUrl(''), 'directions', t('route'), t('with_app', { app: via })));
+/** Bouton « Commander » vers le site choisi (la petite flèche permet d'en changer). */
+function orderTile() {
   const shop = S.prefs.shops[S.prefs.shopIndex];
-  tiles.push(h('div', { class: 'tile-wrap' },
-    link('tile', shop.url, 'bag', t('order'), shop.name),
+  return h('div', { class: 'tile-wrap' },
+    h('a', { class: 'tile', href: safeUrl(shop.url), target: '_blank', rel: 'noopener noreferrer' },
+      icon('bag', 26),
+      h('span', { class: 'tile-txt' },
+        h('span', { class: 'tile-label' }, t('order')),
+        h('span', { class: 'tile-cap' }, shop.name))),
     S.prefs.shops.length > 1
       ? h('button', { type: 'button', class: 'tile-pick', title: t('pick_shop'), 'aria-label': t('pick_shop'), on: { click: choseShop } }, icon('expand_more', 18))
-      : null));
-  return h('div', { class: 'tiles' }, tiles);
+      : null);
 }
 
 async function choseShop() {
@@ -419,13 +401,15 @@ function historyView() {
     menuItem('delete_forever', t('menu_clear_all'), () => clearHistory(false)));
 
   const body = entries.length === 0
-    ? h('div', { class: 'empty' }, icon('history', 56), h('p', {}, t('history_empty')))
+    ? h('div', { class: 'empty' }, icon('history', 56), h('p', {}, t('history_empty')),
+      h('button', { type: 'button', class: 'btn tonal', on: { click: () => editEntry(null) } }, icon('add', 18), t('entry_add')))
     : [...byDay.entries()].map(([key, list]) => dayBlock(key, list));
 
   return h('div', { class: 'page' },
     h('header', { class: 'top' },
       iconBtn('arrow_back', t('back'), goBack),
       h('h1', { class: 'grow' }, t('history')),
+      iconBtn('add', t('entry_add'), () => editEntry(null), 'accent'),
       h('div', { class: 'menu-wrap' }, iconBtn('more_vert', t('more'), toggleMenu), menu)),
     body);
 }
@@ -475,7 +459,114 @@ function entryRow(e) {
       h('div', { class: 'strong' }, typeLabel(e.type)),
       h('div', { class: 'small muted' }, t('at_time', { time: e.time }))),
     h('span', { class: 'dur' }, formatDuration(e.seconds)),
+    iconBtn('edit', t('edit'), () => editEntry(e)),
     iconBtn('delete', t('delete'), () => deleteEntry(e)));
+}
+
+/** Boîte « ajouter / modifier une entrée » : renvoie {type, date, time, seconds}, ou null si on annule. */
+function entryDialog(initial) {
+  return openDialog((dlg, close) => {
+    const now = new Date();
+    const todayCal = dayKey(now);
+    let type = initial ? initial.type : 'break';
+    let touched = !!initial; // durée modifiée à la main : on ne la remplace plus quand on change de type
+    const defaultMinutes = (v) => (v === 'lunch' ? LUNCH_MINUTES : S.ui.pauseMinutes);
+
+    const date = h('input', {
+      type: 'date', class: 'field', required: true, max: todayCal, 'aria-label': t('entry_date'),
+      value: initial ? initial.date : todayCal,
+    });
+    const time = h('input', {
+      type: 'time', class: 'field', required: true, 'aria-label': t('entry_start'),
+      value: initial ? initial.time : `${two(now.getHours())}:${two(now.getMinutes())}`,
+    });
+    const mins = h('input', {
+      type: 'number', class: 'field num', min: '0', max: '1440', step: '1', inputmode: 'numeric', 'aria-label': t('entry_minutes'),
+      value: String(initial ? Math.floor(initial.seconds / 60) : defaultMinutes(type)),
+    });
+    const secs = h('input', {
+      type: 'number', class: 'field num', min: '0', max: '59', step: '1', inputmode: 'numeric', 'aria-label': t('entry_seconds'),
+      value: String(initial ? initial.seconds % 60 : 0),
+    });
+    [mins, secs].forEach((el) => el.addEventListener('input', () => { touched = true; }));
+
+    const hint = h('p', { class: 'small muted', hidden: true, 'aria-live': 'polite' });
+    const error = h('p', { class: 'small dlg-error', hidden: true, role: 'alert' });
+    const fail = (message) => { error.textContent = message; error.hidden = false; };
+
+    const updateHint = () => {
+      const d = parseDay(date.value);
+      let text = '';
+      if (S.prefs.nightMode && d && dayKey(d) === date.value && /^\d{2}:\d{2}$/.test(time.value)) {
+        const key = workDay({ date: date.value, time: time.value });
+        if (key !== date.value) text = t('entry_night_note', { day: dateLong(parseDay(key)) });
+      }
+      hint.textContent = text;
+      hint.hidden = !text;
+    };
+    [date, time].forEach((el) => { el.addEventListener('input', updateHint); el.addEventListener('change', updateHint); });
+
+    const segBtns = {};
+    const pickType = (v) => {
+      type = v;
+      Object.entries(segBtns).forEach(([k, b]) => { b.classList.toggle('on', k === v); b.setAttribute('aria-pressed', String(k === v)); });
+      if (!touched) { mins.value = String(defaultMinutes(v)); secs.value = '0'; }
+    };
+    const seg = (value, ic) => {
+      segBtns[value] = h('button', {
+        type: 'button', class: `seg${type === value ? ' on' : ''}`, 'aria-pressed': String(type === value), on: { click: () => pickType(value) },
+      }, icon(ic, 20), h('span', {}, typeLabel(value)));
+      return segBtns[value];
+    };
+
+    const submit = () => {
+      error.hidden = true;
+      const d = parseDay(date.value);
+      if (!d || dayKey(d) !== date.value || date.value > todayCal) return fail(t('entry_err_date'));
+      if (!/^\d{2}:\d{2}$/.test(time.value)) return fail(t('entry_err_time'));
+      const m = mins.value === '' ? 0 : Number(mins.value);
+      const s = secs.value === '' ? 0 : Number(secs.value);
+      const total = m * 60 + s;
+      if (!Number.isInteger(m) || !Number.isInteger(s) || m < 0 || s < 0 || s > 59 || total < 1 || total > 86400) return fail(t('entry_err_duration'));
+      return close({ type, date: date.value, time: time.value, seconds: total });
+    };
+
+    dlg.append(
+      h('h2', {}, initial ? t('entry_edit_title') : t('entry_add')),
+      h('div', { class: 'dlg-fields' },
+        h('div', { class: 'segs' }, seg('break', 'coffee'), seg('lunch', 'restaurant')),
+        h('div', { class: 'fld-pair' },
+          h('label', { class: 'fld' }, h('span', { class: 'fld-label' }, t('entry_date')), date),
+          h('label', { class: 'fld' }, h('span', { class: 'fld-label' }, t('entry_start')), time)),
+        h('div', { class: 'fld' },
+          h('span', { class: 'fld-label' }, t('entry_duration')),
+          h('div', { class: 'dur-row' }, mins, h('span', { class: 'unit' }, 'min'), secs, h('span', { class: 'unit' }, 's'))),
+        hint,
+        error),
+      h('div', { class: 'dlg-actions' },
+        h('button', { type: 'button', class: 'btn text', on: { click: () => close(null) } }, t('cancel')),
+        h('button', { type: 'button', class: 'btn filled', on: { click: submit } }, t('entry_save'))),
+    );
+    [date, time, mins, secs].forEach((el) => el.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); submit(); } }));
+    updateHint();
+  });
+}
+
+/** Ajoute (entry = null) ou modifie une entrée de l'historique, pour les oublis. */
+async function editEntry(entry) {
+  const res = await entryDialog(entry);
+  if (!res) return;
+  const vars = { Type: typeLabel(res.type), dur: formatDuration(res.seconds) };
+  if (entry) {
+    // L'entrée a pu être remplacée par une synchro pendant que la boîte était ouverte : on la retrouve par son identifiant.
+    if (!updateEntry(entry.id, res)) addEntry({ id: entry.id, ...res, synced: false });
+    toast(t('entry_updated', vars));
+  } else {
+    addEntry({ id: uid(), ...res, synced: false });
+    toast(t('entry_added', vars));
+  }
+  render();
+  scheduleSync();
 }
 
 function undoAction(removed) {
@@ -566,17 +657,6 @@ function settingsView() {
 
     syncEnabled() ? [sectionTitle(t('sec_account')), accountCard()] : null,
 
-    sectionTitle(t('sec_routes')),
-    h('div', { class: 'stack' },
-      addressField(t('addr_home'), 'home', S.prefs.homeAddr, (v) => { S.prefs.homeAddr = v.trim(); savePrefs(); }),
-      addressField(t('addr_work'), 'business', S.prefs.workAddr, (v) => { S.prefs.workAddr = v.trim(); savePrefs(); })),
-    sectionTitle(t('sec_nav')),
-    h('div', { class: 'card pad' },
-      h('div', { class: 'chips' },
-        chip('Waze', S.prefs.navApp === 'waze', () => { S.prefs.navApp = 'waze'; savePrefs(); render(); }),
-        chip('Google Maps', S.prefs.navApp === 'gmaps', () => { S.prefs.navApp = 'gmaps'; savePrefs(); render(); })),
-      h('p', { class: 'small muted' }, t('nav_note'))),
-
     sectionTitle(t('sec_order')),
     shopsCard(),
     h('p', { class: 'small muted note' }, t('order_note')),
@@ -613,12 +693,6 @@ function langCard() {
       chip('Français', LANG === 'fr', pick('fr')),
       chip('Nederlands', LANG === 'nl', pick('nl'))),
     h('p', { class: 'small muted' }, t('lang_note')));
-}
-
-function addressField(label, ic, value, onInput) {
-  return h('label', { class: 'field-row' },
-    icon(ic, 20),
-    h('input', { type: 'text', class: 'field', value, placeholder: label, 'aria-label': label, autocomplete: 'street-address', on: { input: (e) => onInput(e.target.value) } }));
 }
 
 function shopsCard() {

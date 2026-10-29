@@ -96,6 +96,8 @@ h1, h2, p { margin: 0; }
   background: var(--high); color: var(--text);
 }
 .icon-btn:hover { background: var(--highest); }
+.icon-btn.accent { background: var(--primary); color: var(--on-primary); }
+.icon-btn.accent:hover { background: var(--primary); filter: brightness(1.08); }
 .icon-btn:focus-visible, .btn:focus-visible, .chip:focus-visible, .seg:focus-visible,
 .start:focus-visible, .tile:focus-visible, .menu-item:focus-visible, .shop-main:focus-visible {
   outline: 3px solid var(--primary); outline-offset: 2px;
@@ -193,23 +195,19 @@ h1, h2, p { margin: 0; }
 .start:hover { filter: brightness(1.06); }
 
 /* ---------- Raccourcis ---------- */
-.tiles { display: flex; gap: 10px; }
-.tiles > * { flex: 1 1 0; min-width: 0; }
 .tile-wrap { position: relative; display: flex; }
-.tile-wrap .tile { flex: 1; }
 .tile {
-  display: flex; flex-direction: column; align-items: center; gap: 3px;
-  padding: 10px 4px; border-radius: 20px;
-  background: var(--high); color: var(--text); text-decoration: none; min-width: 0;
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 14px;
+  padding: 14px 56px; border-radius: 22px; min-width: 0;
+  background: var(--high); color: var(--text); text-decoration: none;
 }
 .tile .ico { color: var(--primary); }
-.tile.route { background: var(--secondary-c); color: var(--on-secondary-c); }
-.tile.route .ico { color: inherit; }
 .tile:hover { filter: brightness(.97); }
-.tile-label { font-size: 12px; font-weight: 700; text-align: center; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 4px; }
-.tile-cap { font-size: 10px; opacity: .7; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 4px; }
+.tile-txt { display: flex; flex-direction: column; min-width: 0; text-align: left; }
+.tile-label { font-size: 16px; font-weight: 700; }
+.tile-cap { font-size: 13px; opacity: .72; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tile-pick {
-  position: absolute; top: 4px; right: 4px; width: 26px; height: 26px;
+  position: absolute; top: 50%; right: 10px; transform: translateY(-50%); width: 36px; height: 36px;
   display: grid; place-items: center; border: 0; border-radius: 50%;
   background: color-mix(in srgb, var(--surface) 70%, transparent); color: var(--text);
 }
@@ -249,14 +247,9 @@ h1, h2, p { margin: 0; }
 .note { padding: 0 4px; }
 .banner { padding: 16px; border-radius: 20px; background: var(--primary-c); color: var(--on-primary-c); }
 .stack { display: flex; flex-direction: column; gap: 12px; }
-.field-row {
-  display: flex; align-items: center; gap: 10px;
-  padding: 0 14px; border-radius: 18px; background: var(--high);
-}
 .field {
   width: 100%; padding: 14px 4px; border: 0; background: transparent; outline: none;
 }
-.field-row:focus-within { outline: 2px solid var(--primary); }
 .card .field, .dlg-fields .field { background: var(--high); border-radius: 14px; padding: 12px 14px; }
 .row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .acct-form { display: flex; flex-direction: column; gap: 10px; }
@@ -298,6 +291,14 @@ h1, h2, p { margin: 0; }
 .dlg h2 { font-size: 21px; font-weight: 600; margin-bottom: 12px; text-wrap: balance; }
 .dlg-body { white-space: pre-line; color: var(--muted); line-height: 1.45; }
 .dlg-fields { display: flex; flex-direction: column; gap: 12px; }
+.fld-pair { display: grid; grid-template-columns: 1.3fr 1fr; gap: 10px; }
+.fld { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.fld-label { font-size: 12px; font-weight: 600; color: var(--muted); padding-left: 4px; }
+.dlg-fields input[type="date"], .dlg-fields input[type="time"] { min-width: 0; font: inherit; color: inherit; color-scheme: light dark; }
+.dur-row { display: flex; align-items: center; gap: 8px; }
+.dur-row .field.num { width: 5.5em; text-align: right; }
+.unit { color: var(--muted); font-size: 14px; margin-right: 6px; }
+.dlg-error { color: var(--error); font-weight: 600; }
 .dlg-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 22px; }
 .pick-list { display: flex; flex-direction: column; }
 .pick-item {

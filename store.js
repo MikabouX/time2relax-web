@@ -43,9 +43,6 @@ const LUNCH_MINUTES = 30;
 function defaultPrefs() {
   return {
     lang: null,
-    homeAddr: '',
-    workAddr: '',
-    navApp: 'waze',
     shops: [{ name: 'Smile Sandwicherie', url: DEFAULT_SHOP_URL }],
     shopIndex: 0,
     nightMode: false,
@@ -58,7 +55,7 @@ function loadPrefs() {
   const p = Object.assign(defaultPrefs(), store.get('t2r.prefs', {}));
   if (!Array.isArray(p.shops) || p.shops.length === 0) p.shops = defaultPrefs().shops;
   p.shopIndex = Math.min(Math.max(parseInt(p.shopIndex, 10) || 0, 0), p.shops.length - 1);
-  if (p.navApp !== 'gmaps') p.navApp = 'waze';
+  ['homeAddr', 'workAddr', 'navApp'].forEach((k) => { delete p[k]; }); // anciens réglages d'itinéraire
   p.nightCutoff = parseInt(p.nightCutoff, 10);
   if (Number.isNaN(p.nightCutoff)) p.nightCutoff = 12;
   return p;
@@ -181,6 +178,20 @@ function addEntry(e) {
   S.entries.push(e);
   sortEntries();
   saveEntries();
+}
+
+/** Modifie une entrée (même identifiant) ; elle sera renvoyée au serveur à la prochaine synchro. */
+function updateEntry(id, fields) {
+  const e = S.entries.find((x) => x.id === id);
+  if (!e) return null;
+  e.date = fields.date;
+  e.time = fields.time;
+  e.type = fields.type;
+  e.seconds = fields.seconds;
+  e.synced = false;
+  sortEntries();
+  saveEntries();
+  return e;
 }
 
 /** Retire les entrées d'identifiants donnés et renvoie celles qui ont été retirées (pour annuler). */
