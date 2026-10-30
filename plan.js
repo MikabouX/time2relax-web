@@ -81,16 +81,20 @@ function planStarts(now = new Date()) {
 /** Fonction pure. items : [{ms, type}] ; starts : [{ms, type}] → { item, secs, due } ou null.
     due : l'heure est passée depuis moins de 10 minutes et rien n'a été lancé (secs = secondes écoulées). */
 function pickPlanned(nowMs, items, starts) {
-  const used = new Set();
-  const open = [];
-  for (const it of items) {
-    let k = -1;
-    for (let i = 0; i < starts.length; i += 1) {
-      if (used.has(i) || starts[i].type !== it.type) continue;
-      if (starts[i].ms >= it.ms - PLAN_EARLY_MS && starts[i].ms <= it.ms + PLAN_LATE_MS) { k = i; break; }
-    }
-    if (k >= 0) used.add(k); else open.push(it);
+  // Chaque départ « consomme » l'horaire du même type le plus proche (de -30 min à +3 h).
+  const taken = new Set();
+  for (const s of [...starts].sort((x, y) => x.ms - y.ms)) {
+    let best = -1;
+    let bestGap = Infinity;
+    items.forEach((it, i) => {
+      if (taken.has(i) || it.type !== s.type) return;
+      if (s.ms < it.ms - PLAN_EARLY_MS || s.ms > it.ms + PLAN_LATE_MS) return;
+      const gap = Math.abs(s.ms - it.ms);
+      if (gap < bestGap) { best = i; bestGap = gap; }
+    });
+    if (best >= 0) taken.add(best);
   }
+  const open = items.filter((_, i) => !taken.has(i));
   const due = open.find((it) => it.ms <= nowMs && nowMs < it.ms + PLAN_DUE_MS);
   if (due) return { item: due, secs: Math.floor((nowMs - due.ms) / 1000), due: true };
   const next = open.find((it) => it.ms > nowMs);

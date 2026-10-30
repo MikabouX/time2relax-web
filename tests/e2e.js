@@ -465,6 +465,12 @@ async function planTests(browser) {
         wrongType: pick(0, [{ ms: min(10), type: 'lunch' }]),
         late: pick(40, [{ ms: min(35), type: 'break' }]),
         twoStarts: pick(100, [{ ms: min(10), type: 'break' }, { ms: min(12), type: 'break' }]),
+        nearest: (() => {
+          const two = [{ ms: min(15), type: 'break' }, { ms: min(60), type: 'break' }];
+          const a = pickPlanned(min(55), two, [{ ms: min(50), type: 'break' }]);
+          const b = pickPlanned(min(25), two, [{ ms: min(20), type: 'break' }]);
+          return { a, b: b && b.item.ms - base };
+        })(),
         none: pick(400),
         allDone: pick(10, [{ ms: min(10), type: 'break' }, { ms: min(120), type: 'lunch' }, { ms: min(290), type: 'break' }]),
         fmt: [formatCountdown(0), formatCountdown(59), formatCountdown(61), formatCountdown(3600), formatCountdown(6130), formatCountdown(-4)],
@@ -480,6 +486,7 @@ async function planTests(browser) {
     check(r.wrongType && r.wrongType.t === 'break', "un lunch ne remplace pas un break prévu");
     check(r.late && r.late.t === 'lunch', 'lancé en retard (35 min après) : compte pour le break prévu');
     check(r.twoStarts && r.twoStarts.t === 'lunch' && r.twoStarts.secs === 3000, 'deux départs : un seul break prévu consommé');
+    check(r.nearest.a === null && r.nearest.b === 60 * 60000, "un break compte pour l'horaire le plus proche (10:50 → 11:00, 10:20 → 10:15)");
     check(r.none === null, 'plus rien de prévu : null');
     check(r.allDone === null, 'tout a été pris : null');
     eq(r.fmt.join(' | '), '00:00 | 00:59 | 01:01 | 1:00:00 | 1:42:10 | 00:00', 'format du décompte');
