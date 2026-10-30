@@ -1,0 +1,55 @@
+# Essai à la main du chrono partagé sur le vrai projet Supabase (nom de test « __essai-chrono__ », effacé à la fin).
+# Lancement : onglet « Actions » du dépôt → « Essai du chrono partagé » → « Run workflow ».
+name: Essai du chrono partagé
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  essai:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Départ, relecture, conflit, arrêt
+        run: |
+          URL=$(sed -n "s/.*supabaseUrl: '\([^']*\)'.*/\1/p" config.js)
+          KEY=$(sed -n "s/.*supabaseKey: '\([^']*\)'.*/\1/p" config.js)
+          N='__essai-chrono__'
+          A='aaaaaaaa-1111-4222-8333-444444444444'
+          B='bbbbbbbb-1111-4222-8333-444444444444'
+          call() { curl -sS --max-time 30 -X POST "$URL/rest/v1/rpc/$1" -H "apikey: $KEY" -H "Content-Type: application/json" -d "$2"; }
+          fail() { echo "::error::$1"; call t2r_run_stop "{\"p_username\":\"$N\",\"p_id\":\"$A\"}" >/dev/null; exit 1; }
+          call t2r_run_stop "{\"p_username\":\"$N\",\"p_id\":\"$A\"}" >/dev/null   # nettoyage éventuel d'un essai précédent
+
+          r=$(call t2r_run_start "{\"p_username\":\"$N\",\"p_id\":\"$A\",\"p_type\":\"break\",\"p_planned\":600,\"p_elapsed_ms\":120000}")
+          echo "départ : $r"
+          [ "$(echo "$r" | jq -r '.[0].run_id')" = "$A" ] || fail "départ : le chrono n'est pas celui envoyé"
+          [ "$(echo "$r" | jq '.[0].elapsed_ms >= 120000 and .[0].elapsed_ms < 130000')" = "true" ] || fail "départ : temps écoulé incorrect"
+          [ "$(echo "$r" | jq -r '.[0].planned_s')" = "600" ] || fail "départ : durée prévue incorrecte"
+
+          r=$(call t2r_run_get "{\"p_username\":\"  $(echo $N | tr a-z A-Z)  \"}")
+          echo "relecture (autre casse, espaces) : $r"
+          [ "$(echo "$r" | jq -r '.[0].run_id')" = "$A" ] || fail "relecture : nom pas normalisé"
+
+          r=$(call t2r_run_start "{\"p_username\":\"$N\",\"p_id\":\"$B\",\"p_type\":\"lunch\",\"p_planned\":1800,\"p_elapsed_ms\":0}")
+          echo "deuxième départ : $r"
+          [ "$(echo "$r" | jq -r '.[0].run_id')" = "$A" ] || fail "deuxième départ : le premier chrono aurait dû rester en place"
+
+          r=$(call t2r_run_get '{"p_username":"un-autre-nom-sans-chrono"}')
+          [ "$r" = "[]" ] || fail "un autre nom voit un chrono : $r"
+
+          r=$(call t2r_run_stop "{\"p_username\":\"$N\",\"p_id\":\"$B\"}")
+          [ "$r" = "false" ] || fail "arrêt d'un autre chrono : devrait renvoyer false, reçu $r"
+          r=$(call t2r_run_stop "{\"p_username\":\"$N\",\"p_id\":\"$A\"}")
+          [ "$r" = "true" ] || fail "arrêt : devrait renvoyer true, reçu $r"
+          r=$(call t2r_run_get "{\"p_username\":\"$N\"}")
+          [ "$r" = "[]" ] || fail "après l'arrêt, un chrono reste : $r"
+
+          r=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 30 "$URL/rest/v1/runs?select=*" -H "apikey: $KEY")
+          echo "lecture directe de la table runs : HTTP $r"
+          body=$(curl -sS --max-time 30 "$URL/rest/v1/runs?select=*" -H "apikey: $KEY")
+          [ "$body" = "[]" ] || [ "$r" != "200" ] || fail "la table runs est lisible directement : $body"
+          echo "::notice::Chrono partagé : départ, relecture, conflit, arrêt et protection de la table : tout est correct sur le vrai projet Supabase."
