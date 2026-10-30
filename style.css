@@ -317,7 +317,7 @@ h1, h2, p { margin: 0; }
   transition: opacity .2s, transform .2s;
 }
 #toast.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
-.toast-action { border: 0; background: transparent; color: var(--primary-c); font-weight: 700; padding: 4px 6px; }
+.toast-action { border: 0; background: transparent; color: var(--primary-c); font-weight: 700; padding: 4px 6px; flex: none; text-align: right; }
 
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; }

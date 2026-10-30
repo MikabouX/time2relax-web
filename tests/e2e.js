@@ -744,7 +744,7 @@ async function stopTests(browser) {
   await advance(page, 180000);
   await page.locator('.start').click();
   check((await text(page, '#toast')).includes('Break enregistré : 03:00'), 'message « Break enregistré : 03:00 »');
-  check(await page.locator('#toast .toast-action', { hasText: 'Reprendre' }).isVisible(), "bouton « Reprendre » proposé dans le message");
+  check(await page.locator('#toast .toast-action', { hasText: "C'est une erreur : reprendre" }).isVisible(), "bouton « C'est une erreur : reprendre » proposé dans le message");
   let list = await entries();
   check(list.length === 1 && list[0].id === runId && list[0].seconds === 180, "l'entrée porte l'identifiant du chrono");
   await settled();
@@ -937,7 +937,7 @@ async function sharedRunTests(browser) {
   await a.page.locator('.start').click();
   await waitFor(() => !db.runs['duo-test']);
   await advance(a.page, 30000);
-  await a.page.locator('#toast .toast-action', { hasText: 'Reprendre' }).click();
+  await a.page.locator('#toast .toast-action', { hasText: "C'est une erreur : reprendre" }).click();
   await waitFor(() => db.runs['duo-test']);
   const elapsedSrv = db.now() - db.runs['duo-test'].startedAt;
   check(db.runs['duo-test'].id === idR && elapsedSrv >= 210000 && elapsedSrv < 240000, `« Reprendre » : le serveur retrouve le chrono (${Math.round(elapsedSrv / 1000)} s écoulées)`);
@@ -959,7 +959,7 @@ async function sharedRunTests(browser) {
   await b.page.locator('.start').click();
   await waitRunPushed(b.page);
   const idBusy = (await runOn(b.page)).id;
-  await a.page.locator('#toast .toast-action', { hasText: 'Reprendre' }).click();
+  await a.page.locator('#toast .toast-action', { hasText: "C'est une erreur : reprendre" }).click();
   await a.page.waitForFunction(() => document.getElementById('toast').innerText.includes('Un autre chrono était déjà en cours'), null, { timeout: 5000 });
   check(true, 'reprise alors qu’un autre chrono tourne : A en est prévenu');
   eq((await runOn(a.page) || {}).id, idBusy, 'A suit le chrono de B');
