@@ -417,12 +417,208 @@ async function main() {
 
     console.log('J. Chrono partagé entre appareils');
     await sharedRunTests(browser);
+
+    console.log('K. Breaks prévus : décompte grisé, sans alerte');
+    await planTests(browser);
   } finally {
     await browser.close();
     server.kill();
   }
   console.log(`\n${passed} vérifications réussies, ${failed} échec(s).`);
   process.exit(failed ? 1 : 0);
+}
+
+/* ---------- K. Breaks prévus ---------- */
+
+const planSetup = (items, extra = {}, prefs = {}) => `() => {
+  localStorage.setItem('t2r.prefs', JSON.stringify(Object.assign({ setupDone: true }, ${JSON.stringify(prefs)})));
+  localStorage.setItem('t2r.plan', JSON.stringify(Object.assign({ items: ${JSON.stringify(items)}, repeat: true, day: '' }, ${JSON.stringify(extra)})));
+}`;
+const PLAN3 = [
+  { id: 'a', time: '10:15', type: 'break' },
+  { id: 'b', time: '12:30', type: 'lunch' },
+  { id: 'c', time: '15:00', type: 'break' },
+];
+const planLine = async (page) => ({
+  hidden: await page.locator('#planLine').evaluate((e) => e.hidden),
+  text: await page.locator('#planText').innerText(),
+  due: await page.locator('#planLine').evaluate((e) => e.classList.contains('due')),
+  arc: await page.locator('#planArc').evaluate((e) => ({ op: e.style.opacity, off: Number(e.style.strokeDashoffset) })),
+});
+
+async function planTests(browser) {
+  // --- logique pure
+  {
+    const { page, context } = await newPage(browser);
+    const r = await page.evaluate(() => {
+      const base = new Date('2026-10-29T10:00:00+01:00').getTime();
+      const min = (m) => base + m * 60000;
+      const items = [{ ms: min(15), type: 'break' }, { ms: min(150), type: 'lunch' }, { ms: min(300), type: 'break' }];
+      const pick = (now, starts = []) => { const p = pickPlanned(min(now), items, starts); return p && { t: p.item.type, ms: p.item.ms - base, secs: p.secs, due: p.due }; };
+      return {
+        upcoming: pick(0),
+        dueNow: pick(15),
+        dueLater: pick(24),
+        dueGone: pick(26),
+        early: pick(0, [{ ms: min(-5), type: 'break' }]),
+        tooEarly: pick(-20, [{ ms: min(-20), type: 'break' }]),
+        wrongType: pick(0, [{ ms: min(10), type: 'lunch' }]),
+        late: pick(40, [{ ms: min(35), type: 'break' }]),
+        twoStarts: pick(100, [{ ms: min(10), type: 'break' }, { ms: min(12), type: 'break' }]),
+        none: pick(400),
+        allDone: pick(10, [{ ms: min(10), type: 'break' }, { ms: min(120), type: 'lunch' }, { ms: min(290), type: 'break' }]),
+        fmt: [formatCountdown(0), formatCountdown(59), formatCountdown(61), formatCountdown(3600), formatCountdown(6130), formatCountdown(-4)],
+        nextQ: [nextQuarter(new Date('2026-10-29T10:00:00+01:00')), nextQuarter(new Date('2026-10-29T10:14:30+01:00')), nextQuarter(new Date('2026-10-29T23:50:00+01:00'))],
+      };
+    });
+    check(r.upcoming && r.upcoming.t === 'break' && r.upcoming.ms === 15 * 60000 && r.upcoming.secs === 900 && !r.upcoming.due, 'le prochain break prévu et le temps restant (15 min)');
+    check(r.dueNow && r.dueNow.due && r.dueNow.secs === 0, "à l'heure pile : « c'est l'heure »");
+    check(r.dueLater && r.dueLater.due && r.dueLater.secs === 540, "« c'est l'heure » reste affiché 10 minutes");
+    check(r.dueGone && r.dueGone.t === 'lunch' && !r.dueGone.due, "après 10 minutes sans rien lancer : on passe au suivant");
+    check(r.early && r.early.t === 'lunch', 'un break lancé 5 min avant compte pour le break prévu');
+    check(r.tooEarly && r.tooEarly.t === 'break' && r.tooEarly.ms === 15 * 60000, 'lancé plus de 30 min avant : ne compte pas');
+    check(r.wrongType && r.wrongType.t === 'break', "un lunch ne remplace pas un break prévu");
+    check(r.late && r.late.t === 'lunch', 'lancé en retard (35 min après) : compte pour le break prévu');
+    check(r.twoStarts && r.twoStarts.t === 'lunch' && r.twoStarts.secs === 3000, 'deux départs : un seul break prévu consommé');
+    check(r.none === null, 'plus rien de prévu : null');
+    check(r.allDone === null, 'tout a été pris : null');
+    eq(r.fmt.join(' | '), '00:00 | 00:59 | 01:01 | 1:00:00 | 1:42:10 | 00:00', 'format du décompte');
+    eq(r.nextQ.join(' '), '10:15 10:15 00:00', 'heure de départ proposée : prochain quart d\'heure');
+    await context.close();
+  }
+
+  // --- l'icône, la page, les ajouts, modifications et suppressions
+  {
+    const { page, context, errors } = await newPage(browser, { setup: () => localStorage.setItem('t2r.prefs', JSON.stringify({ setupDone: true })) });
+    check(await page.locator('#planLine').evaluate((e) => e.hidden), 'sans horaire : aucune ligne grise');
+    eq(await page.locator('#planTrack').evaluate((e) => e.style.opacity), '0', 'sans horaire : aucun cercle gris');
+    const labels = await page.locator('.icon-btn').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')));
+    eq(labels.slice(0, 3).join(' | '), 'Historique | Breaks prévus | Réglages', "icône calendrier entre l'historique et les réglages");
+    await page.getByRole('button', { name: 'Breaks prévus' }).click();
+    eq(await text(page, 'h1'), 'Breaks prévus', 'la page des breaks prévus');
+    check(await page.locator('.plan-empty').isVisible(), 'liste vide : message');
+    const setTime = async (i, v) => { await page.locator('.time-in').nth(i).fill(v); await page.locator('.time-in').nth(i).dispatchEvent('change'); };
+    await page.getByRole('button', { name: 'Ajouter un break' }).click();
+    eq(await page.locator('.time-in').first().inputValue(), '10:15', "heure de départ = prochain quart d'heure");
+    await setTime(0, '09:45');
+    await page.getByRole('button', { name: 'Ajouter un lunch' }).click();
+    await setTime(1, '12:30');
+    await page.getByRole('button', { name: 'Ajouter un break' }).click();
+    await setTime(1, '15:00');
+    eq(await page.locator('.plan-row').count(), 3, 'trois horaires ajoutés');
+    const list = () => page.evaluate(() => window.t2r.state.plan.items.map((i) => `${i.time} ${i.type}`).join(', '));
+    eq(await list(), '09:45 break, 12:30 lunch, 15:00 break', 'liste triée par heure, type choisi à l\'ajout');
+    await page.locator('.plan-row').nth(0).getByRole('button', { name: 'Lunch' }).click();
+    eq(await list(), '09:45 lunch, 12:30 lunch, 15:00 break', 'changer le type (break → lunch)');
+    await page.locator('.plan-row').nth(0).getByRole('button', { name: 'Supprimer' }).click();
+    eq(await list(), '12:30 lunch, 15:00 break', 'supprimer un horaire');
+    await page.locator('.time-in').nth(0).fill('');
+    await page.locator('.time-in').nth(0).dispatchEvent('change');
+    eq(await list(), '12:30 lunch, 15:00 break', 'une heure vide est ignorée');
+    await page.reload();
+    eq(await list(), '12:30 lunch, 15:00 break', 'les horaires sont gardés après rechargement');
+    check(errors.length === 0, `aucune erreur console (${errors.join(' | ')})`);
+    await context.close();
+  }
+
+  // --- affichage sur l'accueil : décompte, « c'est l'heure », suivant, plus rien — et jamais d'alerte
+  {
+    const { page, context, errors } = await newPage(browser, { setup: eval(planSetup(PLAN3)) });
+    let p = await planLine(page);
+    check(!p.hidden, 'une ligne grise sous le cadran');
+    eq(p.text, 'Prochain break · 10:15 · dans 15:00', 'prochain break et temps restant');
+    const circ = await page.evaluate(() => PLAN_CIRC);
+    check(!p.due && p.arc.op === '1' && Math.abs(p.arc.off / circ - 0.875) < 0.01, "l'arc gris est rempli à 12,5 % (15 min sur 2 h)");
+    await advance(page, 5 * 60000 + 1000);
+    p = await planLine(page);
+    eq(p.text, 'Prochain break · 10:15 · dans 09:59', 'le décompte avance (sans relancer le chrono)');
+    eq(await text(page, '#ringBig'), '00:00', 'le chrono du cadran reste à zéro');
+    await advance(page, 10 * 60000);
+    p = await planLine(page);
+    eq(p.text, "C'est l'heure du break (10:15)", "à l'heure : « c'est l'heure du break »");
+    check(p.due, 'mise en évidence (classe due)');
+    await advance(page, 11 * 60000);
+    p = await planLine(page);
+    eq(p.text, 'Prochain lunch · 12:30 · dans 2:03:59', 'sans rien lancer : on passe au lunch');
+    await page.evaluate(() => window.__setNow('2026-10-29T16:00:00+01:00'));
+    await tick(page);
+    p = await planLine(page);
+    eq(p.text, "Plus de break prévu aujourd'hui", 'plus rien de prévu aujourd\'hui');
+    check(p.arc.op === '0', 'plus d\'arc gris');
+    eq((await page.evaluate(() => window.__notes)).length, 0, 'aucune notification, aucune alerte');
+    eq(await page.evaluate(() => window.__beeps), 0, 'aucun bip');
+    check(errors.length === 0, `aucune erreur console (${errors.join(' | ')})`);
+    await context.close();
+  }
+
+  // --- un break lancé un peu en avance compte, y compris pendant qu'il tourne
+  {
+    const { page, context } = await newPage(browser, { setup: eval(planSetup(PLAN3)), startIso: '2026-10-29T10:05:00+01:00' });
+    await page.locator('.start').click();
+    let p = await planLine(page);
+    eq(p.text, 'Prochain lunch · 12:30 · dans 2:25:00', 'break en cours (lancé 10 min avant) : le suivant est le lunch');
+    await advance(page, 4 * 60000);
+    await page.locator('.start').click();
+    p = await planLine(page);
+    eq(p.text, 'Prochain lunch · 12:30 · dans 2:21:00', 'après le break : toujours le lunch');
+    await page.locator('.seg').nth(1).click();
+    await page.locator('.start').click();
+    p = await planLine(page);
+    eq(p.text, 'Prochain lunch · 12:30 · dans 2:21:00', 'un lunch lancé 2 h avant l\'heure prévue ne compte pas');
+    await page.locator('.start').click();
+    await page.evaluate(() => window.__setNow('2026-10-29T12:10:00+01:00'));
+    await tick(page);
+    await page.locator('.start').click();
+    p = await planLine(page);
+    eq(p.text, 'Prochain break · 15:00 · dans 2:50:00', 'un lunch lancé 20 min avant l\'heure prévue compte');
+    await context.close();
+  }
+
+  // --- jours de la semaine, répétition, mode nuit, néerlandais, réinitialisation
+  {
+    const sat = await newPage(browser, { setup: eval(planSetup(PLAN3)), startIso: '2026-10-31T10:00:00+01:00' });
+    check(await sat.page.locator('#planLine').evaluate((e) => e.hidden), 'samedi : rien (répétition du lundi au vendredi)');
+    await sat.context.close();
+
+    const noRep = await newPage(browser, { setup: eval(planSetup(PLAN3, { repeat: false, day: '2026-10-31' })), startIso: '2026-10-31T10:00:00+01:00' });
+    check(!(await noRep.page.locator('#planLine').evaluate((e) => e.hidden)), 'sans répétition : vaut pour le jour où on les a saisis');
+    await noRep.context.close();
+    const noRep2 = await newPage(browser, { setup: eval(planSetup(PLAN3, { repeat: false, day: '2026-10-28' })), startIso: '2026-10-29T10:00:00+01:00' });
+    check(await noRep2.page.locator('#planLine').evaluate((e) => e.hidden), 'sans répétition : plus rien le lendemain');
+    await noRep2.context.close();
+
+    const night = await newPage(browser, {
+      setup: eval(planSetup([{ id: 'n', time: '01:30', type: 'break' }, { id: 'm', time: '23:00', type: 'lunch' }], {}, { nightMode: true, nightCutoff: 6 })),
+      startIso: '2026-10-29T22:00:00+01:00',
+    });
+    let p = await planLine(night.page);
+    eq(p.text, 'Prochain lunch · 23:00 · dans 1:00:00', 'mode nuit : le lunch de 23 h');
+    await night.page.evaluate(() => window.__setNow('2026-10-30T00:30:00+01:00'));
+    await tick(night.page);
+    p = await planLine(night.page);
+    eq(p.text, 'Prochain break · 01:30 · dans 1:00:00', 'mode nuit : 01:30 est la nuit suivante, pas hier');
+    await night.page.evaluate(() => window.__setNow('2026-10-30T03:00:00+01:00'));
+    await tick(night.page);
+    p = await planLine(night.page);
+    eq(p.text, "Plus de break prévu aujourd'hui", 'mode nuit : tout est passé à 3 h du matin');
+    await night.context.close();
+
+    const nl = await newPage(browser, { setup: eval(planSetup(PLAN3)), lang: 'nl-BE' });
+    p = await planLine(nl.page);
+    eq(p.text, 'Volgende break · 10:15 · over 15:00', 'néerlandais : décompte');
+    await advance(nl.page, 15 * 60000);
+    p = await planLine(nl.page);
+    eq((await planLine(nl.page)).text, 'Tijd voor je break (10:15)', 'néerlandais : « tijd voor je break »');
+    await nl.context.close();
+
+    const rs = await newPage(browser, { setup: eval(planSetup(PLAN3)) });
+    await rs.page.getByRole('button', { name: 'Réglages' }).click();
+    await rs.page.getByRole('button', { name: 'Réinitialiser cette page' }).click();
+    await rs.page.getByRole('button', { name: 'Tout effacer' }).click();
+    eq(await rs.page.evaluate(() => window.t2r.state.plan.items.length), 0, 'réinitialiser la page efface aussi les horaires prévus');
+    eq(await rs.page.evaluate(() => localStorage.getItem('t2r.plan')), null, 'et la copie enregistrée');
+    await rs.context.close();
+  }
 }
 
 /* ---------- Faux Supabase en mémoire : les trois fonctions SQL, par nom d'utilisateur ---------- */

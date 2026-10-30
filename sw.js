@@ -3,7 +3,7 @@
 const CACHE = 't2r-v1';
 const CORE = [
   './', 'index.html', 'style.css', 'config.js', 'i18n.js', 'store.js', 'sync.js',
-  'timer.js', 'ui.js', 'main.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png',
+  'timer.js', 'plan.js', 'ui.js', 'main.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png',
 ];
 
 self.addEventListener('install', (event) => {

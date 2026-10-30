@@ -44,6 +44,7 @@ const ICONS = {
   check_circle: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z',
   download: 'M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z',
   upload: 'M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z',
+  event: 'M17 12h-5v5h5v-5zM16 1v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2h-1V1h-2zm3 18H5V8h14v11z',
   cloud: 'M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z',
 };
 
@@ -175,6 +176,7 @@ function render() {
   let page;
   if (S.view === 'history') page = historyView();
   else if (S.view === 'settings') page = settingsView();
+  else if (S.view === 'plan') page = planView();
   else page = homeView();
   $app.replaceChildren(page);
   if (S.view === 'home') updateRing(true);
@@ -203,7 +205,10 @@ const chip = (label, selected, onClick) => h('button', {
 
 const RING = 220;
 const STROKE = 13;
-const RADIUS = (RING - STROKE) / 2;
+const PLAN_STROKE = 4; // fin arc gris autour du cadran : le temps avant le prochain break prévu
+const PLAN_R = (RING - PLAN_STROKE) / 2;
+const PLAN_CIRC = 2 * Math.PI * PLAN_R;
+const RADIUS = PLAN_R - PLAN_STROKE / 2 - 1.5 - STROKE / 2;
 const CIRC = 2 * Math.PI * RADIUS;
 
 function homeView() {
@@ -213,6 +218,7 @@ function homeView() {
         h('div', { class: 'muted small' }, greeting()),
         h('div', { class: 'date' }, capitalize(dateLong(new Date())))),
       iconBtn('history', t('history'), () => go('history')),
+      iconBtn('event', t('plan_title'), () => go('plan')),
       iconBtn('settings', t('settings'), () => go('settings'))),
     todayCard(),
     typeSelector(),
@@ -273,14 +279,32 @@ function ringBlock() {
   arc.setAttribute('stroke-linecap', 'round');
   arc.setAttribute('stroke-dasharray', CIRC);
   arc.setAttribute('transform', `rotate(-90 ${RING / 2} ${RING / 2})`);
-  svg.append(circle('ring-track'), arc);
+  const planCircle = (cls, id) => {
+    const c = document.createElementNS(ns, 'circle');
+    c.id = id;
+    c.setAttribute('cx', RING / 2);
+    c.setAttribute('cy', RING / 2);
+    c.setAttribute('r', PLAN_R);
+    c.setAttribute('fill', 'none');
+    c.setAttribute('stroke-width', PLAN_STROKE);
+    c.setAttribute('class', cls);
+    return c;
+  };
+  const planTrack = planCircle('plan-track', 'planTrack');
+  const planArc = planCircle('plan-arc', 'planArc');
+  planArc.setAttribute('stroke-linecap', 'round');
+  planArc.setAttribute('stroke-dasharray', PLAN_CIRC);
+  planArc.setAttribute('transform', `rotate(-90 ${RING / 2} ${RING / 2})`);
+  svg.append(planTrack, planArc, circle('ring-track'), arc);
   const type = S.run ? S.run.type : S.ui.type;
-  return h('div', { class: 'ring', role: 'timer', 'aria-live': 'off' },
-    svg,
-    h('div', { class: 'ring-in' },
-      h('span', { id: 'ringIco', class: 'ring-ico' }, icon(type === 'lunch' ? 'restaurant' : 'coffee', 24)),
-      h('div', { id: 'ringBig', class: 'ring-big' }),
-      h('div', { id: 'ringCap', class: 'ring-cap' })));
+  return h('div', { class: 'ring-wrap' },
+    h('div', { class: 'ring', role: 'timer', 'aria-live': 'off' },
+      svg,
+      h('div', { class: 'ring-in' },
+        h('span', { id: 'ringIco', class: 'ring-ico' }, icon(type === 'lunch' ? 'restaurant' : 'coffee', 24)),
+        h('div', { id: 'ringBig', class: 'ring-big' }),
+        h('div', { id: 'ringCap', class: 'ring-cap' }))),
+    h('div', { id: 'planLine', class: 'plan-line', hidden: true }, icon('schedule', 16), h('span', { id: 'planText' })));
 }
 
 /** Met à jour l'anneau et les chiffres, sans reconstruire la page. */
@@ -301,6 +325,7 @@ function updateRing(initial) {
   big.style.color = alert ? st.color : '';
   cap.style.color = alert ? st.color : '';
   ico.style.color = st.color;
+  updatePlan();
 }
 
 function runningInfo() {
@@ -643,6 +668,60 @@ function pickImportFile() {
 
 const sectionTitle = (text) => h('h2', { class: 'sec-title' }, text);
 
+/* ---------- Page « Breaks prévus » ---------- */
+
+function planRow(it) {
+  const typeBtn = (value, label, ic) => h('button', {
+    type: 'button',
+    class: `seg small${it.type === value ? ' on' : ''}`,
+    'aria-pressed': String(it.type === value),
+    on: { click: () => setPlannedType(it.id, value) },
+  }, icon(ic, 18), h('span', {}, label));
+  return h('div', { class: 'plan-row' },
+    h('input', {
+      type: 'time',
+      class: 'time-in',
+      value: it.time,
+      required: true,
+      'aria-label': t('plan_time_label'),
+      on: { change: (e) => setPlannedTime(it.id, e.target.value) },
+    }),
+    h('div', { class: 'segs plan-type' },
+      typeBtn('break', t('type_break'), 'coffee'),
+      typeBtn('lunch', t('type_lunch'), 'restaurant')),
+    iconBtn('delete', t('plan_remove'), () => removePlanned(it.id)));
+}
+
+function planView() {
+  const repeatBox = h('input', {
+    type: 'checkbox',
+    class: 'switch',
+    role: 'switch',
+    checked: S.plan.repeat,
+    'aria-label': t('plan_repeat'),
+    on: { change: (e) => setPlanRepeat(e.target.checked) },
+  });
+  return h('div', { class: 'page' },
+    h('header', { class: 'top' },
+      iconBtn('arrow_back', t('back'), goBack),
+      h('h1', { class: 'grow' }, t('plan_title'))),
+    h('p', { class: 'small muted note' }, t('plan_intro')),
+    h('div', { class: 'card plan-list' },
+      S.plan.items.length
+        ? S.plan.items.map(planRow)
+        : h('p', { class: 'muted pad plan-empty' }, t('plan_empty'))),
+    h('div', { class: 'plan-add' },
+      h('button', { type: 'button', class: 'btn tonal', 'aria-label': t('plan_add_break_long'), on: { click: () => addPlanned('break') } }, icon('add', 18), t('plan_add_break')),
+      h('button', { type: 'button', class: 'btn tonal', 'aria-label': t('plan_add_lunch_long'), on: { click: () => addPlanned('lunch') } }, icon('add', 18), t('plan_add_lunch'))),
+    h('div', { class: 'card' },
+      h('label', { class: 'switch-row pad' },
+        h('span', { class: 'grow' },
+          h('span', { class: 'strong block' }, t('plan_repeat')),
+          h('span', { class: 'small muted block' }, S.plan.repeat ? t('plan_repeat_on') : t('plan_repeat_off'))),
+        repeatBox)),
+    h('p', { class: 'small muted note' }, t('plan_note')));
+}
+
 function settingsView() {
   const first = !S.prefs.setupDone;
   return h('div', { class: 'page' },
@@ -804,6 +883,7 @@ async function resetAll() {
   S.prefs.lang = lang;
   S.prefs.setupDone = false;
   savePrefs();
+  S.plan = normalizePlan(null);
   S.entries = [];
   S.deleted = [];
   S.run = null;

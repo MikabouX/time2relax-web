@@ -18,6 +18,16 @@ Les données restent dans le navigateur (localStorage). Réglages → « Fichier
 et réimporte l'historique au même format que l'appli Android
 (`date;heure;type;durée_en_secondes`).
 
+### Breaks prévus (facultatif)
+
+L'icône calendrier (à côté des réglages) ouvre une page où l'on saisit l'heure de ses breaks et de son
+lunch. Sur l'accueil, un arc gris autour du cadran (il se remplit pendant les 2 dernières heures) et une
+ligne grise sous le cadran (« Prochain break · 10:15 · dans 1:42:10 ») donnent le temps restant. À l'heure
+prévue : « C'est l'heure du break » pendant 10 minutes, puis le suivant. **Aucune alerte.** Un break lancé
+jusqu'à 30 minutes avant l'heure prévue compte pour celui-ci. « Répéter chaque jour de semaine » (lundi à
+vendredi) est activé par défaut ; désactivé, les horaires ne valent que pour le jour où on les a saisis.
+Les horaires restent sur l'appareil (pas de synchronisation). Le mode nuit est respecté.
+
 ## Historique en ligne (facultatif), sous un nom d'utilisateur
 
 Sans nom d'utilisateur, tout fonctionne en local. Avec un nom, l'historique est aussi gardé sur un
@@ -62,7 +72,7 @@ réactiver dans l'onglet *Actions*.
 ## Tests
 
 `node tests/e2e.js` lance Chromium (Playwright) : chrono, alertes, historique (ajout, modification,
-suppression), mode nuit, vidage, import/export, néerlandais, nom d'utilisateur et synchronisation (serveur simulé).
+suppression), mode nuit, vidage, import/export, néerlandais, nom d'utilisateur, synchronisation (serveur simulé), chrono partagé et breaks prévus.
 
 ## Fichiers
 
@@ -72,6 +82,7 @@ suppression), mode nuit, vidage, import/export, néerlandais, nom d'utilisateur 
 | `i18n.js` | textes français / néerlandais |
 | `store.js` | stockage local, journée de travail (mode nuit), import/export |
 | `timer.js` | chrono, minuteur, alertes, sons, notifications |
+| `plan.js` | breaks prévus : décompte grisé sur l'accueil (sans alerte) |
 | `sync.js` | nom d'utilisateur et synchronisation (sans bibliothèque) |
 | `ui.js`, `main.js` | écrans et démarrage |
 | `sw.js`, `manifest.webmanifest` | utilisation hors-ligne et installation comme appli |
