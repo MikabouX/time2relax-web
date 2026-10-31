@@ -24,9 +24,12 @@ L'icône calendrier (à côté des réglages) ouvre une page où l'on saisit l'h
 lunch. Sur l'accueil, un arc gris autour du cadran (il se remplit pendant les 2 dernières heures) et une
 ligne grise sous le cadran (« Prochain break · 10:15 · dans 1:42:10 ») donnent le temps restant. À l'heure
 prévue : « C'est l'heure du break » pendant 10 minutes, puis le suivant. **Aucune alerte.** Un break lancé
-jusqu'à 30 minutes avant l'heure prévue compte pour celui-ci. « Répéter chaque jour de semaine » (lundi à
-vendredi) est activé par défaut ; désactivé, les horaires ne valent que pour le jour où on les a saisis.
-Les horaires restent sur l'appareil (pas de synchronisation). Le mode nuit est respecté.
+jusqu'à 30 minutes avant l'heure prévue compte pour celui-ci. « Répéter chaque semaine » est activé par
+défaut, avec sept jours à cocher (par défaut du lundi au vendredi ; cocher le samedi et le dimanche pour
+ceux qui travaillent le week-end) ; désactivé, les horaires ne valent que pour le jour où on les a saisis.
+Un jour non coché n'affiche rien, et la page l'explique. Avec un nom d'utilisateur, les horaires sont
+enregistrés en ligne avec les autres réglages (voir plus bas) ; sinon ils restent sur l'appareil. Le mode
+nuit est respecté.
 
 ## Historique en ligne (facultatif), sous un nom d'utilisateur
 
@@ -38,7 +41,8 @@ d'autre n'utilise, par exemple `prénom-nom-1234`). Rien n'est affiché ni list�
 
 1. Crée un projet gratuit sur supabase.com (région Europe).
 2. *SQL Editor* → colle le contenu de `supabase/schema.sql` → *Run*. Cela crée les tables et les
-   fonctions (`t2r_list`, `t2r_save`, `t2r_delete`, et `t2r_run_*` pour le chrono partagé) ; les tables
+   fonctions (`t2r_list`, `t2r_save`, `t2r_delete`, `t2r_run_*` pour le chrono partagé, et `t2r_settings_*`
+   pour les réglages) ; les tables
    elles-mêmes ne sont pas accessibles directement.
 3. *Project Settings → API Keys* : copie l'**URL du projet** et la clé **publique** (« publishable » ou
    « anon »). Ne copie jamais la clé « secret » / « service_role ».
@@ -48,6 +52,18 @@ d'autre n'utilise, par exemple `prénom-nom-1234`). Rien n'est affiché ni list�
    ```
 
 Aucun e-mail n'est collecté ni envoyé : les réglages « Authentication » de Supabase ne servent pas.
+
+### Réglages sous le nom d'utilisateur
+
+Avec un nom d'utilisateur, les réglages suivent le nom sur tous les appareils (page web et appli
+téléphone) : langue, sandwicheries (liste et choix), mode nuit et heure de bascule, confirmation avant
+d'arrêter, minuteur et durée du break, breaks prévus (heures et jours) ; l'appli y ajoute l'application
+d'itinéraire et le moment de l'alarme. **Les adresses maison et bureau de l'appli ne sont jamais envoyées** :
+la fonction SQL `t2r_settings_set` ne garde que cette liste (liste blanche) et jette le reste. Chaque
+appareil envoie seulement ce qu'il a changé (le dernier à changer un réglage l'emporte) ; hors connexion, le
+changement attend le retour du réseau. Au premier passage sous un nom, ce que le serveur a déjà gagne et le
+reste lui est envoyé. Si les fonctions `t2r_settings_*` ne sont pas installées, rien n'est envoyé et tout
+continue en local.
 
 ### Chrono partagé entre appareils
 
@@ -82,7 +98,7 @@ suppression), mode nuit, vidage, import/export, néerlandais, nom d'utilisateur,
 | `i18n.js` | textes français / néerlandais |
 | `store.js` | stockage local, journée de travail (mode nuit), import/export |
 | `timer.js` | chrono, minuteur, alertes, sons, notifications |
-| `plan.js` | breaks prévus : décompte grisé sur l'accueil (sans alerte) |
+| `plan.js` | breaks prévus : décompte grisé sur l'accueil (sans alerte), jours au choix |
 | `sync.js` | nom d'utilisateur et synchronisation (sans bibliothèque) |
 | `ui.js`, `main.js` | écrans et démarrage |
 | `sw.js`, `manifest.webmanifest` | utilisation hors-ligne et installation comme appli |
