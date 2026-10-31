@@ -32,6 +32,7 @@ const store = {
 };
 
 const DEFAULT_SHOP_URL = 'https://www.smile-sandwicherie.be/';
+const SITE_URL = 'https://bardiaux.wordpress.com/'; // site explicatif : fonctions, téléchargement des applis Android et iPhone
 const SUGGESTIONS = [
   { name: 'Takeaway.com', url: 'https://www.takeaway.com/be/' },
   { name: 'Uber Eats', url: 'https://www.ubereats.com/be' },

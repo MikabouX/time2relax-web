@@ -45,6 +45,8 @@ const ICONS = {
   download: 'M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z',
   upload: 'M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z',
   event: 'M17 12h-5v5h5v-5zM16 1v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2h-1V1h-2zm3 18H5V8h14v11z',
+  phone_android: 'M17 1.01L7 1c-1.1 0-2 .9-2 2v18c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V3c0-1.1-.9-1.99-2-1.99zM17 19H7V5h10v14z',
+  open_in_new: 'M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z',
   cloud: 'M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z',
 };
 
@@ -371,7 +373,12 @@ function timerOptions() {
         h('span', { class: 'strong block' }, t('timer_switch')),
         h('span', { class: 'small muted block' }, sub)),
       box),
-    S.ui.useTimer ? h('div', { class: 'chips scroll' }, chips) : null);
+    S.ui.useTimer ? h('div', { class: 'chips scroll' }, chips) : null,
+    // Sur téléphone, un minuteur du système (« OS ») sonne même écran éteint : ici, on renvoie vers les applis.
+    h('div', { class: 'timer-note small muted' },
+      icon('phone_android', 18),
+      h('span', {}, t('timer_app_note'), ' ',
+        h('a', { href: safeUrl(SITE_URL), target: '_blank', rel: 'noopener noreferrer' }, t('timer_app_link')))));
 }
 
 function startButton() {
@@ -749,6 +756,9 @@ function settingsView() {
 
     syncEnabled() ? [sectionTitle(t('sec_account')), accountCard()] : null,
 
+    sectionTitle(t('sec_apps')),
+    appsCard(),
+
     sectionTitle(t('sec_order')),
     shopsCard(),
     h('p', { class: 'small muted note' }, t('order_note')),
@@ -772,6 +782,13 @@ function settingsView() {
       ],
 
     h('p', { class: 'footer' }, `✦ ${t('footer')}`));
+}
+
+/** Lien vers le site explicatif (fonctions, téléchargement des applis Android et iPhone). */
+function appsCard() {
+  return h('div', { class: 'card pad' },
+    h('p', {}, t('apps_intro')),
+    h('a', { class: 'btn tonal', href: safeUrl(SITE_URL), target: '_blank', rel: 'noopener noreferrer' }, icon('open_in_new', 18), t('apps_btn')));
 }
 
 function langCard() {

@@ -25,6 +25,8 @@ const STRINGS = {
     edit: 'Modifier',
 
     timer_switch: 'Lancer un minuteur',
+    timer_app_note: "Ici, l'alerte ne sonne que si cette page reste ouverte. Pour être prévenu même écran éteint, installe l'appli sur ton téléphone.",
+    timer_app_link: 'Télécharger',
     lunch_fixed: 'Lunch : {m} minutes',
     break_duration: 'Durée du break',
     stopwatch_only: 'Chronomètre seul, sans limite',
@@ -139,6 +141,9 @@ const STRINGS = {
     signout_body: "L'historique de ce navigateur sera effacé (il reste enregistré sous ton nom d'utilisateur).",
     signout_pending: 'Attention : {n} modification(s) n’ont pas pu être envoyées et seront perdues.',
 
+    sec_apps: 'Les applications',
+    apps_intro: "Time2Relax existe aussi en appli pour Android et pour iPhone. Le site explique toutes les fonctions et permet de télécharger les applis.",
+    apps_btn: 'Ouvrir le site Time2Relax',
     sec_order: 'Commander à manger',
     order_note: "Touche un site pour le choisir : c'est celui qu'ouvre le bouton « Commander ». Sur l'écran principal, la petite flèche du bouton permet d'en changer rapidement.",
     suggestions: 'Suggestions',
@@ -188,6 +193,8 @@ const STRINGS = {
     edit: 'Wijzigen',
 
     timer_switch: 'Timer starten',
+    timer_app_note: 'Hier klinkt het alarm alleen als deze pagina open blijft. Wil je ook een melding als het scherm uit staat? Installeer de app op je telefoon.',
+    timer_app_link: 'Downloaden',
     lunch_fixed: 'Lunch: {m} minuten',
     break_duration: 'Duur van de break',
     stopwatch_only: 'Stopwatch zonder limiet',
@@ -302,6 +309,9 @@ const STRINGS = {
     signout_body: 'De geschiedenis in deze browser wordt gewist (ze blijft bewaard onder je gebruikersnaam).',
     signout_pending: 'Opgelet: {n} wijziging(en) konden niet worden verzonden en gaan verloren.',
 
+    sec_apps: 'De apps',
+    apps_intro: 'Time2Relax bestaat ook als app voor Android en iPhone. De website legt alle functies uit en laat je de apps downloaden.',
+    apps_btn: 'Time2Relax-website openen',
     sec_order: 'Eten bestellen',
     order_note: 'Tik op een site om hem te kiezen: die opent de knop “Bestellen”. Op het hoofdscherm kun je met het pijltje op die knop snel van site wisselen.',
     suggestions: 'Suggesties',

@@ -186,6 +186,9 @@ h1, h2, p { margin: 0; }
 .card.info .ico { color: var(--primary); }
 .timer-opts .switch-row { padding: 10px 14px; }
 .timer-opts .ico { color: var(--primary); }
+.timer-note { display: flex; align-items: flex-start; gap: 8px; padding: 0 16px 12px; }
+.timer-note .ico { flex: none; margin-top: 1px; }
+.timer-note a { color: var(--primary); font-weight: 600; white-space: nowrap; }
 
 .switch-row { display: flex; align-items: center; gap: 12px; cursor: pointer; }
 .switch {
@@ -304,6 +307,8 @@ h1, h2, p { margin: 0; }
 .btn.text { background: transparent; color: var(--primary); }
 .btn.text:hover { background: var(--low); }
 .btn.tonal { background: var(--secondary-c); color: var(--on-secondary-c); }
+a.btn { text-decoration: none; }
+.card.pad > p + a.btn { margin-top: 12px; }
 .btn.filled { background: var(--primary); color: var(--on-primary); }
 .btn.filled.danger { background: var(--error); color: var(--on-error); }
 .btn.danger-outline { background: transparent; color: var(--error); border: 1px solid color-mix(in srgb, var(--error) 55%, transparent); }

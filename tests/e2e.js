@@ -78,8 +78,13 @@ async function main() {
       eq(await text(page, '#ringCap'), 'Prêt à démarrer', 'légende « prêt »');
       check((await text(page, '.date')).toLowerCase().includes('jeudi 29 octobre'), 'date du jour en français');
       eq(await text(page, '.stat-val'), '—', 'compteur du jour vide');
+      // sous le minuteur : l'alerte écran éteint demande l'appli mobile (pas de minuteur « OS » sur le web)
+      check((await text(page, '.timer-note')).includes('installe l\'appli sur ton téléphone'), 'sous le minuteur : message sur l\'appli mobile');
+      eq(await page.locator('.timer-note a[href="https://bardiaux.wordpress.com/"][target="_blank"]').count(), 1, 'le message renvoie vers le site des applis');
+      eq((await text(page, '.timer-note a')).trim(), 'Télécharger', 'lien « Télécharger »');
 
       await page.locator('.start').click();
+      eq(await page.locator('.timer-note').count(), 0, 'pendant un chrono, le message disparaît avec les options');
       await advance(page, 312000);
       eq(await text(page, '#ringBig'), '05:12', 'chrono après 5 min 12 s');
       check((await page.title()).startsWith('05:12'), "le titre de l'onglet affiche le chrono");
@@ -206,8 +211,16 @@ async function main() {
       // néerlandais
       await page.getByRole('button', { name: 'Retour' }).click();
       await page.getByRole('button', { name: 'Réglages' }).click();
+      // lien vers le site explicatif (téléchargement des applis)
+      const siteLink = page.locator('a[href="https://bardiaux.wordpress.com/"]');
+      eq(await siteLink.count(), 1, 'réglages : un seul lien vers le site explicatif');
+      eq(await siteLink.getAttribute('target'), '_blank', 'le lien du site s\'ouvre dans un nouvel onglet');
+      check(((await siteLink.getAttribute('rel')) || '').includes('noopener'), 'le lien du site est en noopener');
+      eq((await siteLink.innerText()).trim(), 'Ouvrir le site Time2Relax', 'texte du lien du site en français');
+      check((await text(page, '#app')).includes('télécharger les applis'), 'phrase d\'introduction : téléchargement des applis');
       await page.getByRole('button', { name: 'Nederlands' }).click();
       eq(await text(page, 'h1'), 'Instellingen', 'titre des réglages en néerlandais');
+      eq((await page.locator('a[href="https://bardiaux.wordpress.com/"]').innerText()).trim(), 'Time2Relax-website openen', 'texte du lien du site en néerlandais');
       await page.getByRole('button', { name: 'Terug' }).click();
       check((await text(page, '.date')).toLowerCase().includes('donderdag 29 oktober'), 'date en néerlandais');
       eq(await text(page, '.start'), 'Break starten', 'bouton de démarrage en néerlandais');
