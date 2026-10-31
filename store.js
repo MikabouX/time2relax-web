@@ -73,10 +73,10 @@ const S = {
   sync: { busy: false, last: store.get('t2r.lastSync', null), error: '' },
 };
 
-const savePrefs = () => store.set('t2r.prefs', S.prefs);
+const savePrefs = () => { store.set('t2r.prefs', S.prefs); if (typeof settingsChanged === 'function') settingsChanged(); };
 const saveEntries = () => { store.set('t2r.entries', S.entries); store.set('t2r.deleted', S.deleted); };
 const saveRun = () => (S.run ? store.set('t2r.run', S.run) : store.remove('t2r.run'));
-const saveUi = () => store.set('t2r.ui', S.ui);
+const saveUi = () => { store.set('t2r.ui', S.ui); if (typeof settingsChanged === 'function') settingsChanged(); };
 
 /* ---------- Formats d'affichage ---------- */
 

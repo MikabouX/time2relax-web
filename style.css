@@ -150,6 +150,9 @@ h1, h2, p { margin: 0; }
 .plan-line[hidden] { display: none; }
 .plan-line.due { color: var(--primary); opacity: 1; font-weight: 600; }
 .plan-list { display: flex; flex-direction: column; }
+.plan-days { margin-top: 0; padding-top: 0; }
+.plan-hint { display: flex; align-items: flex-start; gap: 6px; margin: 10px 0 0; padding: 0 4px; color: var(--primary); }
+.plan-hint .icon { flex: none; }
 .plan-row { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 8px 10px; padding: 10px 12px; }
 .plan-row + .plan-row { border-top: 1px solid var(--outline); }
 .time-in {

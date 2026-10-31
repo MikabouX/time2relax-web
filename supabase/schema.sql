@@ -143,3 +143,66 @@ revoke all on function public.t2r_run_stop(text, uuid) from public;
 grant execute on function public.t2r_run_get(text) to anon, authenticated;
 grant execute on function public.t2r_run_start(text, uuid, text, integer, bigint) to anon, authenticated;
 grant execute on function public.t2r_run_stop(text, uuid) to anon, authenticated;
+
+-- ---------------------------------------------------------------------------------------------
+-- Réglages rangés sous le nom d'utilisateur (langue, sandwicheries, breaks prévus, minuteurs…).
+-- (À coller une seule fois, comme les parties du haut ; sans danger si on le colle deux fois.)
+--
+-- Les adresses (maison, bureau) ne sont JAMAIS enregistrées ici : la fonction ci-dessous ne garde
+-- que les réglages de la liste blanche et jette tout le reste, même si une appli en envoyait.
+-- Les réglages sont envoyés par morceaux (« patch ») : une appli ne touche que ce qu'elle a changé.
+-- ---------------------------------------------------------------------------------------------
+
+create table if not exists public.settings (
+  username   text primary key check (char_length(username) between 2 and 40),
+  data       jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.settings enable row level security;
+revoke all on public.settings from anon, authenticated;
+
+-- Réglages d'un nom (null : rien d'enregistré).
+create or replace function public.t2r_settings_get(p_username text)
+returns jsonb
+language sql stable security definer set search_path = public as $$
+  select s.data from public.settings s where s.username = lower(trim(p_username))
+$$;
+
+-- Ajoute ou remplace les réglages envoyés (liste blanche), garde les autres ; renvoie le résultat.
+create or replace function public.t2r_settings_set(p_username text, p_patch jsonb)
+returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  u text := lower(trim(p_username));
+  allowed text[] := array['lang', 'confirm_stop', 'night_mode', 'night_cutoff', 'use_timer',
+                          'pause_minutes', 'os_lead', 'nav_app', 'shops', 'shop_index', 'plan'];
+  clean jsonb;
+  res jsonb;
+begin
+  if char_length(u) < 2 or char_length(u) > 40 then
+    raise exception 'nom d''utilisateur invalide';
+  end if;
+  if p_patch is null or jsonb_typeof(p_patch) <> 'object' then
+    raise exception 'réglages invalides';
+  end if;
+  if octet_length(p_patch::text) > 20000 then
+    raise exception 'réglages trop gros';
+  end if;
+  select coalesce(jsonb_object_agg(e.key, e.value), '{}'::jsonb) into clean
+  from jsonb_each(p_patch) as e where e.key = any (allowed);
+  insert into public.settings (username, data) values (u, clean)
+  on conflict (username) do update
+    set data = public.settings.data || excluded.data, updated_at = now()
+  returning data into res;
+  if octet_length(res::text) > 30000 then
+    raise exception 'réglages trop gros';
+  end if;
+  return res;
+end
+$$;
+
+revoke all on function public.t2r_settings_get(text) from public;
+revoke all on function public.t2r_settings_set(text, jsonb) from public;
+grant execute on function public.t2r_settings_get(text) to anon, authenticated;
+grant execute on function public.t2r_settings_set(text, jsonb) to anon, authenticated;

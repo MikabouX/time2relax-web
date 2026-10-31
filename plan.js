@@ -4,15 +4,19 @@
    On note à quelle heure on aura ses breaks et son lunch. L'accueil affiche, en gris, le temps qui reste
    avant le prochain : un arc autour du cadran (il se remplit pendant les 2 dernières heures) et une ligne
    sous le cadran. Un break lancé jusqu'à 30 minutes avant l'heure prévue compte pour celui-ci.
-   Les horaires restent sur cet appareil. */
+   Les horaires se répètent les jours cochés ; ils sont enregistrés sous le nom d'utilisateur (sinon, sur cet appareil). */
 
 const PLAN_WINDOW = 7200; // secondes : l'arc se remplit pendant les 2 dernières heures
 const PLAN_DUE_MS = 10 * 60000; // « c'est l'heure » reste affiché 10 minutes
 const PLAN_EARLY_MS = 30 * 60000; // un break lancé jusqu'à 30 min avant l'heure prévue compte pour celui-ci
 const PLAN_LATE_MS = 3 * 3600000; // …ou jusqu'à 3 h après
 
+const DEFAULT_PLAN_DAYS = [1, 2, 3, 4, 5]; // 1 = lundi … 7 = dimanche
+
+const cleanDays = (list) => [...new Set(list.filter((d) => Number.isInteger(d) && d >= 1 && d <= 7))].sort((a, b) => a - b);
+
 function normalizePlan(p) {
-  const out = { items: [], repeat: true, day: '' };
+  const out = { items: [], repeat: true, day: '', days: DEFAULT_PLAN_DAYS.slice() };
   if (!p || typeof p !== 'object') return out;
   if (Array.isArray(p.items)) {
     for (const it of p.items) {
@@ -26,12 +30,13 @@ function normalizePlan(p) {
   }
   out.repeat = p.repeat !== false;
   out.day = typeof p.day === 'string' ? p.day : '';
+  if (Array.isArray(p.days)) out.days = cleanDays(p.days); // absent (anciennes versions) : lundi à vendredi
   out.items.sort((a, b) => a.time.localeCompare(b.time));
   return out;
 }
 
 S.plan = normalizePlan(store.get('t2r.plan', null));
-const savePlan = () => store.set('t2r.plan', S.plan);
+const savePlan = () => { store.set('t2r.plan', S.plan); if (typeof settingsChanged === 'function') settingsChanged(); };
 
 /** Après une modification : la liste est triée, et (sans répétition) elle vaut pour aujourd'hui. */
 function touchPlan() {
@@ -47,7 +52,7 @@ function planApplies(now = new Date()) {
   if (!S.plan.repeat) return S.plan.day === key;
   const d = parseDay(key);
   const wd = d ? d.getDay() : 1; // 0 = dimanche, 6 = samedi
-  return wd >= 1 && wd <= 5;
+  return S.plan.days.includes(wd === 0 ? 7 : wd);
 }
 
 /** Les heures prévues de cette journée de travail, en instants précis (en mode nuit, avant l'heure de bascule = lendemain). */
@@ -169,6 +174,16 @@ function setPlannedType(id, type) {
 function removePlanned(id) {
   S.plan.items = S.plan.items.filter((x) => x.id !== id);
   touchPlan();
+  render();
+}
+
+/** Coche ou décoche un jour de la semaine (1 = lundi … 7 = dimanche). */
+function setPlanDay(weekday, on) {
+  const set = new Set(S.plan.days);
+  if (on) set.add(weekday); else set.delete(weekday);
+  S.plan.days = cleanDays([...set]);
+  S.plan.day = todayKey();
+  savePlan();
   render();
 }
 

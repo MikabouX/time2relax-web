@@ -692,6 +692,14 @@ function planRow(it) {
     iconBtn('delete', t('plan_remove'), () => removePlanned(it.id)));
 }
 
+/** Des horaires existent mais ne valent pas pour aujourd'hui : on explique pourquoi l'accueil n'affiche rien. */
+function planHint() {
+  if (!S.plan.items.length || planApplies()) return null;
+  const wd = parseDay(todayKey()).getDay();
+  const text = S.plan.repeat ? t('plan_hint_day', { day: DAYS[LANG][(wd + 6) % 7] }) : t('plan_hint_other');
+  return h('p', { class: 'small plan-hint' }, icon('info', 16), ' ', text);
+}
+
 function planView() {
   const repeatBox = h('input', {
     type: 'checkbox',
@@ -718,8 +726,13 @@ function planView() {
         h('span', { class: 'grow' },
           h('span', { class: 'strong block' }, t('plan_repeat')),
           h('span', { class: 'small muted block' }, S.plan.repeat ? t('plan_repeat_on') : t('plan_repeat_off'))),
-        repeatBox)),
-    h('p', { class: 'small muted note' }, t('plan_note')));
+        repeatBox),
+      S.plan.repeat
+        ? h('div', { class: 'chips plan-days pad', role: 'group', 'aria-label': t('plan_days_label') },
+          DAYS_SHORT[LANG].map((label, i) => chip(label, S.plan.days.includes(i + 1), () => setPlanDay(i + 1, !S.plan.days.includes(i + 1)))))
+        : null),
+    planHint(),
+    h('p', { class: 'small muted note' }, t(S.session ? 'plan_note_sync' : 'plan_note')));
 }
 
 function settingsView() {
@@ -877,6 +890,7 @@ async function resetAll() {
   stopTicker();
   stopRunPolling();
   resetRunState();
+  resetSettingsState();
   const lang = S.prefs.lang;
   store.clearAll();
   S.prefs = loadPrefs();

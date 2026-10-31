@@ -54,6 +54,7 @@ const validName = (s) => s.length >= 2 && s.length <= 40;
 function signIn(name) {
   S.session = { username: name };
   store.set('t2r.session', S.session);
+  resetSettingsState(); // les réglages de ce nom sont (re)lus à la prochaine synchro
   // Ce qui est déjà dans ce navigateur est (ré)envoyé sous ce nom ; l'envoi ne crée jamais de doublon.
   S.deleted = [];
   S.entries.forEach((e) => { e.synced = false; });
@@ -67,11 +68,171 @@ function signOut() {
   if (S.run && S.run.pushed) { S.run.pushed = false; saveRun(); } // le chrono ici reste local
   S.session = null;
   store.remove('t2r.session');
+  resetSettingsState();
   S.entries = [];
   S.deleted = [];
   S.sync.last = null;
   store.remove('t2r.lastSync');
   saveEntries();
+}
+
+/* ---------- Réglages rangés sous le nom d'utilisateur ----------
+   Langue, sandwicheries, breaks prévus, minuteurs… sont retrouvés sur tous les appareils (et dans l'appli
+   téléphone). La liste est la même que dans la fonction SQL t2r_settings_set (supabase/schema.sql). Les adresses
+   (maison, bureau) de l'appli n'en font JAMAIS partie. Chaque appareil envoie seulement ce qu'il a changé :
+   le dernier à changer un réglage l'emporte. Sans la fonction SQL, tout continue en local. */
+
+const SETTING_KEYS = ['lang', 'confirm_stop', 'night_mode', 'night_cutoff', 'use_timer', 'pause_minutes', 'shops', 'shop_index', 'plan'];
+const settingsApi = { retryAt: 0 };
+let applyingSettings = false;
+let setPending = new Set((store.get('t2r.setPending', []) || []).filter((k) => SETTING_KEYS.includes(k)));
+let setSeen = store.get('t2r.setSeen', null);
+
+function readSetting(k) {
+  switch (k) {
+    case 'lang': return S.prefs.lang === 'fr' || S.prefs.lang === 'nl' ? S.prefs.lang : null;
+    case 'confirm_stop': return !!S.prefs.confirmStop;
+    case 'night_mode': return !!S.prefs.nightMode;
+    case 'night_cutoff': return S.prefs.nightCutoff;
+    case 'use_timer': return !!S.ui.useTimer;
+    case 'pause_minutes': return S.ui.pauseMinutes;
+    case 'shops': return S.prefs.shops.map((x) => ({ name: x.name, url: x.url }));
+    case 'shop_index': return S.prefs.shopIndex;
+    case 'plan': return JSON.parse(JSON.stringify(S.plan));
+    default: return null;
+  }
+}
+
+/** Les réglages d'ici (ceux qui ont une valeur), au format du serveur. */
+function snapshotSettings() {
+  const out = {};
+  for (const k of SETTING_KEYS) {
+    const v = readSetting(k);
+    if (v !== null && v !== undefined) out[k] = v;
+  }
+  return out;
+}
+
+/** Valeur du serveur vérifiée et remise au format d'ici ; undefined = à ignorer. */
+function cleanSetting(k, v) {
+  const isInt = (x, a, b) => typeof x === 'number' && Number.isInteger(x) && x >= a && x <= b;
+  switch (k) {
+    case 'lang': return v === 'fr' || v === 'nl' ? v : undefined;
+    case 'confirm_stop': case 'night_mode': case 'use_timer': return typeof v === 'boolean' ? v : undefined;
+    case 'night_cutoff': return isInt(v, 0, 23) ? v : undefined;
+    case 'pause_minutes': return PAUSE_CHOICES.includes(v) ? v : undefined;
+    case 'shop_index': return isInt(v, 0, 50) ? v : undefined;
+    case 'shops': {
+      if (!Array.isArray(v) || !v.length || v.length > 30) return undefined;
+      const out = [];
+      for (const e of v) {
+        if (!e || typeof e.name !== 'string' || typeof e.url !== 'string' || !e.name || e.name.length > 80 || e.url.length > 500) return undefined;
+        let u;
+        try { u = new URL(e.url); } catch (_) { return undefined; }
+        if (u.protocol !== 'https:' && u.protocol !== 'http:') return undefined;
+        out.push({ name: e.name, url: e.url });
+      }
+      return out;
+    }
+    case 'plan': return v && typeof v === 'object' && !Array.isArray(v) ? normalizePlan(v) : undefined;
+    default: return undefined;
+  }
+}
+
+function applySetting(k, v) {
+  switch (k) {
+    case 'lang': S.prefs.lang = v; LANG = v; break;
+    case 'confirm_stop': S.prefs.confirmStop = v; break;
+    case 'night_mode': S.prefs.nightMode = v; break;
+    case 'night_cutoff': S.prefs.nightCutoff = v; break;
+    case 'use_timer': S.ui.useTimer = v; break;
+    case 'pause_minutes': S.ui.pauseMinutes = v; break;
+    case 'shops': S.prefs.shops = v; S.prefs.shopIndex = Math.min(S.prefs.shopIndex, v.length - 1); break;
+    case 'shop_index': S.prefs.shopIndex = Math.min(v, S.prefs.shops.length - 1); break;
+    case 'plan': S.plan = v; break;
+    default: break;
+  }
+}
+
+const sameValue = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+
+function saveSettingsState() {
+  store.set('t2r.setPending', [...setPending]);
+  store.set('t2r.setSeen', setSeen);
+}
+
+/** Après chaque enregistrement local : quels réglages ont changé depuis la dernière fois ? Ils partent à la prochaine synchro. */
+function settingsChanged() {
+  if (applyingSettings || !S.session || !syncEnabled()) return;
+  const now = snapshotSettings();
+  const seen = setSeen || {};
+  let any = false;
+  for (const k of SETTING_KEYS) {
+    if (!sameValue(now[k], seen[k])) { setPending.add(k); any = true; }
+  }
+  if (!any) return;
+  setSeen = now;
+  saveSettingsState();
+  scheduleSync();
+}
+
+/** Connexion, déconnexion, remise à zéro : plus rien en attente ; le nom suivant repart de zéro. */
+function resetSettingsState() {
+  setPending = new Set();
+  setSeen = null;
+  settingsApi.retryAt = 0;
+  store.remove('t2r.setPending');
+  store.remove('t2r.setSeen');
+  store.remove('t2r.setUser');
+}
+
+/** Envoie les réglages changés ici puis récupère ceux des autres appareils. Vrai si un réglage d'ici a changé. */
+async function syncSettings(who) {
+  if (Date.now() < settingsApi.retryAt) return false;
+  try {
+    const got = await rpc('t2r_settings_get', { p_username: who });
+    let server = got && typeof got === 'object' && !Array.isArray(got) ? got : {};
+    const mine = snapshotSettings();
+    let pending = new Set([...setPending].filter((k) => SETTING_KEYS.includes(k)));
+    if (store.get('t2r.setUser', null) !== who) {
+      // Première fois sous ce nom ici : ce que le serveur a gagne, le reste lui est envoyé.
+      pending = new Set(SETTING_KEYS.filter((k) => !(k in server) && k in mine));
+    }
+    const patch = {};
+    for (const k of pending) if (k in mine) patch[k] = mine[k];
+    if (Object.keys(patch).length) {
+      const res = await rpc('t2r_settings_set', { p_username: who, p_patch: patch });
+      if (res && typeof res === 'object' && !Array.isArray(res)) server = res;
+    }
+    if (!S.session || S.session.username !== who) return false;
+    // Ce qui a encore changé ici pendant l'envoi reste « à envoyer ».
+    const now = snapshotSettings();
+    const still = new Set(setPending);
+    for (const k of pending) if (!(k in patch) || sameValue(now[k], patch[k])) still.delete(k);
+    let changed = false;
+    applyingSettings = true;
+    try {
+      for (const k of SETTING_KEYS) {
+        if (still.has(k) || !(k in server)) continue;
+        const v = cleanSetting(k, server[k]);
+        if (v === undefined || sameValue(readSetting(k), v)) continue;
+        applySetting(k, v);
+        changed = true;
+      }
+      if (changed) { savePrefs(); saveUi(); savePlan(); }
+    } finally {
+      applyingSettings = false;
+    }
+    setPending = still;
+    setSeen = snapshotSettings();
+    saveSettingsState();
+    store.set('t2r.setUser', who);
+    return changed;
+  } catch (e) {
+    if (e.offline) throw e;
+    settingsApi.retryAt = Date.now() + 300000; // fonctions SQL pas installées, ou serveur en erreur : plus tard
+    return false;
+  }
 }
 
 const pendingCount = () => S.entries.filter((e) => !e.synced).length + S.deleted.length;
@@ -135,6 +296,8 @@ async function syncNow() {
     saveEntries();
     S.sync.last = Date.now();
     store.set('t2r.lastSync', S.sync.last);
+    // 4. réglages (langue, sandwicheries, breaks prévus…) : jamais d'adresses
+    if (await syncSettings(who)) render();
   } catch (e) {
     S.sync.error = e.offline ? 'offline' : (e.message || 'error');
   } finally {

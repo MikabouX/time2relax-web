@@ -420,6 +420,9 @@ async function main() {
 
     console.log('K. Breaks prévus : décompte grisé, sans alerte');
     await planTests(browser);
+
+    console.log('L. Réglages rangés sous le nom d\'utilisateur');
+    await settingsSyncTests(browser);
   } finally {
     await browser.close();
     server.kill();
@@ -587,6 +590,37 @@ async function planTests(browser) {
     check(await sat.page.locator('#planLine').evaluate((e) => e.hidden), 'samedi : rien (répétition du lundi au vendredi)');
     await sat.context.close();
 
+    // Jours au choix : un samedi, la page explique pourquoi rien ne s'affiche, et cocher « Sam » règle tout
+    {
+      const d = await newPage(browser, { setup: eval(planSetup(PLAN3)), startIso: '2026-10-31T10:00:00+01:00' });
+      await d.page.getByRole('button', { name: 'Breaks prévus' }).click();
+      eq(await d.page.locator('.plan-days .chip').allInnerTexts().then((a) => a.join(' ')), 'Lun Mar Mer Jeu Ven Sam Dim', 'sept jours à cocher');
+      eq(await d.page.locator('.plan-days .chip.on').allInnerTexts().then((a) => a.join(' ')), 'Lun Mar Mer Jeu Ven', 'par défaut : du lundi au vendredi');
+      check((await text(d.page, '.plan-hint')).includes("Rien n'est affiché aujourd'hui (samedi)"), "samedi, jour non coché : une phrase explique pourquoi rien ne s'affiche");
+      await d.page.locator('.plan-days .chip', { hasText: 'Sam' }).click();
+      check(await d.page.locator('.plan-hint').count() === 0, 'samedi coché : la phrase disparaît');
+      eq(await d.page.evaluate(() => window.t2r.state.plan.days.join(',')), '1,2,3,4,5,6', 'jours enregistrés (lundi à samedi)');
+      await d.page.getByRole('button', { name: 'Retour' }).click();
+      check(!(await d.page.locator('#planLine').evaluate((e) => e.hidden)), 'samedi coché : le décompte gris apparaît');
+      await d.page.reload();
+      check(!(await d.page.locator('#planLine').evaluate((e) => e.hidden)), 'et reste après rechargement');
+      await d.page.getByRole('button', { name: 'Breaks prévus' }).click();
+      await d.page.locator('.plan-days .chip', { hasText: 'Sam' }).click();
+      await d.page.locator('.plan-days .chip', { hasText: 'Dim' }).click();
+      await d.page.locator('.plan-days .chip', { hasText: 'Jeu' }).click();
+      eq(await d.page.evaluate(() => window.t2r.state.plan.days.join(',')), '1,2,3,5,7', 'décocher le samedi et le jeudi, cocher le dimanche');
+      await d.context.close();
+      const old = await newPage(browser, { setup: eval(planSetup(PLAN3)), startIso: '2026-10-30T10:00:00+01:00' });
+      eq(await old.page.evaluate(() => window.t2r.state.plan.days.join(',')), '1,2,3,4,5', 'anciens horaires (sans jours) : lundi à vendredi');
+      check(!(await old.page.locator('#planLine').evaluate((e) => e.hidden)), 'et un vendredi, ça s\'affiche');
+      await old.context.close();
+      const nlp = await newPage(browser, { setup: eval(planSetup(PLAN3)), lang: 'nl-BE', startIso: '2026-10-31T10:00:00+01:00' });
+      await nlp.page.getByRole('button', { name: 'Geplande breaks' }).click();
+      eq(await nlp.page.locator('.plan-days .chip').allInnerTexts().then((a) => a.join(' ')), 'Ma Di Wo Do Vr Za Zo', 'néerlandais : jours');
+      check((await text(nlp.page, '.plan-hint')).includes('Vandaag (zaterdag) wordt niets getoond'), 'néerlandais : explication du week-end');
+      await nlp.context.close();
+    }
+
     const noRep = await newPage(browser, { setup: eval(planSetup(PLAN3, { repeat: false, day: '2026-10-31' })), startIso: '2026-10-31T10:00:00+01:00' });
     check(!(await noRep.page.locator('#planLine').evaluate((e) => e.hidden)), 'sans répétition : vaut pour le jour où on les a saisis');
     await noRep.context.close();
@@ -630,7 +664,7 @@ async function planTests(browser) {
 
 /* ---------- Faux Supabase en mémoire : les trois fonctions SQL, par nom d'utilisateur ---------- */
 function makeMockSupabase() {
-  const db = { rows: [], log: [], delayPost: 0, runs: {}, skew: 0, noRun: false };
+  const db = { rows: [], log: [], delayPost: 0, runs: {}, skew: 0, noRun: false, settings: {}, noSettings: false, settingsSets: 0 };
   db.now = () => Date.now() + db.skew; // horloge du « serveur » (avançable)
   db.advance = (ms) => { db.skew += ms; };
   const cors = {
@@ -646,9 +680,10 @@ function makeMockSupabase() {
     if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
     db.log.push(`${req.method()} ${url.pathname}${url.search}`);
     if (!req.headers().apikey) return json(401, { message: 'No API key found in request' });
-    const m = /^\/rest\/v1\/rpc\/(t2r_list|t2r_save|t2r_delete|t2r_run_get|t2r_run_start|t2r_run_stop)$/.exec(url.pathname);
+    const m = /^\/rest\/v1\/rpc\/(t2r_list|t2r_save|t2r_delete|t2r_run_get|t2r_run_start|t2r_run_stop|t2r_settings_get|t2r_settings_set)$/.exec(url.pathname);
     if (!m || req.method() !== 'POST') return json(404, { message: 'not found' });
     if (m[1].startsWith('t2r_run_') && db.noRun) return json(404, { code: 'PGRST202', message: 'Could not find the function public.' + m[1] });
+    if (m[1].startsWith('t2r_settings_') && db.noSettings) return json(404, { code: 'PGRST202', message: 'Could not find the function public.' + m[1] });
     const body = req.postData() ? JSON.parse(req.postData()) : {};
     const who = String(body.p_username || '').trim().toLowerCase();
     if (who.length < 2 || who.length > 40) return json(400, { code: 'P0001', message: "nom d'utilisateur invalide" });
@@ -676,6 +711,17 @@ function makeMockSupabase() {
       return json(200, had);
     }
 
+    if (m[1].startsWith('t2r_settings_')) {
+      // Même liste blanche que la fonction SQL : les adresses ne sont jamais gardées.
+      const allowed = ['lang', 'confirm_stop', 'night_mode', 'night_cutoff', 'use_timer', 'pause_minutes', 'os_lead', 'nav_app', 'shops', 'shop_index', 'plan'];
+      if (m[1] === 't2r_settings_get') return json(200, db.settings[who]);
+      if (!body.p_patch || typeof body.p_patch !== 'object') return json(400, { code: 'P0001', message: 'réglages invalides' });
+      db.settingsSets += 1;
+      db.settings[who] = db.settings[who] || {};
+      for (const [k, v] of Object.entries(body.p_patch)) if (allowed.includes(k)) db.settings[who][k] = v;
+      return json(200, db.settings[who]);
+    }
+
     if (m[1] === 't2r_list') {
       const mine = db.of(who).sort((a, b) => (a.date + a.time + a.id).localeCompare(b.date + b.time + b.id));
       const limit = Number(url.searchParams.get('limit') || 1000);
@@ -696,6 +742,91 @@ function makeMockSupabase() {
     return route.fulfill({ status: 204, headers: cors });
   };
   return db;
+}
+
+async function settingsSyncTests(browser) {
+  const db = makeMockSupabase();
+  const open = (iso, opts) => openWithMock(browser, db, iso, opts);
+  const idle = (page) => page.waitForFunction(() => !window.t2r.state.sync.busy && window.t2r.state.sync.last, null, { timeout: 10000 });
+  const A = await open('2026-10-29T10:00:00+01:00');
+  await A.page.getByRole('button', { name: 'Continuer' }).click();
+  // Réglages choisis avant la connexion : langue, mode nuit, boutique, jours des breaks prévus
+  await A.page.evaluate(() => {
+    const s = window.t2r.state;
+    s.prefs.lang = 'nl'; s.prefs.nightMode = true; s.prefs.nightCutoff = 6;
+    s.prefs.shops = [{ name: 'Chez Moi', url: 'https://moi.be/' }]; s.prefs.shopIndex = 0;
+    s.plan.items = [{ id: 'p1', time: '10:15', type: 'break' }]; s.plan.days = [6, 7];
+    s.ui.useTimer = true; s.ui.pauseMinutes = 10;
+    savePrefs(); savePlan(); saveUi();
+  });
+  await A.page.getByRole('button', { name: /Instellingen|Réglages/ }).click();
+  await signInAs(A.page, 'réglages-1');
+  await A.page.getByRole('button', { name: /Aanmelden|Se connecter/ }).click().catch(() => {});
+  await idle(A.page);
+  const s1 = db.settings['réglages-1'];
+  check(!!s1, 'les réglages sont envoyés sous le nom');
+  eq(s1 && s1.lang, 'nl', 'langue envoyée');
+  eq(s1 && s1.night_mode, true, 'mode nuit envoyé');
+  eq(s1 && s1.shops && s1.shops[0].name, 'Chez Moi', 'sandwicherie envoyée');
+  eq(s1 && s1.plan && s1.plan.days.join(','), '6,7', 'jours des breaks prévus envoyés');
+  eq(s1 && s1.pause_minutes, 10, 'durée du minuteur envoyée');
+  check(!JSON.stringify(db.settings).match(/home_addr|work_addr/), 'aucune adresse sur le serveur');
+
+  // Appareil B (neuf) : même nom → retrouve les réglages
+  const B = await open('2026-10-30T09:00:00+01:00');
+  await B.page.getByRole('button', { name: 'Continuer' }).click();
+  await B.page.getByRole('button', { name: 'Réglages' }).click();
+  await signInAs(B.page, 'RÉGLAGES-1');
+  await B.page.waitForFunction(() => window.t2r.state.prefs.lang === 'nl', null, { timeout: 10000 });
+  const bs = await B.page.evaluate(() => { const s = window.t2r.state; return { night: s.prefs.nightMode, cut: s.prefs.nightCutoff, shop: s.prefs.shops[0].name, days: s.plan.days.join(','), items: s.plan.items.length, timer: s.ui.useTimer, pm: s.ui.pauseMinutes }; });
+  check(bs.night && bs.cut === 6 && bs.shop === 'Chez Moi' && bs.days === '6,7' && bs.items === 1 && bs.timer && bs.pm === 10, 'le second appareil retrouve tous les réglages');
+  eq(await B.page.evaluate(() => document.querySelector('h1').innerText), 'Instellingen', 'et la langue change tout de suite');
+
+  // Un réglage changé sur B arrive sur A
+  await B.page.evaluate(() => { window.t2r.state.prefs.confirmStop = true; savePrefs(); });
+  await waitFor(() => db.settings['réglages-1'].confirm_stop === true);
+  check(true, 'réglage changé sur B : envoyé tout seul');
+  await A.page.evaluate(() => window.t2r.runPoll());
+  await A.page.evaluate(() => syncNow());
+  await A.page.waitForFunction(() => window.t2r.state.prefs.confirmStop === true, null, { timeout: 10000 });
+  check(true, 'et récupéré sur A à la synchro suivante');
+
+  // Hors connexion : le réglage attend, puis part au retour du réseau
+  B.setOffline(true);
+  await B.page.evaluate(() => { window.t2r.state.prefs.nightCutoff = 8; savePrefs(); });
+  await B.page.waitForTimeout(1200);
+  eq(db.settings['réglages-1'].night_cutoff, 6, 'hors connexion : rien ne part');
+  B.setOffline(false);
+  await B.page.evaluate(() => syncNow());
+  await waitFor(() => db.settings['réglages-1'].night_cutoff === 8);
+  check(true, 'au retour du réseau : le réglage part');
+  eq(await B.page.evaluate(() => window.t2r.state.prefs.nightCutoff), 8, 'et reste tel quel ici');
+
+  // Valeurs du serveur abîmées : ignorées, jamais d'erreur
+  db.settings['réglages-1'].lang = 'de';
+  db.settings['réglages-1'].shops = [{ name: 'X', url: 'javascript:alert(1)' }];
+  db.settings['réglages-1'].pause_minutes = 7;
+  await A.page.evaluate(() => syncNow());
+  await A.page.waitForFunction(() => !window.t2r.state.sync.busy);
+  const ok = await A.page.evaluate(() => { const s = window.t2r.state; return s.prefs.lang === 'nl' && s.prefs.shops[0].name === 'Chez Moi' && s.ui.pauseMinutes === 10; });
+  check(ok, 'valeurs invalides du serveur ignorées');
+  check(A.errors.length === 0, `aucune erreur console (${A.errors.join(' | ')})`);
+
+  // Fonctions SQL pas encore installées : l'historique marche, aucun message d'erreur
+  const db2 = makeMockSupabase();
+  db2.noSettings = true;
+  const C = await openWithMock(browser, db2, '2026-10-29T10:00:00+01:00');
+  await C.page.getByRole('button', { name: 'Continuer' }).click();
+  await C.page.getByRole('button', { name: 'Réglages' }).click();
+  await signInAs(C.page, 'sans-sql');
+  await idle(C.page);
+  eq(await C.page.evaluate(() => window.t2r.state.sync.error), '', 'fonctions de réglages absentes : aucune erreur affichée');
+  C.setOffline(false);
+
+  // Déconnexion : plus rien en attente
+  await B.page.evaluate(() => signOut());
+  eq(await B.page.evaluate(() => localStorage.getItem('t2r.setUser')), null, 'déconnexion : le nom des réglages est oublié');
+  for (const x of [A, B, C]) await x.context.close();
 }
 
 const cfgFor = (pollMs) => `window.T2R_CONFIG = { supabaseUrl: 'https://mock.supabase.test', supabaseKey: 'sb_publishable_test', pollMs: ${pollMs} };`;
