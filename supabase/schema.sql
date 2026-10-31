@@ -218,7 +218,7 @@ declare
   n integer;
 begin
   if char_length(u) < 2 or char_length(u) > 40 then
-    raise exception 'nom d''utilisateur invalide';
+    raise exception 'nom invalide';
   end if;
   delete from public.settings where username = u;
   get diagnostics n = row_count;
