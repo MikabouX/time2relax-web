@@ -206,3 +206,25 @@ revoke all on function public.t2r_settings_get(text) from public;
 revoke all on function public.t2r_settings_set(text, jsonb) from public;
 grant execute on function public.t2r_settings_get(text) to anon, authenticated;
 grant execute on function public.t2r_settings_set(text, jsonb) to anon, authenticated;
+
+
+-- Efface les réglages rangés sous un nom (« Réinitialiser l'application » / « Réinitialiser cette page »).
+-- L'historique et le chrono ne sont pas touchés. Renvoie vrai s'il y avait des réglages.
+create or replace function public.t2r_settings_clear(p_username text)
+returns boolean
+language plpgsql security definer set search_path = public as $$
+declare
+  u text := lower(trim(p_username));
+  n integer;
+begin
+  if char_length(u) < 2 or char_length(u) > 40 then
+    raise exception 'nom d''utilisateur invalide';
+  end if;
+  delete from public.settings where username = u;
+  get diagnostics n = row_count;
+  return n > 0;
+end
+$$;
+
+revoke all on function public.t2r_settings_clear(text) from public;
+grant execute on function public.t2r_settings_clear(text) to anon, authenticated;

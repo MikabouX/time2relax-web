@@ -904,6 +904,13 @@ function nightCard() {
 async function resetAll() {
   const ok = await confirmDialog({ title: t('reset_title'), body: t('reset_body'), ok: t('reset_ok'), danger: true });
   if (!ok) return;
+  // Connecté : les réglages rangés en ligne sont effacés d'abord ; si c'est impossible, on ne touche à rien.
+  try {
+    await clearOnlineSettings();
+  } catch (_) {
+    toast(t('reset_online_failed'));
+    return;
+  }
   stopTicker();
   stopRunPolling();
   resetRunState();

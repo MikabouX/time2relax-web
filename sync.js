@@ -186,6 +186,22 @@ function resetSettingsState() {
   store.remove('t2r.setUser');
 }
 
+/** « Réinitialiser » efface aussi les réglages rangés en ligne sous ce nom (l'historique en ligne reste).
+    Lève une erreur si c'est impossible (hors connexion) : la remise à zéro est alors annulée.
+    Sans la fonction SQL t2r_settings_clear sur le serveur (404), il n'y a rien à effacer en ligne : on continue. */
+async function clearOnlineSettings() {
+  if (!syncEnabled() || !S.session) return;
+  const who = S.session.username;
+  clearTimeout(syncTimer); // plus d'envoi programmé…
+  for (let i = 0; i < 50 && S.sync.busy; i += 1) await new Promise((r) => setTimeout(r, 100)); // …et pas d'envoi en cours
+  try {
+    await rpc('t2r_settings_clear', { p_username: who });
+  } catch (e) {
+    if (e.status === 404) return;
+    throw e;
+  }
+}
+
 /** Envoie les réglages changés ici puis récupère ceux des autres appareils. Vrai si un réglage d'ici a changé. */
 async function syncSettings(who) {
   if (Date.now() < settingsApi.retryAt) return false;

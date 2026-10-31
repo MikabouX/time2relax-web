@@ -677,7 +677,7 @@ async function planTests(browser) {
 
 /* ---------- Faux Supabase en mémoire : les trois fonctions SQL, par nom d'utilisateur ---------- */
 function makeMockSupabase() {
-  const db = { rows: [], log: [], delayPost: 0, runs: {}, skew: 0, noRun: false, settings: {}, noSettings: false, settingsSets: 0 };
+  const db = { rows: [], log: [], delayPost: 0, runs: {}, skew: 0, noRun: false, settings: {}, noSettings: false, settingsSets: 0, failClear: false, clears: 0 };
   db.now = () => Date.now() + db.skew; // horloge du « serveur » (avançable)
   db.advance = (ms) => { db.skew += ms; };
   const cors = {
@@ -693,7 +693,7 @@ function makeMockSupabase() {
     if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
     db.log.push(`${req.method()} ${url.pathname}${url.search}`);
     if (!req.headers().apikey) return json(401, { message: 'No API key found in request' });
-    const m = /^\/rest\/v1\/rpc\/(t2r_list|t2r_save|t2r_delete|t2r_run_get|t2r_run_start|t2r_run_stop|t2r_settings_get|t2r_settings_set)$/.exec(url.pathname);
+    const m = /^\/rest\/v1\/rpc\/(t2r_list|t2r_save|t2r_delete|t2r_run_get|t2r_run_start|t2r_run_stop|t2r_settings_get|t2r_settings_set|t2r_settings_clear)$/.exec(url.pathname);
     if (!m || req.method() !== 'POST') return json(404, { message: 'not found' });
     if (m[1].startsWith('t2r_run_') && db.noRun) return json(404, { code: 'PGRST202', message: 'Could not find the function public.' + m[1] });
     if (m[1].startsWith('t2r_settings_') && db.noSettings) return json(404, { code: 'PGRST202', message: 'Could not find the function public.' + m[1] });
@@ -728,6 +728,13 @@ function makeMockSupabase() {
       // Même liste blanche que la fonction SQL : les adresses ne sont jamais gardées.
       const allowed = ['lang', 'confirm_stop', 'night_mode', 'night_cutoff', 'use_timer', 'pause_minutes', 'os_lead', 'nav_app', 'shops', 'shop_index', 'plan'];
       if (m[1] === 't2r_settings_get') return json(200, db.settings[who]);
+      if (m[1] === 't2r_settings_clear') {
+        if (db.failClear) return json(500, { message: 'serveur en panne' });
+        db.clears += 1;
+        const existed = !!db.settings[who];
+        delete db.settings[who];
+        return json(200, existed);
+      }
       if (!body.p_patch || typeof body.p_patch !== 'object') return json(400, { code: 'P0001', message: 'réglages invalides' });
       db.settingsSets += 1;
       db.settings[who] = db.settings[who] || {};
@@ -835,6 +842,41 @@ async function settingsSyncTests(browser) {
   await idle(C.page);
   eq(await C.page.evaluate(() => window.t2r.state.sync.error), '', 'fonctions de réglages absentes : aucune erreur affichée');
   C.setOffline(false);
+
+  // « Réinitialiser » efface aussi les réglages en ligne (pas l'historique) ; sans réseau ou serveur en panne : rien n'est touché
+  await B.page.evaluate(() => go('settings'));
+  const rowsBefore = db.rows.length;
+  db.failClear = true;
+  await B.page.getByRole('button', { name: 'Deze pagina resetten' }).click();
+  await B.page.getByRole('button', { name: 'Alles wissen' }).click();
+  await B.page.waitForFunction(() => document.getElementById('toast').textContent.includes('De online instellingen konden niet worden gewist'));
+  check(true, 'serveur en panne : message, la réinitialisation est annulée');
+  check(!!db.settings['réglages-1'], 'et les réglages en ligne sont toujours là');
+  eq(await B.page.evaluate(() => (window.t2r.state.session || {}).username), 'réglages-1', 'et la session est conservée');
+  eq(await B.page.evaluate(() => window.t2r.state.prefs.nightCutoff), 8, 'et les réglages locaux aussi');
+  db.failClear = false;
+  await B.page.getByRole('button', { name: 'Deze pagina resetten' }).click();
+  await B.page.getByRole('button', { name: 'Alles wissen' }).click();
+  await waitFor(() => !db.settings['réglages-1']);
+  check(true, 'réinitialiser : les réglages en ligne sont effacés');
+  eq(db.clears, 1, 'une seule demande d\'effacement');
+  eq(await B.page.evaluate(() => window.t2r.state.session), null, 'réinitialiser : déconnecté');
+  eq(db.rows.length, rowsBefore, "l'historique en ligne n'est pas touché");
+  eq(await B.page.evaluate(() => window.t2r.state.prefs.nightCutoff), 12, 'les réglages locaux sont remis à zéro');
+  // Un autre appareil qui se connecte sous ce nom ne retrouve plus de réglages
+  const D2 = await open('2026-10-29T10:00:00+01:00');
+  await D2.page.getByRole('button', { name: 'Continuer' }).click();
+  await D2.page.getByRole('button', { name: 'Réglages' }).click();
+  await signInAs(D2.page, 'réglages-1');
+  await idle(D2.page);
+  eq(await D2.page.evaluate(() => window.t2r.state.prefs.lang), 'fr', 'sous ce nom, plus aucun réglage à retrouver');
+  await D2.context.close();
+  // Fonction d'effacement absente du serveur (404) : la réinitialisation se fait quand même
+  await C.page.evaluate(() => go('settings'));
+  await C.page.getByRole('button', { name: 'Réinitialiser cette page' }).click();
+  await C.page.getByRole('button', { name: 'Tout effacer' }).click();
+  await C.page.waitForFunction(() => window.t2r.state.session === null);
+  check(true, 'serveur sans la fonction d\'effacement : la réinitialisation aboutit');
 
   // Déconnexion : plus rien en attente
   await B.page.evaluate(() => signOut());

@@ -63,7 +63,9 @@ la fonction SQL `t2r_settings_set` ne garde que cette liste (liste blanche) et j
 appareil envoie seulement ce qu'il a changé (le dernier à changer un réglage l'emporte) ; hors connexion, le
 changement attend le retour du réseau. Au premier passage sous un nom, ce que le serveur a déjà gagne et le
 reste lui est envoyé. Si les fonctions `t2r_settings_*` ne sont pas installées, rien n'est envoyé et tout
-continue en local.
+continue en local. « Réinitialiser » (page web ou appli) efface aussi les réglages en ligne du nom
+(`t2r_settings_clear`) ; si le serveur ne répond pas, rien n'est réinitialisé. L'historique en ligne
+n'est supprimé que par « Vider tout l'historique ».
 
 ### Chrono partagé entre appareils
 
