@@ -860,6 +860,7 @@ async function settingsSyncTests(browser) {
   await waitFor(() => !db.settings['réglages-1']);
   check(true, 'réinitialiser : les réglages en ligne sont effacés');
   eq(db.clears, 1, 'une seule demande d\'effacement');
+  await B.page.waitForFunction(() => window.t2r.state.session === null);
   eq(await B.page.evaluate(() => window.t2r.state.session), null, 'réinitialiser : déconnecté');
   eq(db.rows.length, rowsBefore, "l'historique en ligne n'est pas touché");
   eq(await B.page.evaluate(() => window.t2r.state.prefs.nightCutoff), 12, 'les réglages locaux sont remis à zéro');
@@ -869,7 +870,7 @@ async function settingsSyncTests(browser) {
   await D2.page.getByRole('button', { name: 'Réglages' }).click();
   await signInAs(D2.page, 'réglages-1');
   await idle(D2.page);
-  eq(await D2.page.evaluate(() => window.t2r.state.prefs.lang), 'fr', 'sous ce nom, plus aucun réglage à retrouver');
+  eq(await D2.page.evaluate(() => window.t2r.state.prefs.shops[0].name), 'Smile Sandwicherie', 'sous ce nom, plus aucun réglage à retrouver (sandwicherie par défaut)');
   await D2.context.close();
   // Fonction d'effacement absente du serveur (404) : la réinitialisation se fait quand même
   await C.page.evaluate(() => go('settings'));
