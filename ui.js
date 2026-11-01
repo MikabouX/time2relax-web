@@ -234,22 +234,21 @@ function render() {
   applyTheme(); // couleur et mode (aussi après une synchro ou une réinitialisation)
   let page;
   if (S.view === 'history') page = historyView();
-  else if (S.view === 'settings') page = settingsView();
+  else if (S.view === 'welcome') page = welcomeView();
   else if (S.view === 'plan') page = planView();
-  else page = homeView();
+  else page = homeView(); // les réglages sont en bas de l'accueil
   $app.replaceChildren(page);
-  if (S.view === 'home') updateRing(true);
+  if (S.view === 'home' || S.view === 'settings') updateRing(true);
+  if (S.view === 'settings') {
+    const sec = document.getElementById('settings');
+    if (sec) sec.scrollIntoView();
+  }
   updateTitle();
 }
 
 /** Appelé par la synchro quand son état change. */
 function onSyncChange() {
-  if (S.view === 'settings') {
-    const old = document.getElementById('acctCard');
-    if (old) old.replaceWith(accountCard());
-  } else {
-    render();
-  }
+  render();
 }
 
 const iconBtn = (name, label, onClick, cls) => h('button', {
@@ -278,13 +277,45 @@ function homeView() {
         h('div', { class: 'date' }, capitalize(dateLong(new Date())))),
       iconBtn('history', t('history'), () => go('history')),
       iconBtn('event', t('plan_title'), () => go('plan')),
-      iconBtn('settings', t('settings'), () => go('settings'))),
+      iconBtn('settings', t('settings'), () => { const sec = document.getElementById('settings'); if (sec) sec.scrollIntoView({ behavior: 'smooth' }); })),
     todayCard(),
     typeSelector(),
     ringBlock(),
     h('div', { class: 'options' }, S.run ? runningInfo() : timerOptions()),
     startButton(),
-    orderTile());
+    appStrip(),
+    settingsSection());
+}
+
+/** Liens directs vers les applis mobiles. */
+const storeLinks = () => h('div', { class: 'store-links' },
+  h('a', { class: 'btn tonal', href: safeUrl(ANDROID_URL), rel: 'noopener noreferrer' }, icon('phone_android', 18), 'Android'),
+  h('a', { class: 'btn tonal', href: safeUrl(IPHONE_URL), target: '_blank', rel: 'noopener noreferrer' }, icon('phone_android', 18), 'iPhone'));
+
+/** Sous le chrono : « Pour plus de fonctionnalités, téléchargez l'application mobile ». */
+function appStrip() {
+  return h('div', { class: 'card pad app-strip' },
+    h('p', { class: 'small' }, t('more_features')),
+    storeLinks());
+}
+
+/* ---------- Première visite : courte page d'accueil ---------- */
+
+function welcomeView() {
+  const features = ['app_f1', 'app_f2', 'app_f3', 'app_f4', 'app_f5'];
+  return h('div', { class: 'page welcome' },
+    h('header', { class: 'top' }, h('h1', { class: 'grow' }, t('welcome_title'))),
+    h('p', {}, t('welcome_web')),
+    langCard(),
+    h('div', { class: 'card pad' },
+      h('div', { class: 'strong' }, t('app_features_title')),
+      h('ul', { class: 'feature-list' }, features.map((k) => h('li', {}, t(k))))),
+    h('div', { class: 'card pad' },
+      h('div', { class: 'strong' }, t('download_title')),
+      storeLinks()),
+    h('p', { class: 'center' }, h('a', { href: safeUrl(SITE_URL), target: '_blank', rel: 'noopener noreferrer' }, t('learn_more'))),
+    h('div', { class: 'center' },
+      h('button', { type: 'button', class: 'btn text small-btn', on: { click: () => { S.prefs.setupDone = true; savePrefs(); go('home', false); } } }, t('continue_web'))));
 }
 
 function statBlock(iconName, label, agg) {
@@ -430,11 +461,7 @@ function timerOptions() {
         h('span', { class: 'small muted block' }, sub)),
       box),
     S.ui.useTimer ? h('div', { class: 'chips scroll' }, chips) : null,
-    // Sur téléphone, un minuteur du système (« OS ») sonne même écran éteint : ici, on renvoie vers les applis.
-    h('div', { class: 'timer-note small muted' },
-      icon('phone_android', 18),
-      h('span', {}, t('timer_app_note'), ' ',
-        h('a', { href: safeUrl(SITE_URL), target: '_blank', rel: 'noopener noreferrer' }, t('timer_app_link')))));
+    h('div', { class: 'timer-note small muted' }, icon('timer', 18), h('span', {}, t('timer_web_note'))));
 }
 
 function startButton() {
@@ -897,14 +924,11 @@ function planView() {
     h('p', { class: 'small muted note' }, t(S.session ? 'plan_note_sync' : 'plan_note')));
 }
 
-function settingsView() {
-  const first = !S.prefs.setupDone;
-  return h('div', { class: 'page' },
-    h('header', { class: 'top' },
-      first ? null : iconBtn('arrow_back', t('back'), goBack),
-      h('h1', { class: 'grow' }, first ? t('welcome_title') : t('settings'))),
+/** Réglages, en bas de l'accueil (on y descend en faisant défiler, ou avec la roue dentée). */
+function settingsSection() {
+  return h('section', { id: 'settings', class: 'settings-sec' },
+    h('h2', { class: 'sec-title big' }, t('settings')),
     h('p', { class: 'small muted note' }, t('settings_auto')),
-    first ? h('div', { class: 'banner' }, t('welcome_body')) : null,
 
     sectionTitle(t('sec_lang')),
     langCard(),
@@ -912,17 +936,8 @@ function settingsView() {
     sectionTitle(t('sec_colors')),
     themeCard(),
 
-    syncEnabled() ? [sectionTitle(t('sec_account')), accountCard()] : null,
-
-    sectionTitle(t('sec_apps')),
-    appsCard(),
-
     sectionTitle(t('sec_durations')),
     durationsCard(),
-
-    sectionTitle(t('sec_order')),
-    shopsCard(),
-    h('p', { class: 'small muted note' }, t('order_note')),
 
     sectionTitle(t('sec_history')),
     confirmStopCard(),
@@ -934,13 +949,12 @@ function settingsView() {
         h('button', { type: 'button', class: 'btn tonal', on: { click: doExport } }, icon('download', 18), t('btn_export')),
         h('button', { type: 'button', class: 'btn tonal', on: { click: pickImportFile } }, icon('upload', 18), t('btn_import')))),
 
-    first
-      ? h('button', { type: 'button', class: 'start big', on: { click: () => { S.prefs.setupDone = true; savePrefs(); go('home', false); } } }, t('continue_btn'))
-      : [
-        sectionTitle(t('sec_danger')),
-        h('button', { type: 'button', class: 'btn danger-outline wide', on: { click: resetAll } }, icon('delete_forever', 20), t('reset_btn')),
-        h('p', { class: 'small muted note' }, t('reset_note')),
-      ],
+    sectionTitle(t('sec_apps')),
+    appsCard(),
+
+    sectionTitle(t('sec_danger')),
+    h('button', { type: 'button', class: 'btn danger-outline wide', on: { click: resetAll } }, icon('delete_forever', 20), t('reset_btn')),
+    h('p', { class: 'small muted note' }, t('reset_note')),
 
     h('p', { class: 'footer' }, `✦ ${t('footer')}`));
 }
@@ -948,9 +962,7 @@ function settingsView() {
 /** Lien vers le site explicatif (fonctions, téléchargement des applis Android et iPhone). */
 function appsCard() {
   return h('div', { class: 'card pad' },
-    h('p', { class: 'strong' }, t('web_or_app_title')),
     h('p', { class: 'small muted' }, t('web_or_app_body')),
-    h('p', {}, t('apps_intro')),
     h('a', { class: 'btn tonal', href: safeUrl(SITE_URL), target: '_blank', rel: 'noopener noreferrer' }, icon('open_in_new', 18), t('apps_btn')));
 }
 
@@ -1137,7 +1149,7 @@ async function resetAll() {
   S.session = null;
   S.ui = { type: 'break', useTimer: false, pauseMinutes: 15 };
   S.sync = { busy: false, last: null, error: '' };
-  S.view = 'settings';
+  S.view = 'welcome';
   render();
 }
 

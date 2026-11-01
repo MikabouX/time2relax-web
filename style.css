@@ -405,3 +405,16 @@ button.tile { border: 0; font: inherit; cursor: pointer; }
 .note.center { text-align: center; margin-top: 14px; }
 .plan-add { flex-wrap: wrap; }
 .card.pad > p + p { margin-top: 10px; }
+
+/* Page d'accueil (première visite), liens vers les applis, réglages en bas de l'accueil */
+.welcome > p { margin: 0 4px 14px; line-height: 1.45; }
+.feature-list { margin: 8px 0 0; padding-left: 20px; line-height: 1.6; }
+.store-links { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.store-links .btn { flex: 1; justify-content: center; }
+.app-strip { margin-top: 14px; }
+.app-strip p { margin: 0; text-align: center; }
+.center { text-align: center; }
+.small-btn { font-size: 14px; }
+.settings-sec { margin-top: 36px; padding-top: 8px; border-top: 1px solid var(--outline); }
+.sec-title.big { font-size: 22px; }
+.welcome a, .app-strip a:not(.btn) { color: var(--primary); font-weight: 600; }

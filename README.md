@@ -5,6 +5,11 @@
 > inactif : `config.js` laissé vide). Une seule alerte du navigateur prévient 30 secondes avant la fin.
 > L'historique est gardé une semaine. Les breaks prévus acceptent aussi un moment « Autre » avec un nom
 > (meeting, formation…).
+>
+> Première visite : courte page de bienvenue (ce que fait la version web, choix de la langue, fonctions de
+> l'application, téléchargement direct Android / iPhone, lien vers la page explicative, bouton « Continuer
+> avec la version web »). Ensuite : chrono, liens vers les applis sous le chrono, et les réglages en bas de
+> l'accueil (plus de commande de repas sur le web).
 
 Chrono de break et de lunch, minuteur avec alertes, historique (avec ajout et modification d'une
 entrée oubliée), commande de repas, mode nuit, français, néerlandais, anglais et allemand. Même esprit que l'appli

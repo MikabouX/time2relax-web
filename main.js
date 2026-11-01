@@ -21,7 +21,7 @@
     store.remove('t2r.session');
   }
 
-  if (!S.prefs.setupDone) S.view = 'settings';
+  if (!S.prefs.setupDone) S.view = 'welcome';
   try { history.replaceState({ v: S.view, d: 0 }, ''); } catch (_) { /* file:// restreint */ }
 
   render();

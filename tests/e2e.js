@@ -72,16 +72,24 @@ async function main() {
     console.log('A. Premier lancement, chrono sans minuteur');
     {
       const { page, context, errors } = await newPage(browser);
-      check(await page.locator('.banner').isVisible(), 'écran de bienvenue au premier lancement');
-      await page.getByRole('button', { name: 'Continuer' }).click();
+      check(await page.locator('.welcome').isVisible(), 'courte page de bienvenue au premier lancement');
+      check((await text(page, '.welcome')).includes('30 secondes avant la fin'), 'bienvenue : la version web fait le chrono et prévient 30 s avant');
+      eq(await page.locator('.welcome .swatch').count(), 0, 'bienvenue : pas de choix de couleur');
+      eq(await page.locator('.welcome').getByRole('button', { name: 'Nederlands' }).count(), 1, 'bienvenue : choix de la langue');
+      eq(await page.locator('.welcome .feature-list li').count(), 5, "bienvenue : les fonctions de l'application");
+      eq(await page.locator(`.welcome a[href="${'https://github.com/MikabouX/time2relax-web/releases/latest/download/Time2Relax_v1.0.0.apk'}"]`).count(), 1, 'bienvenue : téléchargement direct Android');
+      eq(await page.locator('.welcome a[href="https://testflight.apple.com/join/Net95ZVk"]').count(), 1, 'bienvenue : téléchargement direct iPhone');
+      eq(await page.locator('.welcome a[href="https://bardiaux.wordpress.com/"]').count(), 1, 'bienvenue : lien vers la page explicative');
+      await page.getByRole('button', { name: 'Continuer avec la version web' }).click();
       eq(await text(page, '#ringBig'), '00:00', 'chrono à zéro');
       eq(await text(page, '#ringCap'), 'Prêt à démarrer', 'légende « prêt »');
       check((await text(page, '.date')).toLowerCase().includes('jeudi 29 octobre'), 'date du jour en français');
       eq(await text(page, '.stat-val'), '—', 'compteur du jour vide');
       // sous le minuteur : l'alerte écran éteint demande l'appli mobile (pas de minuteur « OS » sur le web)
-      check((await text(page, '.timer-note')).includes('30 secondes avant la fin') && (await text(page, '.timer-note')).includes('installe plutôt l\'application'), 'sous le minuteur : alerte 30 s avant la fin et renvoi vers l\'appli');
-      eq(await page.locator('.timer-note a[href="https://bardiaux.wordpress.com/"][target="_blank"]').count(), 1, 'le message renvoie vers le site des applis');
-      eq((await text(page, '.timer-note a')).trim(), 'Télécharger', 'lien « Télécharger »');
+      check((await text(page, '.timer-note')).includes('30 secondes avant la fin'), 'sous le minuteur : alerte 30 s avant la fin');
+      check((await text(page, '.app-strip')).includes('Pour plus de fonctionnalités'), "sous le chrono : « pour plus de fonctionnalités, télécharge l'application »");
+      eq(await page.locator('.app-strip a').count(), 2, 'deux liens : Android et iPhone');
+      eq(await page.locator('.tile-wrap').count(), 0, 'plus de bouton « Commander »');
 
       await page.locator('.start').click();
       eq(await page.locator('.timer-note').count(), 0, 'pendant un chrono, le message disparaît avec les options');
@@ -214,23 +222,18 @@ async function main() {
       const types = await page.evaluate(() => window.t2r.state.entries.filter((e) => e.date === '2026-10-31').map((e) => e.type));
       eq(types.join(), 'break', "ancien type « pause » lu comme break");
 
-      // néerlandais
+      // néerlandais : les réglages sont en bas de l'accueil
       await page.getByRole('button', { name: 'Retour' }).click();
-      await page.getByRole('button', { name: 'Réglages' }).click();
-      // lien vers le site explicatif (téléchargement des applis)
-      const siteLink = page.locator('a[href="https://bardiaux.wordpress.com/"]');
-      eq(await siteLink.count(), 1, 'réglages : un seul lien vers le site explicatif');
+      check(await page.locator('#settings').isVisible(), "réglages en bas de l'accueil");
+      const siteLink = page.locator('#settings a[href="https://bardiaux.wordpress.com/"]');
+      eq(await siteLink.count(), 1, 'réglages : un lien vers le site explicatif');
       eq(await siteLink.getAttribute('target'), '_blank', 'le lien du site s\'ouvre dans un nouvel onglet');
-      check(((await siteLink.getAttribute('rel')) || '').includes('noopener'), 'le lien du site est en noopener');
-      eq((await siteLink.innerText()).trim(), 'Ouvrir le site Time2Relax', 'texte du lien du site en français');
-      check((await text(page, '#app')).includes('télécharger les applis'), 'phrase d\'introduction : téléchargement des applis');
-      await page.getByRole('button', { name: 'Nederlands' }).click();
-      eq(await text(page, 'h1'), 'Instellingen', 'titre des réglages en néerlandais');
-      eq((await page.locator('a[href="https://bardiaux.wordpress.com/"]').innerText()).trim(), 'Time2Relax-website openen', 'texte du lien du site en néerlandais');
-      await page.getByRole('button', { name: 'Terug' }).click();
+      eq(await page.locator('#settings').getByText('Commander à manger').count(), 0, 'plus de sites de commande dans les réglages');
+      await page.locator('#settings').getByRole('button', { name: 'Nederlands' }).click();
+      eq(await text(page, '#settings h2'), 'Instellingen', 'titre des réglages en néerlandais');
+      eq((await siteLink.innerText()).trim(), 'Time2Relax-website openen', 'texte du lien du site en néerlandais');
       check((await text(page, '.date')).toLowerCase().includes('donderdag 29 oktober'), 'date en néerlandais');
       eq(await text(page, '.start'), 'Break starten', 'bouton de démarrage en néerlandais');
-      check((await text(page, '.tile-wrap')).includes('Bestellen'), 'bouton « Bestellen »');
       await page.locator('.start').click();
       await advance(page, 65000);
       await page.locator('.start').click();
@@ -245,58 +248,28 @@ async function main() {
     console.log('D. Langue du navigateur par défaut');
     {
       const { page, context } = await newPage(browser, { lang: 'nl-BE' });
-      check((await text(page, '.banner')).startsWith('Kies je taal'), 'navigateur en néerlandais : page directement en néerlandais');
+      check((await text(page, '.welcome')).includes('Met de webversie'), 'navigateur en néerlandais : page directement en néerlandais');
       await context.close();
     }
 
-    /* ------------------------------------------------------------ E. commande et réglages */
-    console.log('E. Commande de repas, réglages (plus d\'itinéraires)');
+    /* ------------------------------------------------------------ E. réglages en bas de l'accueil */
+    console.log("E. Réglages en bas de l'accueil (plus de commande ni d'itinéraires)");
     {
       const { page, context, errors } = await newPage(browser, {
         // anciens réglages d'itinéraire encore présents dans le navigateur : ils doivent être ignorés
         setup: () => localStorage.setItem('t2r.prefs', JSON.stringify({ setupDone: true, homeAddr: 'ancienne adresse', navApp: 'gmaps' })),
       });
-      const hrefsOf = () => page.locator('.tile-wrap a').evaluateAll((as) => as.map((a) => a.getAttribute('href')));
-      let hrefs = await hrefsOf();
-      eq(hrefs.length, 0, 'plus de sandwicherie par défaut : aucun lien');
-      check((await text(page, '.tile-wrap')).includes('Ajouter un site'), 'bouton « Commander » : « Ajouter un site »');
-      // ajout depuis le bouton : adresse tapée sans https ni nom
-      await page.locator('.tile-wrap .tile').click();
-      await page.locator('.dlg input[type=url]').fill('pas une adresse');
-      await page.locator('.dlg').getByRole('button', { name: 'OK' }).click();
-      check(await page.locator('.dlg .dlg-error').isVisible(), 'adresse invalide : message dans la boîte');
-      await page.locator('.dlg input[type=url]').fill('www.ma-sandwicherie.be');
-      await page.locator('.dlg').getByRole('button', { name: 'OK' }).click();
-      hrefs = await hrefsOf();
-      eq(hrefs.length, 1, "un seul raccourci : « Commander »");
-      eq(hrefs[0], 'https://www.ma-sandwicherie.be', 'bouton « Commander » vers le site ajouté (https ajouté)');
-      eq(await page.evaluate(() => window.t2r.state.prefs.shops[0].name), 'ma-sandwicherie.be', 'nom déduit de l\'adresse');
       eq(await page.locator('a[href*="waze"], a[href*="google.com/maps"]').count(), 0, 'aucun lien Waze / Google Maps');
       const prefs0 = await page.evaluate(() => window.t2r.state.prefs);
       check(!('homeAddr' in prefs0) && !('workAddr' in prefs0) && !('navApp' in prefs0), "anciens réglages d'itinéraire ignorés");
+      eq(await page.locator('input[placeholder*="dresse"]').count(), 0, "pas de champs d'adresse");
       await page.getByRole('button', { name: 'Réglages' }).click();
-      eq(await page.locator('input[placeholder*="dresse"]').count(), 0, "plus de champs d'adresse dans les réglages");
-      eq(await page.getByRole('button', { name: /Waze|Google Maps/ }).count(), 0, "plus de choix d'application d'itinéraire");
-      await page.getByRole('button', { name: 'Takeaway.com' }).click();
-      await page.getByRole('button', { name: 'Takeaway.com' }).first().click();
-      await page.getByRole('button', { name: 'Terug' }).or(page.getByRole('button', { name: 'Retour' })).click();
-      hrefs = await hrefsOf();
-      check(hrefs[0] === 'https://www.takeaway.com/be/', 'commande vers Takeaway après sélection');
-      await page.getByRole('button', { name: 'Choisir un autre site' }).click();
-      await page.locator('.pick-item').first().click();
-      hrefs = await hrefsOf();
-      check(hrefs[0] === 'https://www.ma-sandwicherie.be', 'sélecteur rapide de site de commande');
-      await page.getByRole('button', { name: 'Choisir un autre site' }).click();
-      await page.locator('.pick-item').nth(1).click();
-      // les réglages survivent au rechargement
-      await page.reload();
-      hrefs = await hrefsOf();
-      check(hrefs.length === 1 && hrefs[0] === 'https://www.takeaway.com/be/', 'réglages conservés après rechargement');
+      await page.waitForTimeout(600);
+      check(await page.locator('#settings').isVisible(), 'la roue dentée descend jusqu\'aux réglages');
       // réinitialisation
-      await page.getByRole('button', { name: 'Réglages' }).click();
       await page.getByRole('button', { name: 'Réinitialiser cette page' }).click();
       await page.getByRole('button', { name: 'Tout effacer' }).click();
-      check(await page.locator('.banner').isVisible(), 'après réinitialisation : retour à l\'écran de bienvenue');
+      check(await page.locator('.welcome').isVisible(), 'après réinitialisation : retour à la page de bienvenue');
       check(errors.length === 0, `aucune erreur console (${errors.join(' | ')})`);
       await context.close();
     }
@@ -438,24 +411,18 @@ async function main() {
       await context.close();
     }
 
-    /* ------------------------------------------------------------ F. compte + synchronisation (serveur simulé) */
-    console.log("F. Nom d'utilisateur et synchronisation (Supabase simulé)");
-    await syncTests(browser);
+    // F, H, I, J, L : synchronisation en ligne. La version web est autonome depuis novembre 2026 (config.js vide) :
+    // ces scénarios ne sont plus lancés ; le code et les tests restent si la synchronisation revient un jour.
+    if (process.env.T2R_SYNC_TESTS) {
+      await syncTests(browser);
+      await editSyncTests(browser);
+      await stopTests(browser);
+      await sharedRunTests(browser);
+      await settingsSyncTests(browser);
+    }
 
-    console.log('H. Synchronisation des ajouts et modifications');
-    await editSyncTests(browser);
-
-    console.log('I. Arrêt par erreur : Reprendre et confirmation');
-    await stopTests(browser);
-
-    console.log('J. Chrono partagé entre appareils');
-    await sharedRunTests(browser);
-
-    console.log('K. Breaks prévus : décompte grisé, sans alerte');
+    console.log('K. Breaks prévus : décompte grisé');
     await planTests(browser);
-
-    console.log('L. Réglages rangés sous le nom d\'utilisateur');
-    await settingsSyncTests(browser);
   } finally {
     await browser.close();
     server.kill();
@@ -621,7 +588,7 @@ async function planTests(browser) {
     eq(await es.page.evaluate(() => LANG), 'en', 'langue non proposée (espagnol) : anglais');
     await es.page.getByRole('button', { name: 'Settings' }).click();
     await es.page.getByRole('button', { name: 'Deutsch' }).click();
-    eq(await text(es.page, 'h1'), 'Einstellungen', 'choix « Deutsch » dans les réglages');
+    eq(await text(es.page, '#settings h2'), 'Einstellungen', 'choix « Deutsch » dans les réglages');
     // durées dans les réglages
     await es.page.locator('.dur-row-btn').nth(1).click();
     await es.page.locator('.dlg').getByRole('button', { name: '45 Min.' }).click();
