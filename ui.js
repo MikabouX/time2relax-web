@@ -135,26 +135,82 @@ function confirmDialog({ title, body, ok, danger }) {
   }).then((v) => v === true);
 }
 
+/** Lien web tapé à la main (www.exemple.be, https://…) ; null s'il n'en est pas un. */
+function shopUrlFrom(text) {
+  let u = String(text || '').trim();
+  if (!u || /^https?:\/\/$/i.test(u) || /\s/.test(u)) return null;
+  if (!/^https?:\/\//i.test(u)) u = `https://${u}`;
+  try {
+    const url = new URL(u);
+    if (!url.hostname.includes('.')) return null;
+  } catch (_) { return null; }
+  return u;
+}
+
+const shopNameFrom = (url) => { try { return new URL(url).hostname.replace(/^www\./, ''); } catch (_) { return url; } };
+
 function shopDialog(initial) {
   return openDialog((dlg, close) => {
+    const url = h('input', { type: 'url', class: 'field', value: initial ? initial.url : '', placeholder: t('shop_link_hint'), 'aria-label': t('shop_link') });
     const name = h('input', { type: 'text', class: 'field', value: initial ? initial.name : '', placeholder: t('shop_name'), 'aria-label': t('shop_name') });
-    const url = h('input', { type: 'url', class: 'field', value: initial ? initial.url : 'https://', placeholder: t('shop_link'), 'aria-label': t('shop_link') });
+    const error = h('p', { class: 'small dlg-error', hidden: true, role: 'alert' });
     const submit = () => {
-      const n = name.value.trim();
-      let u = url.value.trim();
-      if (!n || !u || u === 'https://') return;
-      if (!/^https?:\/\//i.test(u)) u = `https://${u}`;
-      close({ name: n, url: u });
+      const u = shopUrlFrom(url.value);
+      if (!u) { error.textContent = t('shop_err'); error.hidden = false; return; }
+      close({ name: name.value.trim() || shopNameFrom(u), url: u });
     };
     dlg.append(
       h('h2', {}, initial ? t('shop_edit_title') : t('shop_add_title')),
-      h('div', { class: 'dlg-fields' }, name, url),
+      h('div', { class: 'dlg-fields' },
+        h('label', { class: 'small muted' }, t('shop_link')), url,
+        h('label', { class: 'small muted' }, t('shop_name')), name),
+      error,
       h('div', { class: 'dlg-actions' },
         h('button', { type: 'button', class: 'btn text', on: { click: () => close(null) } }, t('cancel')),
         h('button', { type: 'button', class: 'btn filled', on: { click: submit } }, t('ok'))),
     );
     [name, url].forEach((el) => el.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); }));
   });
+}
+
+/** Choix d'un nombre de minutes : − / +, ou un choix rapide. zeroLabel : texte pour 0 (« à l'heure »). */
+function minutesDialog({ title, value, min, max, presets = [], zeroLabel = null, note = null }) {
+  return openDialog((dlg, close) => {
+    let v = Math.min(Math.max(value, min), max);
+    const label = (m) => (m === 0 && zeroLabel ? zeroLabel : t('minutes_n', { m }));
+    const out = h('output', { class: 'min-value' });
+    const minus = h('button', { type: 'button', class: 'icon-btn tonal', 'aria-label': '−1', on: { click: () => set(v - 1) } }, '−');
+    const plus = h('button', { type: 'button', class: 'icon-btn tonal', 'aria-label': '+1', on: { click: () => set(v + 1) } }, '+');
+    const chips = h('div', { class: 'chips center' });
+    function set(n) {
+      v = Math.min(Math.max(n, min), max);
+      out.textContent = label(v);
+      minus.disabled = v <= min;
+      plus.disabled = v >= max;
+      chips.replaceChildren(...presets.map((m) => chip(label(m), v === m, () => set(m))));
+    }
+    set(v);
+    dlg.append(...[
+      h('h2', {}, title),
+      h('div', { class: 'min-row' }, minus, out, plus),
+      presets.length ? chips : null,
+      note ? h('p', { class: 'small muted' }, note) : null,
+      h('div', { class: 'dlg-actions' },
+        h('button', { type: 'button', class: 'btn text', on: { click: () => close(null) } }, t('cancel')),
+        h('button', { type: 'button', class: 'btn filled', on: { click: () => close(v) } }, t('ok'))),
+    ].filter(Boolean));
+  });
+}
+
+const pickBreakMinutes = () => minutesDialog({ title: t('dur_break_title'), value: S.ui.pauseMinutes, min: BREAK_MIN, max: BREAK_MAX, presets: [5, 10, 15, 20, 30] });
+const pickLunchMinutes = () => minutesDialog({ title: t('dur_lunch_title'), value: S.ui.lunchMinutes, min: LUNCH_MIN, max: LUNCH_MAX, presets: [20, 30, 45, 60] });
+
+async function editDuration(lunch) {
+  const m = await (lunch ? pickLunchMinutes() : pickBreakMinutes());
+  if (m === null || m === undefined) return;
+  if (lunch) S.ui.lunchMinutes = m; else S.ui.pauseMinutes = m;
+  saveUi();
+  render();
 }
 
 function pickShopDialog() {
@@ -341,9 +397,7 @@ function runningInfo() {
 
 function timerOptions() {
   const lunch = S.ui.type === 'lunch';
-  const sub = lunch
-    ? t('lunch_fixed', { m: LUNCH_MINUTES })
-    : (S.ui.useTimer ? t('break_duration') : t('stopwatch_only'));
+  const sub = S.ui.useTimer ? (lunch ? t('lunch_duration') : t('break_duration')) : t('stopwatch_only');
   const box = h('input', {
     type: 'checkbox',
     class: 'switch',
@@ -359,13 +413,14 @@ function timerOptions() {
       },
     },
   });
-  const chips = lunch
-    ? [h('span', { class: 'chip on static' }, `${LUNCH_MINUTES} min`)]
-    : PAUSE_CHOICES.map((m) => chip(`${m} min`, S.ui.pauseMinutes === m, () => {
-      S.ui.pauseMinutes = m;
-      saveUi();
-      render();
-    }));
+  // Une seule pastille : la durée choisie par l'utilisateur ; un clic permet de la changer.
+  const chips = [h('button', {
+    type: 'button',
+    class: 'chip on dur-chip',
+    title: t('dur_edit'),
+    'aria-label': `${t('dur_edit')} : ${t('minutes_n', { m: lunch ? S.ui.lunchMinutes : S.ui.pauseMinutes })}`,
+    on: { click: () => editDuration(lunch) },
+  }, t('minutes_n', { m: lunch ? S.ui.lunchMinutes : S.ui.pauseMinutes }), ' ', icon('edit', 16))];
   return h('div', { class: 'card timer-opts' },
     h('label', { class: 'switch-row' },
       icon('timer', 24),
@@ -395,6 +450,15 @@ function startButton() {
 /** Bouton « Commander » vers le site choisi (la petite flèche permet d'en changer). */
 function orderTile() {
   const shop = S.prefs.shops[S.prefs.shopIndex];
+  if (!shop) {
+    // Aucun site encore : le bouton propose d'en ajouter un.
+    return h('div', { class: 'tile-wrap' },
+      h('button', { type: 'button', class: 'tile', on: { click: addShop } },
+        icon('bag', 26),
+        h('span', { class: 'tile-txt' },
+          h('span', { class: 'tile-label' }, t('order')),
+          h('span', { class: 'tile-cap' }, t('order_add')))));
+  }
   return h('div', { class: 'tile-wrap' },
     h('a', { class: 'tile', href: safeUrl(shop.url), target: '_blank', rel: 'noopener noreferrer' },
       icon('bag', 26),
@@ -502,7 +566,7 @@ function entryDialog(initial) {
     const todayCal = dayKey(now);
     let type = initial ? initial.type : 'break';
     let touched = !!initial; // durée modifiée à la main : on ne la remplace plus quand on change de type
-    const defaultMinutes = (v) => (v === 'lunch' ? LUNCH_MINUTES : S.ui.pauseMinutes);
+    const defaultMinutes = (v) => (v === 'lunch' ? S.ui.lunchMinutes : S.ui.pauseMinutes);
 
     const date = h('input', {
       type: 'date', class: 'field', required: true, max: todayCal, 'aria-label': t('entry_date'),
@@ -677,26 +741,105 @@ const sectionTitle = (text) => h('h2', { class: 'sec-title' }, text);
 
 /* ---------- Page « Breaks prévus » ---------- */
 
+/** Une ligne du planning (lecture seule) : un clic l'ouvre dans la fenêtre d'édition. */
 function planRow(it) {
-  const typeBtn = (value, label, ic) => h('button', {
+  const lunch = it.type === 'lunch';
+  return h('button', {
     type: 'button',
-    class: `seg small${it.type === value ? ' on' : ''}`,
-    'aria-pressed': String(it.type === value),
-    on: { click: () => setPlannedType(it.id, value) },
-  }, icon(ic, 18), h('span', {}, label));
-  return h('div', { class: 'plan-row' },
-    h('input', {
-      type: 'time',
-      class: 'time-in',
-      value: it.time,
-      required: true,
-      'aria-label': t('plan_time_label'),
-      on: { change: (e) => setPlannedTime(it.id, e.target.value) },
-    }),
-    h('div', { class: 'segs plan-type' },
-      typeBtn('break', t('type_break'), 'coffee'),
-      typeBtn('lunch', t('type_lunch'), 'restaurant')),
-    iconBtn('delete', t('plan_remove'), () => removePlanned(it.id)));
+    class: 'plan-item',
+    'aria-label': `${typeLabel(it.type)} ${it.time} — ${t('edit')}`,
+    on: { click: () => editPlanned(it) },
+  },
+  h('span', { class: `plan-badge${lunch ? ' lun' : ''}` }, icon(lunch ? 'restaurant' : 'coffee', 20)),
+  h('span', { class: 'plan-item-txt' },
+    h('span', { class: 'plan-time' }, it.time),
+    h('span', { class: 'small muted block' }, typeLabel(it.type))),
+  icon('edit', 18));
+}
+
+/** Fenêtre d'édition, séparée du planning : rien ne change avant « Enregistrer ». */
+function planDialog(item, type) {
+  return openDialog((dlg, close) => {
+    let kind = item ? item.type : type;
+    const time = h('input', { type: 'time', class: 'field time-big', required: true, value: item ? item.time : nextQuarter(), 'aria-label': t('plan_time_label') });
+    const segs = h('div', { class: 'segs' });
+    const error = h('p', { class: 'small dlg-error', hidden: true, role: 'alert' });
+    const save = h('button', { type: 'button', class: 'btn filled' }, t('save'));
+    const clash = () => S.plan.items.some((x) => (!item || x.id !== item.id) && x.time === time.value);
+    const refresh = () => {
+      segs.replaceChildren(...[['break', 'coffee'], ['lunch', 'restaurant']].map(([v, ic]) => h('button', {
+        type: 'button',
+        class: `seg${kind === v ? ' on' : ''}`,
+        'aria-pressed': String(kind === v),
+        on: { click: () => { kind = v; refresh(); } },
+      }, icon(ic, 18), h('span', {}, typeLabel(v)))));
+      const bad = clash();
+      error.textContent = bad ? t('plan_clash') : '';
+      error.hidden = !bad;
+      save.disabled = bad || !/^([01]\d|2[0-3]):[0-5]\d$/.test(time.value);
+    };
+    time.addEventListener('input', refresh);
+    save.addEventListener('click', () => { if (!save.disabled) close({ action: 'save', type: kind, time: time.value }); });
+    refresh();
+    dlg.append(
+      h('h2', {}, item ? t('plan_edit_title') : t('plan_new_title')),
+      h('div', { class: 'dlg-fields' }, segs, time),
+      error,
+      h('div', { class: 'dlg-actions wrap' },
+        item ? h('button', { type: 'button', class: 'btn text danger-text', on: { click: () => close({ action: 'delete' }) } }, icon('delete', 18), t('delete')) : null,
+        h('button', { type: 'button', class: 'btn text', on: { click: () => close(null) } }, t('cancel')),
+        save),
+    );
+  });
+}
+
+async function editPlanned(item, type = 'break') {
+  const res = await planDialog(item, type);
+  if (!res) return;
+  if (res.action === 'delete' && item) removePlanned(item.id);
+  else if (res.action === 'save' && item) savePlanned(item.id, res.type, res.time);
+  else if (res.action === 'save') addPlanned(res.type, res.time);
+}
+
+/** « Me prévenir quand l'heure approche » + nombre de minutes. */
+function planNotifyCard() {
+  const box = h('input', {
+    type: 'checkbox',
+    checked: S.prefs.planNotify,
+    'aria-label': t('plan_notify_title'),
+    on: {
+      change: (e) => {
+        S.prefs.planNotify = e.target.checked;
+        savePrefs();
+        if (S.prefs.planNotify) { requestNotifPermission(); ensureAudio(); }
+        render();
+      },
+    },
+  });
+  const lead = S.prefs.planNotifyLead;
+  return h('div', { class: 'card' },
+    h('label', { class: 'switch-row pad' },
+      box,
+      h('span', { class: 'grow' },
+        h('span', { class: 'strong block' }, t('plan_notify_title')),
+        h('span', { class: 'small muted block' }, t('plan_notify_note')))),
+    h('button', {
+      type: 'button',
+      class: 'shop-main pad lead-row',
+      disabled: !S.prefs.planNotify,
+      on: {
+        click: async () => {
+          const m = await minutesDialog({ title: t('plan_notify_lead_title'), value: lead, min: 0, max: LEAD_MAX, presets: [0, 2, 5, 10, 15], zeroLabel: t('on_time') });
+          if (m === null || m === undefined) return;
+          S.prefs.planNotifyLead = m;
+          savePrefs();
+          render();
+        },
+      },
+    },
+    h('span', { class: 'grow' }, t('plan_notify_lead')),
+    h('span', { class: 'strong' }, lead === 0 ? t('on_time') : t('minutes_n', { m: lead })), ' ', icon('edit', 16)),
+    h('p', { class: 'small muted pad' }, t('plan_notify_web')));
 }
 
 /** Des horaires existent mais ne valent pas pour aujourd'hui : on explique pourquoi l'accueil n'affiche rien. */
@@ -721,13 +864,14 @@ function planView() {
       iconBtn('arrow_back', t('back'), goBack),
       h('h1', { class: 'grow' }, t('plan_title'))),
     h('p', { class: 'small muted note' }, t('plan_intro')),
+    sectionTitle(t('plan_my', { n: S.plan.items.length })),
     h('div', { class: 'card plan-list' },
       S.plan.items.length
-        ? S.plan.items.map(planRow)
+        ? S.plan.items.slice().sort((a, b) => a.time.localeCompare(b.time)).map(planRow)
         : h('p', { class: 'muted pad plan-empty' }, t('plan_empty'))),
     h('div', { class: 'plan-add' },
-      h('button', { type: 'button', class: 'btn tonal', 'aria-label': t('plan_add_break_long'), on: { click: () => addPlanned('break') } }, icon('add', 18), t('plan_add_break')),
-      h('button', { type: 'button', class: 'btn tonal', 'aria-label': t('plan_add_lunch_long'), on: { click: () => addPlanned('lunch') } }, icon('add', 18), t('plan_add_lunch'))),
+      h('button', { type: 'button', class: 'btn tonal', 'aria-label': t('plan_add_break_long'), on: { click: () => editPlanned(null, 'break') } }, icon('add', 18), t('plan_add_break')),
+      h('button', { type: 'button', class: 'btn tonal', 'aria-label': t('plan_add_lunch_long'), on: { click: () => editPlanned(null, 'lunch') } }, icon('add', 18), t('plan_add_lunch'))),
     h('div', { class: 'card' },
       h('label', { class: 'switch-row pad' },
         h('span', { class: 'grow' },
@@ -739,6 +883,7 @@ function planView() {
           DAYS_SHORT[LANG].map((label, i) => chip(label, S.plan.days.includes(i + 1), () => setPlanDay(i + 1, !S.plan.days.includes(i + 1)))))
         : null),
     planHint(),
+    planNotifyCard(),
     h('p', { class: 'small muted note' }, t(S.session ? 'plan_note_sync' : 'plan_note')));
 }
 
@@ -758,6 +903,9 @@ function settingsView() {
 
     sectionTitle(t('sec_apps')),
     appsCard(),
+
+    sectionTitle(t('sec_durations')),
+    durationsCard(),
 
     sectionTitle(t('sec_order')),
     shopsCard(),
@@ -791,6 +939,18 @@ function appsCard() {
     h('a', { class: 'btn tonal', href: safeUrl(SITE_URL), target: '_blank', rel: 'noopener noreferrer' }, icon('open_in_new', 18), t('apps_btn')));
 }
 
+function durationsCard() {
+  const row = (ic, label, m, lunch) => h('button', {
+    type: 'button',
+    class: 'shop-main pad dur-row-btn',
+    on: { click: () => editDuration(lunch) },
+  }, icon(ic, 22), h('span', { class: 'grow strong' }, label), h('span', { class: 'strong' }, t('minutes_n', { m })), ' ', icon('edit', 16));
+  return h('div', { class: 'card' },
+    row('coffee', t('dur_break'), S.ui.pauseMinutes, false),
+    row('restaurant', t('dur_lunch'), S.ui.lunchMinutes, true),
+    h('p', { class: 'small muted pad' }, t('dur_note')));
+}
+
 function langCard() {
   const pick = (code) => () => {
     LANG = code;
@@ -801,7 +961,9 @@ function langCard() {
   return h('div', { class: 'card pad' },
     h('div', { class: 'chips' },
       chip('Français', LANG === 'fr', pick('fr')),
-      chip('Nederlands', LANG === 'nl', pick('nl'))),
+      chip('Nederlands', LANG === 'nl', pick('nl')),
+      chip('English', LANG === 'en', pick('en')),
+      chip('Deutsch', LANG === 'de', pick('de'))),
     h('p', { class: 'small muted' }, t('lang_note')));
 }
 
@@ -809,6 +971,7 @@ function shopsCard() {
   const shops = S.prefs.shops;
   const missing = SUGGESTIONS.filter((sg) => !shops.some((x) => x.name === sg.name));
   return h('div', { class: 'card' },
+    shops.length ? null : h('p', { class: 'small muted pad' }, t('shops_empty')),
     shops.map((s, i) => h('div', { class: 'shop-row' },
       h('button', {
         type: 'button',
@@ -818,7 +981,7 @@ function shopsCard() {
       icon(i === S.prefs.shopIndex ? 'check_circle' : 'radio', 22),
       h('span', { class: 'shop-txt' }, h('span', { class: 'strong block' }, s.name), h('span', { class: 'small muted block ellipsis' }, s.url))),
       iconBtn('edit', t('edit'), () => editShop(i)),
-      shops.length > 1 ? iconBtn('delete', t('delete'), () => deleteShop(i)) : null)),
+      iconBtn('delete', t('delete'), () => deleteShop(i)))),
     missing.length
       ? h('div', { class: 'pad' },
         h('div', { class: 'small muted' }, t('suggestions')),
@@ -828,7 +991,7 @@ function shopsCard() {
           on: { click: () => { S.prefs.shops.push({ name: sg.name, url: sg.url }); savePrefs(); render(); } },
         }, icon('add', 16), sg.name))))
       : null,
-    h('div', { class: 'pad' }, h('button', { type: 'button', class: 'btn text', on: { click: addShop } }, icon('add', 18), t('add_site'))));
+    h('div', { class: 'pad' }, h('button', { type: 'button', class: 'btn text', on: { click: addShop } }, icon('add', 18), shops.length ? t('add_site') : t('order_add'))));
 }
 
 async function addShop() {
@@ -850,9 +1013,8 @@ async function editShop(i) {
 
 function deleteShop(i) {
   const shops = S.prefs.shops;
-  if (shops.length <= 1) return;
   shops.splice(i, 1);
-  if (S.prefs.shopIndex >= shops.length) S.prefs.shopIndex = shops.length - 1;
+  if (S.prefs.shopIndex >= shops.length) S.prefs.shopIndex = Math.max(0, shops.length - 1);
   else if (i < S.prefs.shopIndex) S.prefs.shopIndex -= 1;
   savePrefs();
   render();

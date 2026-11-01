@@ -82,7 +82,8 @@ function signOut() {
    (maison, bureau) de l'appli n'en font JAMAIS partie. Chaque appareil envoie seulement ce qu'il a changé :
    le dernier à changer un réglage l'emporte. Sans la fonction SQL, tout continue en local. */
 
-const SETTING_KEYS = ['lang', 'confirm_stop', 'night_mode', 'night_cutoff', 'use_timer', 'pause_minutes', 'shops', 'shop_index', 'plan'];
+const SETTING_KEYS = ['lang', 'confirm_stop', 'night_mode', 'night_cutoff', 'use_timer', 'pause_minutes', 'lunch_minutes',
+  'plan_notify', 'plan_notify_lead', 'shops', 'shop_index', 'plan'];
 const settingsApi = { retryAt: 0 };
 let applyingSettings = false;
 let setPending = new Set((store.get('t2r.setPending', []) || []).filter((k) => SETTING_KEYS.includes(k)));
@@ -90,12 +91,15 @@ let setSeen = store.get('t2r.setSeen', null);
 
 function readSetting(k) {
   switch (k) {
-    case 'lang': return S.prefs.lang === 'fr' || S.prefs.lang === 'nl' ? S.prefs.lang : null;
+    case 'lang': return LANGS.includes(S.prefs.lang) ? S.prefs.lang : null;
     case 'confirm_stop': return !!S.prefs.confirmStop;
     case 'night_mode': return !!S.prefs.nightMode;
     case 'night_cutoff': return S.prefs.nightCutoff;
     case 'use_timer': return !!S.ui.useTimer;
     case 'pause_minutes': return S.ui.pauseMinutes;
+    case 'lunch_minutes': return S.ui.lunchMinutes;
+    case 'plan_notify': return !!S.prefs.planNotify;
+    case 'plan_notify_lead': return S.prefs.planNotifyLead;
     case 'shops': return S.prefs.shops.map((x) => ({ name: x.name, url: x.url }));
     case 'shop_index': return S.prefs.shopIndex;
     case 'plan': return JSON.parse(JSON.stringify(S.plan));
@@ -117,13 +121,15 @@ function snapshotSettings() {
 function cleanSetting(k, v) {
   const isInt = (x, a, b) => typeof x === 'number' && Number.isInteger(x) && x >= a && x <= b;
   switch (k) {
-    case 'lang': return v === 'fr' || v === 'nl' ? v : undefined;
-    case 'confirm_stop': case 'night_mode': case 'use_timer': return typeof v === 'boolean' ? v : undefined;
+    case 'lang': return LANGS.includes(v) ? v : undefined;
+    case 'confirm_stop': case 'night_mode': case 'use_timer': case 'plan_notify': return typeof v === 'boolean' ? v : undefined;
     case 'night_cutoff': return isInt(v, 0, 23) ? v : undefined;
-    case 'pause_minutes': return PAUSE_CHOICES.includes(v) ? v : undefined;
+    case 'pause_minutes': return isInt(v, BREAK_MIN, BREAK_MAX) ? v : undefined;
+    case 'lunch_minutes': return isInt(v, LUNCH_MIN, LUNCH_MAX) ? v : undefined;
+    case 'plan_notify_lead': return isInt(v, 0, LEAD_MAX) ? v : undefined;
     case 'shop_index': return isInt(v, 0, 50) ? v : undefined;
     case 'shops': {
-      if (!Array.isArray(v) || !v.length || v.length > 30) return undefined;
+      if (!Array.isArray(v) || v.length > 30) return undefined; // liste vide permise : plus de site par défaut
       const out = [];
       for (const e of v) {
         if (!e || typeof e.name !== 'string' || typeof e.url !== 'string' || !e.name || e.name.length > 80 || e.url.length > 500) return undefined;
@@ -147,8 +153,11 @@ function applySetting(k, v) {
     case 'night_cutoff': S.prefs.nightCutoff = v; break;
     case 'use_timer': S.ui.useTimer = v; break;
     case 'pause_minutes': S.ui.pauseMinutes = v; break;
-    case 'shops': S.prefs.shops = v; S.prefs.shopIndex = Math.min(S.prefs.shopIndex, v.length - 1); break;
-    case 'shop_index': S.prefs.shopIndex = Math.min(v, S.prefs.shops.length - 1); break;
+    case 'lunch_minutes': S.ui.lunchMinutes = v; break;
+    case 'plan_notify': S.prefs.planNotify = v; break;
+    case 'plan_notify_lead': S.prefs.planNotifyLead = v; break;
+    case 'shops': S.prefs.shops = v; S.prefs.shopIndex = Math.max(0, Math.min(S.prefs.shopIndex, v.length - 1)); break;
+    case 'shop_index': S.prefs.shopIndex = Math.max(0, Math.min(v, S.prefs.shops.length - 1)); break;
     case 'plan': S.plan = v; break;
     default: break;
   }

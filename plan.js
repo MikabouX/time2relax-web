@@ -119,7 +119,8 @@ function planState(now = new Date()) {
   if (!moments.length) return { has: false, text: '', due: false, progress: 0 };
   const pick = pickPlanned(now.getTime(), moments, planStarts(now));
   if (!pick) return { has: true, text: t('plan_none'), due: false, progress: 0 };
-  const vars = { type: typeLabel(pick.item.type).toLowerCase(), time: pick.item.time, left: formatCountdown(pick.secs) };
+  const Type = typeLabel(pick.item.type);
+  const vars = { type: Type.toLowerCase(), Type, time: pick.item.time, left: formatCountdown(pick.secs) };
   return pick.due
     ? { has: true, text: t('plan_due', vars), due: true, progress: 0 }
     : { has: true, text: t('plan_next', vars), due: false, progress: Math.min(1, pick.secs / PLAN_WINDOW) };
@@ -149,10 +150,46 @@ function nextQuarter(now = new Date()) {
   return `${two(d.getHours())}:${two(d.getMinutes())}`;
 }
 
-function addPlanned(type) {
-  S.plan.items.push({ id: uid(), time: nextQuarter(), type });
+function addPlanned(type, time = nextQuarter()) {
+  S.plan.items.push({ id: uid(), time, type });
   touchPlan();
   render();
+}
+
+/** Enregistre la fenêtre d'édition d'un moment prévu (type et heure changés ensemble). */
+function savePlanned(id, type, time) {
+  const it = S.plan.items.find((x) => x.id === id);
+  if (!it || !/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) return;
+  it.time = time;
+  it.type = type;
+  touchPlan();
+  render();
+}
+
+/* ---------- Rappel avant un break prévu (« Me prévenir quand l'heure approche ») ---------- */
+
+let planNotified = store.get('t2r.planNotified', []);
+if (!Array.isArray(planNotified)) planNotified = [];
+
+/** Envoie la notification des moments dont l'heure de rappel est arrivée (une seule fois chacun). */
+function checkPlanReminders(now = new Date()) {
+  if (!S.prefs.planNotify) return;
+  const lead = S.prefs.planNotifyLead;
+  const nowMs = now.getTime();
+  for (const m of planMoments(now)) {
+    const at = m.ms - lead * 60000;
+    const key = `${m.ms}-${m.type}`;
+    // Dans les 5 minutes qui suivent l'heure du rappel (page fermée plus longtemps : on ne rattrape pas).
+    if (nowMs < at || nowMs - at > 5 * 60000 || planNotified.includes(key)) continue;
+    planNotified = [...planNotified, key].slice(-60);
+    store.set('t2r.planNotified', planNotified);
+    const Type = typeLabel(m.type);
+    const title = lead === 0
+      ? t('remind_now', { type: Type.toLowerCase(), Type })
+      : t('remind_soon', { type: Type.toLowerCase(), Type, m: lead });
+    notify(title, t('remind_body', { time: m.time }), `plan-${key}`);
+    beep(1);
+  }
 }
 
 function setPlannedTime(id, time) {

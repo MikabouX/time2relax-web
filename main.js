@@ -29,7 +29,7 @@
     startTicker();
   }
   // Le compte à rebours du prochain break prévu avance aussi sans chrono en cours.
-  setInterval(() => { if (S.view === 'home' && !S.run) updatePlan(); }, 1000);
+  setInterval(() => { if (S.view === 'home' && !S.run) updatePlan(); checkPlanReminders(); }, 1000);
 
   if (syncEnabled() && S.session) { syncNow(); startRunPolling(); }
   document.addEventListener('visibilitychange', () => {
@@ -44,5 +44,5 @@
   }
 
   // Pour les tests automatiques.
-  window.t2r = { tick, state: S, render, runPoll, planState };
+  window.t2r = { tick, state: S, render, runPoll, planState, checkPlanReminders };
 }());

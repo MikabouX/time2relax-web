@@ -113,7 +113,11 @@ async function main() {
 
       // Minuteur break de 10 minutes puis rechargement en plein chrono
       await page.locator('.seg').nth(0).click();
-      await page.getByRole('button', { name: '10 min' }).click();
+      // la durée du break se choisit librement (pastille → boîte de minutes)
+      await page.locator('.dur-chip').click();
+      await page.locator('.dlg').getByRole('button', { name: '10 min' }).click();
+      await page.locator('.dlg').getByRole('button', { name: 'OK' }).click();
+      eq(await page.evaluate(() => window.t2r.state.ui.pauseMinutes), 10, 'durée du break choisie : 10 min');
       await page.locator('.start').click();
       await advance(page, 120000);
       await page.reload();
@@ -252,8 +256,19 @@ async function main() {
       });
       const hrefsOf = () => page.locator('.tile-wrap a').evaluateAll((as) => as.map((a) => a.getAttribute('href')));
       let hrefs = await hrefsOf();
+      eq(hrefs.length, 0, 'plus de sandwicherie par défaut : aucun lien');
+      check((await text(page, '.tile-wrap')).includes('Ajouter un site'), 'bouton « Commander » : « Ajouter un site »');
+      // ajout depuis le bouton : adresse tapée sans https ni nom
+      await page.locator('.tile-wrap .tile').click();
+      await page.locator('.dlg input[type=url]').fill('pas une adresse');
+      await page.locator('.dlg').getByRole('button', { name: 'OK' }).click();
+      check(await page.locator('.dlg .dlg-error').isVisible(), 'adresse invalide : message dans la boîte');
+      await page.locator('.dlg input[type=url]').fill('www.ma-sandwicherie.be');
+      await page.locator('.dlg').getByRole('button', { name: 'OK' }).click();
+      hrefs = await hrefsOf();
       eq(hrefs.length, 1, "un seul raccourci : « Commander »");
-      eq(hrefs[0], 'https://www.smile-sandwicherie.be/', 'bouton « Commander » vers la sandwicherie par défaut');
+      eq(hrefs[0], 'https://www.ma-sandwicherie.be', 'bouton « Commander » vers le site ajouté (https ajouté)');
+      eq(await page.evaluate(() => window.t2r.state.prefs.shops[0].name), 'ma-sandwicherie.be', 'nom déduit de l\'adresse');
       eq(await page.locator('a[href*="waze"], a[href*="google.com/maps"]').count(), 0, 'aucun lien Waze / Google Maps');
       const prefs0 = await page.evaluate(() => window.t2r.state.prefs);
       check(!('homeAddr' in prefs0) && !('workAddr' in prefs0) && !('navApp' in prefs0), "anciens réglages d'itinéraire ignorés");
@@ -268,7 +283,7 @@ async function main() {
       await page.getByRole('button', { name: 'Choisir un autre site' }).click();
       await page.locator('.pick-item').first().click();
       hrefs = await hrefsOf();
-      check(hrefs[0] === 'https://www.smile-sandwicherie.be/', 'sélecteur rapide de site de commande');
+      check(hrefs[0] === 'https://www.ma-sandwicherie.be', 'sélecteur rapide de site de commande');
       await page.getByRole('button', { name: 'Choisir un autre site' }).click();
       await page.locator('.pick-item').nth(1).click();
       // les réglages survivent au rechargement
@@ -520,28 +535,94 @@ async function planTests(browser) {
     await page.getByRole('button', { name: 'Breaks prévus' }).click();
     eq(await text(page, 'h1'), 'Breaks prévus', 'la page des breaks prévus');
     check(await page.locator('.plan-empty').isVisible(), 'liste vide : message');
-    const setTime = async (i, v) => { await page.locator('.time-in').nth(i).fill(v); await page.locator('.time-in').nth(i).dispatchEvent('change'); };
+    const dlg = page.locator('.dlg');
+    const addAt = async (label, time) => {
+      await page.getByRole('button', { name: label }).click();
+      await dlg.locator('input[type=time]').fill(time);
+      await dlg.getByRole('button', { name: 'Enregistrer' }).click();
+    };
     await page.getByRole('button', { name: 'Ajouter un break' }).click();
-    eq(await page.locator('.time-in').first().inputValue(), '10:15', "heure de départ = prochain quart d'heure");
-    await setTime(0, '09:45');
-    await page.getByRole('button', { name: 'Ajouter un lunch' }).click();
-    await setTime(1, '12:30');
-    await page.getByRole('button', { name: 'Ajouter un break' }).click();
-    await setTime(1, '15:00');
-    eq(await page.locator('.plan-row').count(), 3, 'trois horaires ajoutés');
+    eq(await dlg.locator('input[type=time]').inputValue(), '10:15', "heure de départ = prochain quart d'heure");
+    eq(await page.locator('.plan-item').count(), 0, "rien n'est ajouté tant que la fenêtre est ouverte");
+    await dlg.getByRole('button', { name: 'Annuler' }).click();
+    eq(await page.locator('.plan-item').count(), 0, 'annuler : rien ajouté');
+    await addAt('Ajouter un break', '09:45');
+    await addAt('Ajouter un lunch', '12:30');
+    await addAt('Ajouter un break', '15:00');
+    eq(await page.locator('.plan-item').count(), 3, 'trois horaires ajoutés');
+    eq(await text(page, '.sec-title'), 'Mon planning (3)', 'titre « Mon planning » avec le nombre');
     const list = () => page.evaluate(() => window.t2r.state.plan.items.map((i) => `${i.time} ${i.type}`).join(', '));
     eq(await list(), '09:45 break, 12:30 lunch, 15:00 break', 'liste triée par heure, type choisi à l\'ajout');
-    await page.locator('.plan-row').nth(0).getByRole('button', { name: 'Lunch' }).click();
+    // même heure qu'un autre : bloqué
+    await page.getByRole('button', { name: 'Ajouter un break' }).click();
+    await dlg.locator('input[type=time]').fill('12:30');
+    check(await dlg.getByRole('button', { name: 'Enregistrer' }).isDisabled(), 'heure déjà prise : « Enregistrer » bloqué');
+    await dlg.getByRole('button', { name: 'Annuler' }).click();
+    // modifier : type et heure ensemble, dans la fenêtre
+    await page.locator('.plan-item').nth(0).click();
+    await dlg.getByRole('button', { name: 'Lunch' }).click();
+    eq(await list(), '09:45 break, 12:30 lunch, 15:00 break', 'pendant l\'édition, le planning ne change pas');
+    await dlg.getByRole('button', { name: 'Enregistrer' }).click();
     eq(await list(), '09:45 lunch, 12:30 lunch, 15:00 break', 'changer le type (break → lunch)');
-    await page.locator('.plan-row').nth(0).getByRole('button', { name: 'Supprimer' }).click();
+    await page.locator('.plan-item').nth(0).click();
+    await dlg.getByRole('button', { name: 'Supprimer' }).click();
     eq(await list(), '12:30 lunch, 15:00 break', 'supprimer un horaire');
-    await page.locator('.time-in').nth(0).fill('');
-    await page.locator('.time-in').nth(0).dispatchEvent('change');
-    eq(await list(), '12:30 lunch, 15:00 break', 'une heure vide est ignorée');
     await page.reload();
     eq(await list(), '12:30 lunch, 15:00 break', 'les horaires sont gardés après rechargement');
     check(errors.length === 0, `aucune erreur console (${errors.join(' | ')})`);
     await context.close();
+  }
+
+  // --- « Me prévenir quand l'heure approche » : une notification N minutes avant, une seule fois
+  {
+    const { page, context, errors } = await newPage(browser, { setup: eval(planSetup(PLAN3, {}, { planNotify: true, planNotifyLead: 5 })) });
+    const notes = () => page.evaluate(() => window.__notes.map((n) => `${n.title} | ${n.body}`));
+    await page.evaluate(() => window.t2r.checkPlanReminders());
+    eq((await notes()).length, 0, 'à 10:00 (break à 10:15, rappel 5 min avant) : rien encore');
+    await advance(page, 10 * 60000 + 1000);
+    await page.evaluate(() => window.t2r.checkPlanReminders());
+    eq((await notes()).join(' / '), 'Break dans 5 min | Prévu à 10:15.', 'à 10:10 : « Break dans 5 min »');
+    await page.evaluate(() => window.t2r.checkPlanReminders());
+    eq((await notes()).length, 1, 'pas de seconde notification pour le même break');
+    await page.reload();
+    await page.evaluate(() => window.t2r.checkPlanReminders());
+    eq((await notes()).length, 0, 'après rechargement non plus');
+    // la case et les minutes dans la page
+    await page.getByRole('button', { name: 'Breaks prévus' }).click();
+    check(await page.getByRole('checkbox', { name: "Me prévenir quand l'heure approche" }).isChecked(), 'case « Me prévenir quand l\'heure approche » cochée');
+    await page.locator('.lead-row').click();
+    await page.locator('.dlg').getByRole('button', { name: '10 min' }).click();
+    await page.locator('.dlg').getByRole('button', { name: 'OK' }).click();
+    eq(await page.evaluate(() => window.t2r.state.prefs.planNotifyLead), 10, 'nombre de minutes choisi : 10');
+    await page.getByRole('checkbox', { name: "Me prévenir quand l'heure approche" }).uncheck();
+    eq(await page.evaluate(() => window.t2r.state.prefs.planNotify), false, 'case décochée : plus de rappel');
+    check(errors.length === 0, `aucune erreur console (${errors.join(' | ')})`);
+    await context.close();
+  }
+
+  // --- anglais et allemand
+  {
+    const en = await newPage(browser, { lang: 'en-GB', setup: eval(planSetup(PLAN3)) });
+    eq(await en.page.evaluate(() => LANG), 'en', 'navigateur en anglais : page en anglais');
+    eq((await planLine(en.page)).text, 'Next break · 10:15 · in 15:00', 'ligne grise en anglais');
+    eq(await text(en.page, '.start'), 'Start break', 'bouton « Start break »');
+    await en.context.close();
+    const de = await newPage(browser, { lang: 'de-DE', setup: eval(planSetup(PLAN3)) });
+    eq(await de.page.evaluate(() => LANG), 'de', 'navigateur en allemand : page en allemand');
+    eq((await planLine(de.page)).text, 'Nächste: Pause · 10:15 · in 15:00', 'ligne grise en allemand');
+    eq(await text(de.page, '.start'), 'Pause starten', 'bouton « Pause starten »');
+    await de.context.close();
+    const es = await newPage(browser, { lang: 'es-ES', setup: () => localStorage.setItem('t2r.prefs', JSON.stringify({ setupDone: true })) });
+    eq(await es.page.evaluate(() => LANG), 'en', 'langue non proposée (espagnol) : anglais');
+    await es.page.getByRole('button', { name: 'Settings' }).click();
+    await es.page.getByRole('button', { name: 'Deutsch' }).click();
+    eq(await text(es.page, 'h1'), 'Einstellungen', 'choix « Deutsch » dans les réglages');
+    // durées dans les réglages
+    await es.page.locator('.dur-row-btn').nth(1).click();
+    await es.page.locator('.dlg').getByRole('button', { name: '45 Min.' }).click();
+    await es.page.locator('.dlg').getByRole('button', { name: 'OK' }).click();
+    eq(await es.page.evaluate(() => window.t2r.state.ui.lunchMinutes), 45, 'durée du lunch choisie dans les réglages : 45 min');
+    await es.context.close();
   }
 
   // --- affichage sur l'accueil : décompte, « c'est l'heure », suivant, plus rien — et jamais d'alerte
@@ -726,7 +807,7 @@ function makeMockSupabase() {
 
     if (m[1].startsWith('t2r_settings_')) {
       // Même liste blanche que la fonction SQL : les adresses ne sont jamais gardées.
-      const allowed = ['lang', 'confirm_stop', 'night_mode', 'night_cutoff', 'use_timer', 'pause_minutes', 'os_lead', 'nav_app', 'shops', 'shop_index', 'plan'];
+      const allowed = ['lang', 'confirm_stop', 'night_mode', 'night_cutoff', 'use_timer', 'pause_minutes', 'lunch_minutes', 'plan_notify', 'plan_notify_lead', 'os_lead', 'nav_app', 'shops', 'shop_index', 'plan'];
       if (m[1] === 't2r_settings_get') return json(200, db.settings[who]);
       if (m[1] === 't2r_settings_clear') {
         if (db.failClear) return json(500, { message: 'serveur en panne' });
@@ -823,9 +904,10 @@ async function settingsSyncTests(browser) {
   eq(await B.page.evaluate(() => window.t2r.state.prefs.nightCutoff), 8, 'et reste tel quel ici');
 
   // Valeurs du serveur abîmées : ignorées, jamais d'erreur
-  db.settings['réglages-1'].lang = 'de';
+  db.settings['réglages-1'].lang = 'es';
   db.settings['réglages-1'].shops = [{ name: 'X', url: 'javascript:alert(1)' }];
-  db.settings['réglages-1'].pause_minutes = 7;
+  db.settings['réglages-1'].pause_minutes = 75;
+  db.settings['réglages-1'].lunch_minutes = 2;
   await A.page.evaluate(() => syncNow());
   await A.page.waitForFunction(() => !window.t2r.state.sync.busy);
   const ok = await A.page.evaluate(() => { const s = window.t2r.state; return s.prefs.lang === 'nl' && s.prefs.shops[0].name === 'Chez Moi' && s.ui.pauseMinutes === 10; });
@@ -870,7 +952,7 @@ async function settingsSyncTests(browser) {
   await D2.page.getByRole('button', { name: 'Réglages' }).click();
   await signInAs(D2.page, 'réglages-1');
   await idle(D2.page);
-  eq(await D2.page.evaluate(() => window.t2r.state.prefs.shops[0].name), 'Smile Sandwicherie', 'sous ce nom, plus aucun réglage à retrouver (sandwicherie par défaut)');
+  eq(await D2.page.evaluate(() => window.t2r.state.prefs.shops.length), 0, 'sous ce nom, plus aucun réglage à retrouver (aucun site)');
   await D2.context.close();
   // Fonction d'effacement absente du serveur (404) : la réinitialisation se fait quand même
   await C.page.evaluate(() => go('settings'));

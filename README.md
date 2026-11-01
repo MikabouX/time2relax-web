@@ -1,7 +1,7 @@
 # Time2Relax — version web (PC)
 
 Chrono de break et de lunch, minuteur avec alertes, historique (avec ajout et modification d'une
-entrée oubliée), commande de repas, mode nuit, français et néerlandais. Même esprit que l'appli
+entrée oubliée), commande de repas, mode nuit, français, néerlandais, anglais et allemand. Même esprit que l'appli
 Android, dans un navigateur : **rien à installer**. (Pas de liens Waze / Google Maps : inutiles sur PC.)
 
 ## Utiliser la page
@@ -23,13 +23,23 @@ et réimporte l'historique au même format que l'appli Android
 L'icône calendrier (à côté des réglages) ouvre une page où l'on saisit l'heure de ses breaks et de son
 lunch. Sur l'accueil, un arc gris autour du cadran (il se remplit pendant les 2 dernières heures) et une
 ligne grise sous le cadran (« Prochain break · 10:15 · dans 1:42:10 ») donnent le temps restant. À l'heure
-prévue : « C'est l'heure du break » pendant 10 minutes, puis le suivant. **Aucune alerte.** Un break lancé
+prévue : « C'est l'heure du break » pendant 10 minutes, puis le suivant. Par défaut, **aucune alerte** ; la case
+« Me prévenir quand l'heure approche » envoie une notification quelques minutes avant (nombre de minutes au
+choix, de 0 à 30), tant que la page reste ouverte. Le planning est une liste en lecture seule ; un clic sur une
+ligne (ou sur « + Break » / « + Lunch ») ouvre une fenêtre d'édition séparée (Enregistrer, Annuler, Supprimer). Un break lancé
 jusqu'à 30 minutes avant l'heure prévue compte pour celui-ci. « Répéter chaque semaine » est activé par
 défaut, avec sept jours à cocher (par défaut du lundi au vendredi ; cocher le samedi et le dimanche pour
 ceux qui travaillent le week-end) ; désactivé, les horaires ne valent que pour le jour où on les a saisis.
 Un jour non coché n'affiche rien, et la page l'explique. Avec un nom d'utilisateur, les horaires sont
 enregistrés en ligne avec les autres réglages (voir plus bas) ; sinon ils restent sur l'appareil. Le mode
 nuit est respecté.
+
+### Durées et sites de commande
+
+La durée du break (1 à 60 min) et celle du lunch (5 à 120 min) se choisissent dans les réglages (écran de
+bienvenue compris) ou d'un clic sur la pastille du minuteur ; elles sont retenues sous le nom d'utilisateur.
+Il n'y a plus de sandwicherie par défaut : le bouton « Commander » propose d'ajouter un site (adresse tapée ;
+le scan d'un code QR existe dans les applis téléphone).
 
 ## Historique en ligne (facultatif), sous un nom d'utilisateur
 

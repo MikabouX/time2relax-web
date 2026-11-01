@@ -363,3 +363,28 @@ a.btn { text-decoration: none; }
 @media (min-width: 700px) {
   .page { padding-top: 28px; }
 }
+
+/* Durée choisie (pastille cliquable) et boîte de minutes */
+.dur-chip { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
+.min-row { display: flex; align-items: center; justify-content: center; gap: 14px; margin: 8px 0 12px; }
+.min-row .icon-btn { background: var(--secondary-c); color: var(--on-secondary-c); border-radius: 50%; width: 44px; height: 44px; font-size: 22px; font-weight: 700; }
+.min-row .icon-btn:disabled { opacity: .35; }
+.min-value { min-width: 6.5em; text-align: center; font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.chips.center { justify-content: center; }
+.dur-row-btn, .lead-row { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; }
+.lead-row:disabled { opacity: .45; cursor: default; }
+
+/* Planning : lignes en lecture seule, édition dans une fenêtre à part */
+.plan-item { display: flex; align-items: center; gap: 14px; width: 100%; padding: 10px 14px; background: none; border: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.plan-item + .plan-item { border-top: 1px solid var(--outline); }
+.plan-item:hover { background: var(--high); }
+.plan-item > .ic:last-child, .plan-item > span:last-child { color: var(--muted); }
+.plan-item-txt { flex: 1; }
+.plan-time { display: block; font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.plan-badge { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 50%; background: var(--primary-c); color: var(--on-primary-c); }
+.plan-badge.lun { background: var(--tertiary-c); color: var(--on-tertiary-c); }
+.time-big { font-size: 26px; font-weight: 600; text-align: center; font-variant-numeric: tabular-nums; }
+.danger-text { color: var(--error); }
+.dlg-actions.wrap { flex-wrap: wrap; gap: 4px; }
+.dlg-actions.wrap .danger-text { margin-right: auto; padding-left: 4px; padding-right: 8px; }
+button.tile { border: 0; font: inherit; cursor: pointer; }

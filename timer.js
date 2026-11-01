@@ -4,7 +4,7 @@
    Le temps écoulé est toujours recalculé à partir de l'heure de départ : même si
    le navigateur ralentit un onglet en arrière-plan, le chrono reste exact. */
 
-const plannedFor = (type) => (S.ui.useTimer ? (type === 'lunch' ? LUNCH_MINUTES : S.ui.pauseMinutes) * 60 : 0);
+const plannedFor = (type) => (S.ui.useTimer ? (type === 'lunch' ? S.ui.lunchMinutes : S.ui.pauseMinutes) * 60 : 0);
 
 /** Tout ce qu'il faut pour dessiner l'anneau à l'instant présent. */
 function ringState() {
@@ -102,16 +102,17 @@ function handleAlerts() {
   const run = S.run;
   if (!run || !run.planned) return;
   const remaining = run.planned - Math.floor((Date.now() - run.start) / 1000);
-  const type = typeLabel(run.type).toLowerCase();
+  const Type = typeLabel(run.type);
+  const type = Type.toLowerCase();
   if (!alertState.warned && run.planned > 60 && remaining <= 60 && remaining > 0) {
     alertState.warned = true;
-    notify(t('warn_title'), t('warn_body', { type }), 'warn');
+    notify(t('warn_title'), t('warn_body', { type, Type }), 'warn');
     beep(1);
   }
   if (!alertState.ended && remaining <= 0) {
     alertState.ended = true;
     alertState.lastRepeat = Date.now();
-    notify(t('end_title', { type }), t('end_body'), 'end');
+    notify(t('end_title', { type, Type }), t('end_body'), 'end');
     beep(3);
   } else if (alertState.ended && remaining < 0 && Date.now() - alertState.lastRepeat >= 30000) {
     alertState.lastRepeat = Date.now();

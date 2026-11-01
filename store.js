@@ -31,32 +31,43 @@ const store = {
   },
 };
 
-const DEFAULT_SHOP_URL = 'https://www.smile-sandwicherie.be/';
 const SITE_URL = 'https://bardiaux.wordpress.com/'; // site explicatif : fonctions, téléchargement des applis Android et iPhone
 const SUGGESTIONS = [
   { name: 'Takeaway.com', url: 'https://www.takeaway.com/be/' },
   { name: 'Uber Eats', url: 'https://www.ubereats.com/be' },
   { name: 'Deliveroo', url: 'https://deliveroo.be/' },
 ];
-const PAUSE_CHOICES = [5, 10, 15, 20, 30];
-const LUNCH_MINUTES = 30;
+// Durées choisies par chacun (minutes), retenues sous le nom d'utilisateur.
+const BREAK_MIN = 1;
+const BREAK_MAX = 60;
+const LUNCH_MIN = 5;
+const LUNCH_MAX = 120;
+const LEAD_MAX = 30;
+const clampInt = (v, a, b, dflt) => {
+  const n = parseInt(v, 10);
+  return Number.isNaN(n) ? dflt : Math.min(Math.max(n, a), b);
+};
 
 function defaultPrefs() {
   return {
     lang: null,
-    shops: [{ name: 'Smile Sandwicherie', url: DEFAULT_SHOP_URL }],
+    shops: [], // aucun site au départ : chacun ajoute le sien
     shopIndex: 0,
     nightMode: false,
     nightCutoff: 12,
     confirmStop: false,
+    planNotify: false,
+    planNotifyLead: 5,
     setupDone: false,
   };
 }
 
 function loadPrefs() {
   const p = Object.assign(defaultPrefs(), store.get('t2r.prefs', {}));
-  if (!Array.isArray(p.shops) || p.shops.length === 0) p.shops = defaultPrefs().shops;
-  p.shopIndex = Math.min(Math.max(parseInt(p.shopIndex, 10) || 0, 0), p.shops.length - 1);
+  if (!Array.isArray(p.shops)) p.shops = [];
+  p.shopIndex = p.shops.length ? Math.min(Math.max(parseInt(p.shopIndex, 10) || 0, 0), p.shops.length - 1) : 0;
+  p.planNotify = !!p.planNotify;
+  p.planNotifyLead = clampInt(p.planNotifyLead, 0, LEAD_MAX, 5);
   ['homeAddr', 'workAddr', 'navApp'].forEach((k) => { delete p[k]; }); // anciens réglages d'itinéraire
   p.nightCutoff = parseInt(p.nightCutoff, 10);
   if (Number.isNaN(p.nightCutoff)) p.nightCutoff = 12;
@@ -69,10 +80,13 @@ const S = {
   entries: store.get('t2r.entries', []),
   deleted: store.get('t2r.deleted', []),
   run: store.get('t2r.run', null),
-  ui: Object.assign({ type: 'break', useTimer: false, pauseMinutes: 15 }, store.get('t2r.ui', {})),
+  ui: Object.assign({ type: 'break', useTimer: false, pauseMinutes: 15, lunchMinutes: 30 }, store.get('t2r.ui', {})),
   session: store.get('t2r.session', null),
   sync: { busy: false, last: store.get('t2r.lastSync', null), error: '' },
 };
+
+S.ui.pauseMinutes = clampInt(S.ui.pauseMinutes, BREAK_MIN, BREAK_MAX, 15);
+S.ui.lunchMinutes = clampInt(S.ui.lunchMinutes, LUNCH_MIN, LUNCH_MAX, 30);
 
 const savePrefs = () => { store.set('t2r.prefs', S.prefs); if (typeof settingsChanged === 'function') settingsChanged(); };
 const saveEntries = () => { store.set('t2r.entries', S.entries); store.set('t2r.deleted', S.deleted); };
