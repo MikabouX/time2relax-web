@@ -82,7 +82,7 @@ function signOut() {
    (maison, bureau) de l'appli n'en font JAMAIS partie. Chaque appareil envoie seulement ce qu'il a changé :
    le dernier à changer un réglage l'emporte. Sans la fonction SQL, tout continue en local. */
 
-const SETTING_KEYS = ['lang', 'confirm_stop', 'night_mode', 'night_cutoff', 'use_timer', 'pause_minutes', 'lunch_minutes',
+const SETTING_KEYS = ['lang', 'theme_color', 'theme_mode', 'confirm_stop', 'night_mode', 'night_cutoff', 'use_timer', 'pause_minutes', 'lunch_minutes',
   'plan_notify', 'plan_notify_lead', 'shops', 'shop_index', 'plan'];
 const settingsApi = { retryAt: 0 };
 let applyingSettings = false;
@@ -92,6 +92,8 @@ let setSeen = store.get('t2r.setSeen', null);
 function readSetting(k) {
   switch (k) {
     case 'lang': return LANGS.includes(S.prefs.lang) ? S.prefs.lang : null;
+    case 'theme_color': return THEME_COLORS[S.prefs.themeColor] ? S.prefs.themeColor : null;
+    case 'theme_mode': return THEME_MODES.includes(S.prefs.themeMode) ? S.prefs.themeMode : null;
     case 'confirm_stop': return !!S.prefs.confirmStop;
     case 'night_mode': return !!S.prefs.nightMode;
     case 'night_cutoff': return S.prefs.nightCutoff;
@@ -122,6 +124,8 @@ function cleanSetting(k, v) {
   const isInt = (x, a, b) => typeof x === 'number' && Number.isInteger(x) && x >= a && x <= b;
   switch (k) {
     case 'lang': return LANGS.includes(v) ? v : undefined;
+    case 'theme_color': return typeof v === 'string' && THEME_COLORS[v] ? v : undefined;
+    case 'theme_mode': return THEME_MODES.includes(v) ? v : undefined;
     case 'confirm_stop': case 'night_mode': case 'use_timer': case 'plan_notify': return typeof v === 'boolean' ? v : undefined;
     case 'night_cutoff': return isInt(v, 0, 23) ? v : undefined;
     case 'pause_minutes': return isInt(v, BREAK_MIN, BREAK_MAX) ? v : undefined;
@@ -148,6 +152,8 @@ function cleanSetting(k, v) {
 function applySetting(k, v) {
   switch (k) {
     case 'lang': S.prefs.lang = v; LANG = v; break;
+    case 'theme_color': S.prefs.themeColor = v; break;
+    case 'theme_mode': S.prefs.themeMode = v; break;
     case 'confirm_stop': S.prefs.confirmStop = v; break;
     case 'night_mode': S.prefs.nightMode = v; break;
     case 'night_cutoff': S.prefs.nightCutoff = v; break;

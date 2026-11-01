@@ -625,6 +625,23 @@ async function planTests(browser) {
     await es.context.close();
   }
 
+  // --- couleurs et mode clair / sombre
+  {
+    const { page, context, errors } = await newPage(browser, { setup: () => localStorage.setItem('t2r.prefs', JSON.stringify({ setupDone: true })) });
+    const prim = () => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--primary').trim());
+    eq(await prim(), '#0F766E', "couleur d'origine par défaut");
+    await page.getByRole('button', { name: 'Réglages' }).click();
+    await page.getByRole('button', { name: 'Couleur 7' }).click();
+    eq(await page.evaluate(() => window.t2r.state.prefs.themeColor), 'purple', 'pastille violette choisie');
+    check((await prim()).startsWith('hsl(262'), 'la couleur principale devient violette');
+    await page.getByRole('button', { name: 'Sombre' }).click();
+    eq(await page.evaluate(() => document.documentElement.style.colorScheme), 'dark', 'mode sombre forcé');
+    await page.reload();
+    check((await prim()).startsWith('hsl(262') && (await page.evaluate(() => document.documentElement.style.colorScheme)) === 'dark', 'couleur et mode gardés après rechargement');
+    check(errors.length === 0, `aucune erreur console (${errors.join(' | ')})`);
+    await context.close();
+  }
+
   // --- affichage sur l'accueil : décompte, « c'est l'heure », suivant, plus rien — et jamais d'alerte
   {
     const { page, context, errors } = await newPage(browser, { setup: eval(planSetup(PLAN3)) });
@@ -807,7 +824,7 @@ function makeMockSupabase() {
 
     if (m[1].startsWith('t2r_settings_')) {
       // Même liste blanche que la fonction SQL : les adresses ne sont jamais gardées.
-      const allowed = ['lang', 'confirm_stop', 'night_mode', 'night_cutoff', 'use_timer', 'pause_minutes', 'lunch_minutes', 'plan_notify', 'plan_notify_lead', 'os_lead', 'nav_app', 'shops', 'shop_index', 'plan'];
+      const allowed = ['lang', 'theme_color', 'theme_mode', 'confirm_stop', 'night_mode', 'night_cutoff', 'use_timer', 'pause_minutes', 'lunch_minutes', 'plan_notify', 'plan_notify_lead', 'os_lead', 'nav_app', 'shops', 'shop_index', 'plan'];
       if (m[1] === 't2r_settings_get') return json(200, db.settings[who]);
       if (m[1] === 't2r_settings_clear') {
         if (db.failClear) return json(500, { message: 'serveur en panne' });

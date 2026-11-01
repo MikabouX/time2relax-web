@@ -388,3 +388,11 @@ a.btn { text-decoration: none; }
 .dlg-actions.wrap { flex-wrap: wrap; gap: 4px; }
 .dlg-actions.wrap .danger-text { margin-right: auto; padding-left: 4px; padding-right: 8px; }
 button.tile { border: 0; font: inherit; cursor: pointer; }
+
+/* Couleurs au choix */
+.swatches { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.swatch { width: 44px; height: 44px; border-radius: 50%; border: 3px solid transparent; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; color: #fff; padding: 0; }
+.swatch.on { border-color: var(--text); }
+.swatch:focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; }
+.theme-modes { margin-bottom: 8px; }
+.theme-modes .seg { flex: 1; justify-content: center; }

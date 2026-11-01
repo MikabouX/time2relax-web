@@ -231,6 +231,7 @@ function pickShopDialog() {
 
 function render() {
   document.documentElement.lang = LANG;
+  applyTheme(); // couleur et mode (aussi après une synchro ou une réinitialisation)
   let page;
   if (S.view === 'history') page = historyView();
   else if (S.view === 'settings') page = settingsView();
@@ -899,6 +900,9 @@ function settingsView() {
     sectionTitle(t('sec_lang')),
     langCard(),
 
+    sectionTitle(t('sec_colors')),
+    themeCard(),
+
     syncEnabled() ? [sectionTitle(t('sec_account')), accountCard()] : null,
 
     sectionTitle(t('sec_apps')),
@@ -949,6 +953,29 @@ function durationsCard() {
     row('coffee', t('dur_break'), S.ui.pauseMinutes, false),
     row('restaurant', t('dur_lunch'), S.ui.lunchMinutes, true),
     h('p', { class: 'small muted pad' }, t('dur_note')));
+}
+
+function themeCard() {
+  const set = (key, v) => () => { S.prefs[key] = v; savePrefs(); applyTheme(); render(); };
+  const keys = Object.keys(THEME_COLORS);
+  return h('div', { class: 'card pad' },
+    h('div', { class: 'swatches', role: 'group', 'aria-label': t('sec_colors') },
+      keys.map((k, i) => h('button', {
+        type: 'button',
+        class: `swatch${S.prefs.themeColor === k ? ' on' : ''}`,
+        style: `background:${THEME_COLORS[k]}`,
+        'aria-pressed': String(S.prefs.themeColor === k),
+        'aria-label': t('color_label', { n: i + 1 }),
+        on: { click: set('themeColor', k) },
+      }, S.prefs.themeColor === k ? icon('check_circle', 20) : null))),
+    h('div', { class: 'segs theme-modes' },
+      [['system', 'mode_auto'], ['light', 'mode_light'], ['dark', 'mode_dark']].map(([v, label]) => h('button', {
+        type: 'button',
+        class: `seg${S.prefs.themeMode === v ? ' on' : ''}`,
+        'aria-pressed': String(S.prefs.themeMode === v),
+        on: { click: set('themeMode', v) },
+      }, t(label)))),
+    h('p', { class: 'small muted' }, t('mode_note')));
 }
 
 function langCard() {

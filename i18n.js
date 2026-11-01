@@ -197,6 +197,12 @@ const STRINGS = {
     plan_edit_title: 'Modifier ce moment',
     plan_clash: 'Un autre moment est déjà prévu à cette heure-là.',
     save: 'Enregistrer',
+    sec_colors: 'Couleurs',
+    mode_auto: 'Auto',
+    mode_light: 'Clair',
+    mode_dark: 'Sombre',
+    mode_note: '« Auto » suit le mode clair ou sombre de l’ordinateur.',
+    color_label: 'Couleur {n}',
   },
 
   nl: {
@@ -393,6 +399,12 @@ const STRINGS = {
     plan_edit_title: 'Dit moment wijzigen',
     plan_clash: 'Er is al een ander moment gepland op dit uur.',
     save: 'Opslaan',
+    sec_colors: 'Kleuren',
+    mode_auto: 'Auto',
+    mode_light: 'Licht',
+    mode_dark: 'Donker',
+    mode_note: '“Auto” volgt de lichte of donkere modus van de computer.',
+    color_label: 'Kleur {n}',
   },
   en: {
     greet_morning: 'Good morning',
@@ -588,6 +600,12 @@ const STRINGS = {
     plan_edit_title: 'Edit this break',
     plan_clash: 'Another break is already planned at this time.',
     save: 'Save',
+    sec_colors: 'Colours',
+    mode_auto: 'Auto',
+    mode_light: 'Light',
+    mode_dark: 'Dark',
+    mode_note: '“Auto” follows the computer’s light or dark mode.',
+    color_label: 'Colour {n}',
   },
   de: {
     greet_morning: 'Guten Morgen',
@@ -783,6 +801,12 @@ const STRINGS = {
     plan_edit_title: 'Diese Pause bearbeiten',
     plan_clash: 'Zu dieser Uhrzeit ist bereits eine andere Pause geplant.',
     save: 'Speichern',
+    sec_colors: 'Farben',
+    mode_auto: 'Auto',
+    mode_light: 'Hell',
+    mode_dark: 'Dunkel',
+    mode_note: '„Auto“ folgt dem hellen oder dunklen Modus des Computers.',
+    color_label: 'Farbe {n}',
   },
 };
 

@@ -175,7 +175,7 @@ returns jsonb
 language plpgsql security definer set search_path = public as $$
 declare
   u text := lower(trim(p_username));
-  allowed text[] := array['lang', 'confirm_stop', 'night_mode', 'night_cutoff', 'use_timer',
+  allowed text[] := array['lang', 'theme_color', 'theme_mode', 'confirm_stop', 'night_mode', 'night_cutoff', 'use_timer',
                           'pause_minutes', 'lunch_minutes', 'plan_notify', 'plan_notify_lead',
                           'os_lead', 'nav_app', 'shops', 'shop_index', 'plan'];
   clean jsonb;

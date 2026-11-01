@@ -57,6 +57,8 @@ function defaultPrefs() {
     nightCutoff: 12,
     confirmStop: false,
     planNotify: false,
+    themeColor: 'teal',
+    themeMode: 'system',
     planNotifyLead: 5,
     setupDone: false,
   };

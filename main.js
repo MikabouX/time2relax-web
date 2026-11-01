@@ -4,6 +4,7 @@
 
 (function boot() {
   LANG = S.prefs.lang || detectLang();
+  applyTheme();
 
   // Données locales abîmées : on repart propre plutôt que de planter.
   if (!Array.isArray(S.entries)) S.entries = [];
