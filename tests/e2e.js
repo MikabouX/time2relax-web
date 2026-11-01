@@ -629,15 +629,17 @@ async function planTests(browser) {
   {
     const { page, context, errors } = await newPage(browser, { setup: () => localStorage.setItem('t2r.prefs', JSON.stringify({ setupDone: true })) });
     const prim = () => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--primary').trim());
-    eq(await prim(), '#0F766E', "couleur d'origine par défaut");
+    check((await prim()).startsWith('hsl(110'), 'couleur par défaut : le cœur (vert)');
     await page.getByRole('button', { name: 'Réglages' }).click();
-    await page.getByRole('button', { name: 'Couleur 7' }).click();
-    eq(await page.evaluate(() => window.t2r.state.prefs.themeColor), 'purple', 'pastille violette choisie');
-    check((await prim()).startsWith('hsl(262'), 'la couleur principale devient violette');
+    await page.getByRole('button', { name: 'Couronne · Sahasrara' }).click();
+    eq(await page.evaluate(() => window.t2r.state.prefs.themeColor), 'crown', 'chakra de la couronne choisi');
+    check((await prim()).startsWith('hsl(293'), 'la couleur principale devient violette');
+    check((await text(page, '.chakra-line')).includes('Connexion à soi'), 'signification du chakra affichée');
+    check((await text(page, '.chakra-info')).includes('Son : AH'), 'position, élément et son affichés');
     await page.getByRole('button', { name: 'Sombre' }).click();
     eq(await page.evaluate(() => document.documentElement.style.colorScheme), 'dark', 'mode sombre forcé');
     await page.reload();
-    check((await prim()).startsWith('hsl(262') && (await page.evaluate(() => document.documentElement.style.colorScheme)) === 'dark', 'couleur et mode gardés après rechargement');
+    check((await prim()).startsWith('hsl(293') && (await page.evaluate(() => document.documentElement.style.colorScheme)) === 'dark', 'couleur et mode gardés après rechargement');
     check(errors.length === 0, `aucune erreur console (${errors.join(' | ')})`);
     await context.close();
   }

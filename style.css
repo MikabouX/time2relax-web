@@ -396,3 +396,8 @@ button.tile { border: 0; font: inherit; cursor: pointer; }
 .swatch:focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; }
 .theme-modes { margin-bottom: 8px; }
 .theme-modes .seg { flex: 1; justify-content: center; }
+.swatches.chakras { justify-content: space-between; flex-wrap: nowrap; gap: 6px; margin-bottom: 10px; }
+.swatches.chakras .swatch { width: 38px; height: 38px; flex: 0 0 auto; }
+.chakra-line { margin: 0 0 4px; }
+.chakra-info { margin: 0 0 14px; }
+.chakra-line .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; vertical-align: middle; }

@@ -1,19 +1,25 @@
 'use strict';
 
 /* ---------- Couleurs et mode clair / sombre ----------
-   Mêmes choix que dans l'appli : une couleur de base (8 pastilles) et le mode Auto / Clair / Sombre.
+   Mêmes choix que dans l'appli : la couleur d'un des 7 chakras et le mode Auto / Clair / Sombre.
    Toutes les teintes de la page (fond, cartes, boutons) sont calculées à partir de cette couleur. */
 
-const THEME_COLORS = {
-  teal: '#0F766E',
-  blue: '#2563EB',
-  green: '#16A34A',
-  orange: '#EA580C',
-  red: '#DC2626',
-  pink: '#DB2777',
-  purple: '#7C3AED',
-  brown: '#8D6E63',
-};
+// Les 7 chakras, de la racine à la couronne : couleurs de l'affiche des 7 chakras (comme dans l'appli).
+const CHAKRAS = [
+  { key: 'root', color: '#B82820', sound: 'LAM', sanskrit: 'Muladhara' },
+  { key: 'sacral', color: '#E87C4E', sound: 'VAM', sanskrit: 'Svadhisthana' },
+  { key: 'solar', color: '#F0DC50', sound: 'RAM', sanskrit: 'Manipura' },
+  { key: 'heart', color: '#388528', sound: 'YAM', sanskrit: 'Anahata' },
+  { key: 'throat', color: '#4084C4', sound: 'HAM', sanskrit: 'Vishuddha' },
+  { key: 'third_eye', color: '#48108A', sound: 'OM', sanskrit: 'Ajna' },
+  { key: 'crown', color: '#A868B0', sound: 'AH', sanskrit: 'Sahasrara' },
+];
+const THEME_COLORS = Object.fromEntries(CHAKRAS.map((c) => [c.key, c.color]));
+// Couleur par défaut : le cœur (vert), comme le centre de l'icône — la paix qui vient de l'intérieur.
+const DEFAULT_CHAKRA = 'heart';
+// Anciennes couleurs : reprises vers le chakra le plus proche.
+const LEGACY_COLORS = { teal: 'heart', green: 'heart', pink: 'heart', blue: 'throat', purple: 'crown', red: 'root', brown: 'root', orange: 'sacral' };
+const chakraKey = (v) => (typeof v !== 'string' ? null : (THEME_COLORS[v] ? v : (LEGACY_COLORS[v] || null)));
 const THEME_MODES = ['system', 'light', 'dark'];
 
 /** Teinte (0–360) et saturation (0–100) d'une couleur #RRGGBB. */
@@ -39,7 +45,8 @@ function hueSat(hex) {
 
 /** Les variables CSS de la page pour une couleur et un mode (clair ou sombre). */
 function themeVars(hex, dark) {
-  const [h, s0] = hueSat(hex);
+  const [h0, s0] = hueSat(hex);
+  const h = h0 >= 45 && h0 <= 65 ? h0 - 12 : h0; // jaune : plus doré, pour rester lisible sur blanc
   const s = Math.min(s0, 90);
   const c = (sat, light) => `hsl(${h} ${Math.round(sat)}% ${light}%)`;
   const tint = Math.min(s, 35); // fonds légèrement teintés
@@ -64,41 +71,23 @@ function themeVars(hex, dark) {
 
 const darkQuery = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
 
-// Couleur d'origine (sarcelle) : les teintes exactes de la feuille de style.
-const TEAL = {
-  light: {
-    '--bg': '#F4F8F7', '--surface': '#FFFFFF', '--low': '#EAF1F0', '--high': '#DFE8E7', '--highest': '#D3DDDC',
-    '--primary': '#0F766E', '--on-primary': '#FFFFFF', '--primary-c': '#BDEBE5', '--on-primary-c': '#00201D',
-    '--secondary-c': '#CDE8E3', '--on-secondary-c': '#0B2724', '--text': '#161D1C', '--muted': '#4A5655', '--outline': '#BEC9C6',
-  },
-  dark: {
-    '--bg': '#0E1514', '--surface': '#131A19', '--low': '#1A2221', '--high': '#242D2C', '--highest': '#2F3837',
-    '--primary': '#5CD6C8', '--on-primary': '#00201D', '--primary-c': '#00504A', '--on-primary-c': '#A0F2E8',
-    '--secondary-c': '#304B47', '--on-secondary-c': '#CDE8E3', '--text': '#DEE4E2', '--muted': '#A9B5B2', '--outline': '#3F4947',
-  },
-};
 // Couleurs qui ne dépendent que du mode (erreur, ambre, bleu du lunch) : celles de la feuille de style.
 const FIXED = {
   light: { '--tertiary': '#4A6A8A', '--tertiary-c': '#D3E4F7', '--on-tertiary-c': '#0A1D2E', '--error': '#BA1A1A', '--on-error': '#FFFFFF', '--amber': '#F59E0B' },
   dark: { '--tertiary': '#A8C8E8', '--tertiary-c': '#2E4A66', '--on-tertiary-c': '#D3E4F7', '--error': '#FFB4AB', '--on-error': '#561E19', '--amber': '#FBBF24' },
 };
 
-/** Applique la couleur et le mode choisis à toute la page. */
+/** Applique la couleur (chakra) et le mode choisis à toute la page. */
 function applyTheme() {
-  const color = THEME_COLORS[S.prefs.themeColor] ? S.prefs.themeColor : 'teal';
+  const color = chakraKey(S.prefs.themeColor) || DEFAULT_CHAKRA;
   const mode = THEME_MODES.includes(S.prefs.themeMode) ? S.prefs.themeMode : 'system';
   const root = document.documentElement;
+  const dark = mode === 'dark' || (mode === 'system' && !!(darkQuery && darkQuery.matches));
+  const key = dark ? 'dark' : 'light';
   root.removeAttribute('style');
-  if (color === 'teal' && mode === 'system') {
-    // Réglage d'origine : la feuille de style suit seule le mode du système.
-    root.style.colorScheme = 'light dark';
-  } else {
-    const dark = mode === 'dark' || (mode === 'system' && !!(darkQuery && darkQuery.matches));
-    const key = dark ? 'dark' : 'light';
-    const vars = Object.assign({}, FIXED[key], color === 'teal' ? TEAL[key] : themeVars(THEME_COLORS[color], dark));
-    Object.entries(vars).forEach(([k, v]) => root.style.setProperty(k, v));
-    root.style.colorScheme = key;
-  }
+  const vars = Object.assign({}, FIXED[key], themeVars(THEME_COLORS[color], dark));
+  Object.entries(vars).forEach(([k, v]) => root.style.setProperty(k, v));
+  root.style.colorScheme = key;
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.setAttribute('content', THEME_COLORS[color]);
 }

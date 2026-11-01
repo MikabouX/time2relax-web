@@ -92,7 +92,7 @@ let setSeen = store.get('t2r.setSeen', null);
 function readSetting(k) {
   switch (k) {
     case 'lang': return LANGS.includes(S.prefs.lang) ? S.prefs.lang : null;
-    case 'theme_color': return THEME_COLORS[S.prefs.themeColor] ? S.prefs.themeColor : null;
+    case 'theme_color': return chakraKey(S.prefs.themeColor);
     case 'theme_mode': return THEME_MODES.includes(S.prefs.themeMode) ? S.prefs.themeMode : null;
     case 'confirm_stop': return !!S.prefs.confirmStop;
     case 'night_mode': return !!S.prefs.nightMode;
@@ -124,7 +124,7 @@ function cleanSetting(k, v) {
   const isInt = (x, a, b) => typeof x === 'number' && Number.isInteger(x) && x >= a && x <= b;
   switch (k) {
     case 'lang': return LANGS.includes(v) ? v : undefined;
-    case 'theme_color': return typeof v === 'string' && THEME_COLORS[v] ? v : undefined;
+    case 'theme_color': return chakraKey(v) || undefined;
     case 'theme_mode': return THEME_MODES.includes(v) ? v : undefined;
     case 'confirm_stop': case 'night_mode': case 'use_timer': case 'plan_notify': return typeof v === 'boolean' ? v : undefined;
     case 'night_cutoff': return isInt(v, 0, 23) ? v : undefined;

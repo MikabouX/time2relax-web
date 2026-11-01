@@ -57,7 +57,7 @@ function defaultPrefs() {
     nightCutoff: 12,
     confirmStop: false,
     planNotify: false,
-    themeColor: 'teal',
+    themeColor: 'heart',
     themeMode: 'system',
     planNotifyLead: 5,
     setupDone: false,

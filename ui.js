@@ -957,17 +957,26 @@ function durationsCard() {
 
 function themeCard() {
   const set = (key, v) => () => { S.prefs[key] = v; savePrefs(); applyTheme(); render(); };
-  const keys = Object.keys(THEME_COLORS);
+  const cur = chakraKey(S.prefs.themeColor) || DEFAULT_CHAKRA;
+  const sel = CHAKRAS.find((c) => c.key === cur);
   return h('div', { class: 'card pad' },
-    h('div', { class: 'swatches', role: 'group', 'aria-label': t('sec_colors') },
-      keys.map((k, i) => h('button', {
+    // Les 7 chakras, de la racine (à gauche) à la couronne (à droite).
+    h('div', { class: 'swatches chakras', role: 'group', 'aria-label': t('sec_colors') },
+      CHAKRAS.map((c) => h('button', {
         type: 'button',
-        class: `swatch${S.prefs.themeColor === k ? ' on' : ''}`,
-        style: `background:${THEME_COLORS[k]}`,
-        'aria-pressed': String(S.prefs.themeColor === k),
-        'aria-label': t('color_label', { n: i + 1 }),
-        on: { click: set('themeColor', k) },
-      }, S.prefs.themeColor === k ? icon('check_circle', 20) : null))),
+        class: `swatch${cur === c.key ? ' on' : ''}`,
+        style: `background:${c.color}`,
+        title: `${t(`chakra_${c.key}`)} · ${c.sanskrit}`,
+        'aria-pressed': String(cur === c.key),
+        'aria-label': `${t(`chakra_${c.key}`)} · ${c.sanskrit}`,
+        on: { click: set('themeColor', c.key) },
+      }, cur === c.key ? icon('check_circle', 20) : null))),
+    h('p', { class: 'chakra-line' },
+      h('span', { class: 'dot', style: `background:${sel.color}` }),
+      h('strong', {}, `${t(`chakra_${sel.key}`)} · ${sel.sanskrit}`),
+      ` — ${t(`chakra_${sel.key}_m`)}`),
+    h('p', { class: 'small muted chakra-info' },
+      `${t(`chakra_${sel.key}_p`)} · ${t('chakra_element')} : ${t(`chakra_${sel.key}_e`)} · ${t('chakra_sound')} : ${sel.sound}`),
     h('div', { class: 'segs theme-modes' },
       [['system', 'mode_auto'], ['light', 'mode_light'], ['dark', 'mode_dark']].map(([v, label]) => h('button', {
         type: 'button',
