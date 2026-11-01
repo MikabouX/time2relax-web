@@ -1524,6 +1524,18 @@ async function sharedRunTests(browser) {
   check(true, 'relecture automatique : B arrête son chrono quand A termine');
   await q.page.waitForFunction(() => window.t2r.state.entries.length === 1, null, { timeout: 10000 });
   eq(db2.of('auto-test').length, 1, 'une seule entrée en ligne');
+  // 11. Sans chrono, la relecture ralentit (trafic du serveur) : avec pollMs 300, au plus une toutes les 3,6 s
+  const gets = () => db2.log.filter((l) => l.includes('t2r_run_get')).length;
+  await q.page.waitForTimeout(500);
+  const g0 = gets();
+  await q.page.waitForTimeout(2500);
+  check(gets() - g0 <= 2, `sans chrono : relecture ralentie (${gets() - g0} en 2,5 s pour deux appareils)`);
+  await p.page.locator('.start').click();
+  await q.page.waitForFunction(() => window.t2r.state.run && window.t2r.state.run.pushed, null, { timeout: 8000 });
+  const g1 = gets();
+  await q.page.waitForTimeout(1500);
+  check(gets() - g1 >= 6, `chrono en cours : relecture rapide (${gets() - g1} en 1,5 s)`);
+  await p.page.locator('.start').click();
   check(errors0(p, q), `aucune erreur console (${[...p.errors, ...q.errors].join(' | ')})`);
   await p.context.close(); await q.context.close();
 }

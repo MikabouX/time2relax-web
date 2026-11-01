@@ -471,6 +471,7 @@ async function runAnnounce() {
 
 /** Compare le chrono d'ici et celui du serveur. */
 async function runPoll() {
+  lastPollAt = Date.now();
   if (runBusy || !runSharing()) return;
   runBusy = true;
   try {
@@ -496,29 +497,46 @@ async function runPoll() {
 
 let pollWorker = null;
 let pollInterval = null;
+let lastPollAt = 0;
 
 function stopRunPolling() {
   if (pollWorker) { pollWorker.terminate(); pollWorker = null; }
   if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
 }
 
-/** Relit le chrono du serveur toutes les 5 secondes (config.js : pollMs, 0 pour désactiver). */
+/* Relecture du chrono, au rythme utile seulement (économise le trafic du serveur gratuit) :
+   - chrono en cours et page visible : toutes les 5 s (config.js : pollMs) ;
+   - pas de chrono, page visible : toutes les minutes (pollIdleMs, par défaut 12 × pollMs) ;
+   - page cachée : toutes les minutes avec un chrono, sinon plus du tout (relue dès qu'on revient). */
+function pollTick(every, idle) {
+  const hidden = document.visibilityState === 'hidden';
+  let wait = S.run ? every : idle;
+  if (hidden) wait = S.run ? idle : Infinity;
+  if (Date.now() - lastPollAt < wait - 50) return;
+  runPoll();
+}
+
+/** Relit le chrono du serveur (config.js : pollMs, 0 pour désactiver). */
 function startRunPolling() {
   stopRunPolling();
-  const ms = Number(window.T2R_CONFIG && window.T2R_CONFIG.pollMs);
+  const cfg = window.T2R_CONFIG || {};
+  const ms = Number(cfg.pollMs);
   const every = Number.isFinite(ms) ? ms : 5000;
   if (!syncEnabled() || !S.session || every <= 0) return;
+  const idleMs = Number(cfg.pollIdleMs);
+  const idle = Number.isFinite(idleMs) && idleMs > 0 ? idleMs : every * 12;
+  const tick = () => pollTick(every, idle);
   try {
     // Un Worker n'est pas ralenti quand l'onglet est en arrière-plan.
     const blob = new Blob([`setInterval(function(){postMessage(0)},${every})`], { type: 'text/javascript' });
     pollWorker = new Worker(URL.createObjectURL(blob));
-    pollWorker.onmessage = runPoll;
+    pollWorker.onmessage = tick;
     pollWorker.onerror = () => {
       if (pollWorker) { pollWorker.terminate(); pollWorker = null; }
-      if (!pollInterval) pollInterval = setInterval(runPoll, every);
+      if (!pollInterval) pollInterval = setInterval(tick, every);
     };
   } catch (_) {
-    pollInterval = setInterval(runPoll, every);
+    pollInterval = setInterval(tick, every);
   }
   runPoll();
 }
