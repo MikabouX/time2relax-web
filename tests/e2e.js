@@ -79,7 +79,7 @@ async function main() {
       check((await text(page, '.date')).toLowerCase().includes('jeudi 29 octobre'), 'date du jour en français');
       eq(await text(page, '.stat-val'), '—', 'compteur du jour vide');
       // sous le minuteur : l'alerte écran éteint demande l'appli mobile (pas de minuteur « OS » sur le web)
-      check((await text(page, '.timer-note')).includes('installe l\'appli sur ton téléphone'), 'sous le minuteur : message sur l\'appli mobile');
+      check((await text(page, '.timer-note')).includes('30 secondes avant la fin') && (await text(page, '.timer-note')).includes('installe plutôt l\'application'), 'sous le minuteur : alerte 30 s avant la fin et renvoi vers l\'appli');
       eq(await page.locator('.timer-note a[href="https://bardiaux.wordpress.com/"][target="_blank"]').count(), 1, 'le message renvoie vers le site des applis');
       eq((await text(page, '.timer-note a')).trim(), 'Télécharger', 'lien « Télécharger »');
 
@@ -100,14 +100,16 @@ async function main() {
       await page.locator('.switch-row').first().click();
       eq(await text(page, '#ringBig'), '30:00', 'lunch : minuteur de 30 minutes');
       await page.locator('.start').click();
-      await advance(page, 29 * 60 * 1000 + 30000);
+      await advance(page, 29 * 60 * 1000);
+      eq((await page.evaluate(() => window.__notes)).length, 0, '1 minute avant la fin : pas encore d\'alerte');
+      await advance(page, 31000);
       eq(await text(page, '#ringCap'), "Plus qu'une minute !", 'légende « plus qu\'une minute » (lunch)');
       await advance(page, 40000);
       check((await text(page, '#ringBig')).startsWith('+00:'), 'dépassement affiché avec « + »');
       const notes = await page.evaluate(() => window.__notes);
-      eq(notes.length, 2, 'deux notifications (1 minute avant, puis fin)');
-      check(notes[0].title === "Plus qu'une minute" && notes[1].title === 'Fin du lunch', 'titres des notifications en français');
-      check((await page.evaluate(() => window.__beeps)) >= 4, 'bips émis');
+      eq(notes.length, 1, 'une seule notification du navigateur, 30 s avant la fin');
+      eq(notes[0] && notes[0].title, 'Plus que 30 secondes', 'titre de la notification en français');
+      check((await page.evaluate(() => window.__beeps)) >= 3, 'bips émis');
       await page.locator('.start').click();
       eq(await text(page, '.segs .seg.on'), 'Lunch', 'le type reste sélectionné');
 
@@ -343,7 +345,10 @@ async function main() {
       check((await text(page, '.dlg-error')).includes('durée valide'), 'durée nulle refusée');
       await fill({ mins: '5', date: '2026-10-30' });
       await save();
-      check((await text(page, '.dlg-error')).includes('pas dans le futur'), 'date future refusée');
+      check((await text(page, '.dlg-error')).includes('7 derniers jours'), 'date future refusée');
+      await fill({ mins: '5', date: '2026-10-20' });
+      await save();
+      check((await text(page, '.dlg-error')).includes('7 derniers jours'), 'date de plus d\'une semaine refusée');
       await fill({ date: '2026-10-29', time: '' });
       await save();
       check((await text(page, '.dlg-error')).includes('heure de début'), 'heure vide refusée');
@@ -623,6 +628,39 @@ async function planTests(browser) {
     await es.page.locator('.dlg').getByRole('button', { name: 'OK' }).click();
     eq(await es.page.evaluate(() => window.t2r.state.ui.lunchMinutes), 45, 'durée du lunch choisie dans les réglages : 45 min');
     await es.context.close();
+  }
+
+  // --- moment « Autre » nommé (meeting, formation…)
+  {
+    const { page, context, errors } = await newPage(browser, { setup: eval(planSetup([{ id: 'a', time: '10:15', type: 'break' }])) });
+    await page.getByRole('button', { name: 'Breaks prévus' }).click();
+    const dlg = page.locator('.dlg');
+    await page.getByRole('button', { name: /Ajouter un autre moment/ }).click();
+    await dlg.locator('input[type=time]').fill('10:05');
+    check(await dlg.getByRole('button', { name: 'Enregistrer' }).isDisabled(), '« Autre » sans nom : « Enregistrer » bloqué');
+    await dlg.locator('input[type=text]').fill('  Meeting   équipe ');
+    await dlg.getByRole('button', { name: 'Enregistrer' }).click();
+    const items = await page.evaluate(() => window.t2r.state.plan.items);
+    check(items.some((i) => i.type === 'other' && i.label === 'Meeting équipe' && i.time === '10:05'), 'moment « Autre » enregistré avec son nom');
+    check((await text(page, '.plan-list')).includes('Meeting équipe'), 'son nom apparaît dans le planning');
+    await page.getByRole('button', { name: 'Retour' }).click();
+    eq((await planLine(page)).text, 'Ensuite : Meeting équipe · 10:05 · dans 05:00', "l'accueil annonce le meeting");
+    check(errors.length === 0, `aucune erreur console (${errors.join(' | ')})`);
+    await context.close();
+  }
+
+  // --- historique gardé une semaine
+  {
+    const old = () => {
+      const mk = (date, i) => ({ id: `o-${i}`, date, time: '10:00', type: 'break', seconds: 600, synced: false });
+      localStorage.setItem('t2r.entries', JSON.stringify([mk('2026-10-10', 1), mk('2026-10-21', 2), mk('2026-10-22', 3), mk('2026-10-29', 4)]));
+      localStorage.setItem('t2r.prefs', JSON.stringify({ setupDone: true }));
+    };
+    const { page, context } = await newPage(browser, { startIso: '2026-10-29T10:00:00+01:00', setup: old });
+    eq(await page.evaluate(() => window.t2r.state.entries.map((e) => e.date).sort().join(',')), '2026-10-22,2026-10-29', 'entrées de plus de 7 jours effacées au démarrage');
+    await page.getByRole('button', { name: 'Historique' }).click();
+    check((await text(page, '.page')).includes("L'historique est gardé une semaine."), "l'historique le précise");
+    await context.close();
   }
 
   // --- couleurs et mode clair / sombre

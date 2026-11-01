@@ -10,6 +10,7 @@
   if (!Array.isArray(S.entries)) S.entries = [];
   if (!Array.isArray(S.deleted)) S.deleted = [];
   S.entries = S.entries.filter((e) => e && typeof e.id === 'string' && typeof e.seconds === 'number');
+  pruneOld(); // historique gardé une semaine
   if (S.run && (typeof S.run.start !== 'number' || (S.run.type !== 'break' && S.run.type !== 'lunch'))) {
     S.run = null;
     saveRun();
@@ -35,6 +36,7 @@
   if (syncEnabled() && S.session) { syncNow(); startRunPolling(); }
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState !== 'visible') return;
+    pruneOld();
     if (S.view === 'home') render(); // recompte la journée si la date a changé pendant la nuit
     if (syncEnabled() && S.session) { syncNow(); runPoll(); }
   });

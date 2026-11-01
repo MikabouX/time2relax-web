@@ -229,3 +229,17 @@ $$;
 
 revoke all on function public.t2r_settings_clear(text) from public;
 grant execute on function public.t2r_settings_clear(text) to anon, authenticated;
+
+-- ---------------------------------------------------------------------------------------------
+-- Historique gardé une semaine (novembre 2026) : chaque nuit, les entrées de plus de 7 jours sont
+-- effacées. À exécuter une fois dans Supabase → SQL Editor.
+create extension if not exists pg_cron;
+
+create or replace function public.t2r_purge_old() returns void
+language sql security definer set search_path to 'public' as $$
+  delete from public.pauses where date < current_date - 7;
+  delete from public.breaks where date < current_date - 7;
+$$;
+revoke all on function public.t2r_purge_old() from public, anon, authenticated;
+
+select cron.schedule('t2r-purge-7-jours', '15 2 * * *', 'select public.t2r_purge_old()');

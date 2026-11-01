@@ -1,5 +1,11 @@
 # Time2Relax — version web (PC)
 
+> **Version web autonome (novembre 2026)** : on choisit la page web **ou** l'application. La page garde
+> tout dans le navigateur et ne partage rien en ligne (le code de synchronisation est conservé mais
+> inactif : `config.js` laissé vide). Une seule alerte du navigateur prévient 30 secondes avant la fin.
+> L'historique est gardé une semaine. Les breaks prévus acceptent aussi un moment « Autre » avec un nom
+> (meeting, formation…).
+
 Chrono de break et de lunch, minuteur avec alertes, historique (avec ajout et modification d'une
 entrée oubliée), commande de repas, mode nuit, français, néerlandais, anglais et allemand. Même esprit que l'appli
 Android, dans un navigateur : **rien à installer**. (Pas de liens Waze / Google Maps : inutiles sur PC.)

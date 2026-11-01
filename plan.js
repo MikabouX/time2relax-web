@@ -15,17 +15,22 @@ const DEFAULT_PLAN_DAYS = [1, 2, 3, 4, 5]; // 1 = lundi … 7 = dimanche
 
 const cleanDays = (list) => [...new Set(list.filter((d) => Number.isInteger(d) && d >= 1 && d <= 7))].sort((a, b) => a - b);
 
+const PLAN_LABEL_MAX = 40;
+/** Nom d'un moment « autre » (meeting, formation…), nettoyé. */
+const planLabel = (l) => (typeof l === 'string' ? l.trim().replace(/\s+/g, ' ').slice(0, PLAN_LABEL_MAX) : '');
+/** Nom affiché d'un moment prévu : Break, Lunch, ou le nom choisi pour « Autre ». */
+const planName = (type, label) => (type === 'other' ? (label || t('type_other')) : typeLabel(type));
+
 function normalizePlan(p) {
   const out = { items: [], repeat: true, day: '', days: DEFAULT_PLAN_DAYS.slice() };
   if (!p || typeof p !== 'object') return out;
   if (Array.isArray(p.items)) {
     for (const it of p.items) {
       if (!it || typeof it.time !== 'string' || !/^([01]\d|2[0-3]):[0-5]\d$/.test(it.time)) continue;
-      out.items.push({
-        id: typeof it.id === 'string' && it.id ? it.id : uid(),
-        time: it.time,
-        type: it.type === 'lunch' ? 'lunch' : 'break',
-      });
+      const type = it.type === 'lunch' ? 'lunch' : (it.type === 'other' ? 'other' : 'break');
+      const item = { id: typeof it.id === 'string' && it.id ? it.id : uid(), time: it.time, type };
+      if (type === 'other') item.label = planLabel(it.label);
+      out.items.push(item);
     }
   }
   out.repeat = p.repeat !== false;
@@ -64,7 +69,7 @@ function planMoments(now = new Date()) {
     const [hh, mm] = it.time.split(':').map(Number);
     const d = new Date(base.getFullYear(), base.getMonth(), base.getDate(), hh, mm, 0, 0);
     if (S.prefs.nightMode && hh < S.prefs.nightCutoff) d.setDate(d.getDate() + 1);
-    return { id: it.id, type: it.type, time: it.time, ms: d.getTime() };
+    return { id: it.id, type: it.type, label: it.label || '', time: it.time, ms: d.getTime() };
   }).sort((a, b) => a.ms - b.ms);
 }
 
@@ -121,6 +126,12 @@ function planState(now = new Date()) {
   if (!pick) return { has: true, text: t('plan_none'), due: false, progress: 0 };
   const Type = typeLabel(pick.item.type);
   const vars = { type: Type.toLowerCase(), Type, time: pick.item.time, left: formatCountdown(pick.secs) };
+  if (pick.item.type === 'other') {
+    const ov = { name: planName('other', pick.item.label), time: pick.item.time, left: vars.left };
+    return pick.due
+      ? { has: true, text: t('plan_due_other', ov), due: true, progress: 0 }
+      : { has: true, text: t('plan_next_other', ov), due: false, progress: Math.min(1, pick.secs / PLAN_WINDOW) };
+  }
   return pick.due
     ? { has: true, text: t('plan_due', vars), due: true, progress: 0 }
     : { has: true, text: t('plan_next', vars), due: false, progress: Math.min(1, pick.secs / PLAN_WINDOW) };
@@ -150,18 +161,21 @@ function nextQuarter(now = new Date()) {
   return `${two(d.getHours())}:${two(d.getMinutes())}`;
 }
 
-function addPlanned(type, time = nextQuarter()) {
-  S.plan.items.push({ id: uid(), time, type });
+function addPlanned(type, time = nextQuarter(), label = '') {
+  const item = { id: uid(), time, type };
+  if (type === 'other') item.label = planLabel(label);
+  S.plan.items.push(item);
   touchPlan();
   render();
 }
 
 /** Enregistre la fenêtre d'édition d'un moment prévu (type et heure changés ensemble). */
-function savePlanned(id, type, time) {
+function savePlanned(id, type, time, label = '') {
   const it = S.plan.items.find((x) => x.id === id);
   if (!it || !/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) return;
   it.time = time;
   it.type = type;
+  if (type === 'other') it.label = planLabel(label); else delete it.label;
   touchPlan();
   render();
 }
@@ -183,9 +197,10 @@ function checkPlanReminders(now = new Date()) {
     if (nowMs < at || nowMs - at > 5 * 60000 || planNotified.includes(key)) continue;
     planNotified = [...planNotified, key].slice(-60);
     store.set('t2r.planNotified', planNotified);
-    const Type = typeLabel(m.type);
+    const Type = planName(m.type, m.label);
+    const other = m.type === 'other';
     const title = lead === 0
-      ? t('remind_now', { type: Type.toLowerCase(), Type })
+      ? t(other ? 'remind_now_other' : 'remind_now', { type: Type.toLowerCase(), Type, name: Type })
       : t('remind_soon', { type: Type.toLowerCase(), Type, m: lead });
     notify(title, t('remind_body', { time: m.time }), `plan-${key}`);
     beep(1);

@@ -84,7 +84,7 @@ function notify(title, body, tag) {
   } catch (_) { /* notifications indisponibles */ }
 }
 
-/* ---------- Alertes : une minute avant, à la fin, puis rappel toutes les 30 s ---------- */
+/* ---------- Alerte : une seule, 30 secondes avant la fin ---------- */
 
 let alertState = { warned: false, ended: false, lastRepeat: 0 };
 
@@ -93,10 +93,11 @@ function resetAlerts(silentIfLate) {
   if (silentIfLate && S.run && S.run.planned > 0) {
     // Page rechargée en cours de route : on ne rejoue pas les alertes déjà passées.
     const remaining = S.run.planned - Math.floor((Date.now() - S.run.start) / 1000);
-    if (remaining <= 60) alertState.warned = true;
-    if (remaining <= 0) { alertState.ended = true; alertState.lastRepeat = Date.now(); }
+    if (remaining <= WARN_SECS) alertState.warned = true;
   }
 }
+
+const WARN_SECS = 30;
 
 function handleAlerts() {
   const run = S.run;
@@ -104,19 +105,11 @@ function handleAlerts() {
   const remaining = run.planned - Math.floor((Date.now() - run.start) / 1000);
   const Type = typeLabel(run.type);
   const type = Type.toLowerCase();
-  if (!alertState.warned && run.planned > 60 && remaining <= 60 && remaining > 0) {
+  // Une seule alerte du navigateur, 30 secondes avant la fin (pas d'alerte du système comme dans l'appli).
+  if (!alertState.warned && run.planned > WARN_SECS && remaining <= WARN_SECS && remaining > 0) {
     alertState.warned = true;
     notify(t('warn_title'), t('warn_body', { type, Type }), 'warn');
-    beep(1);
-  }
-  if (!alertState.ended && remaining <= 0) {
-    alertState.ended = true;
-    alertState.lastRepeat = Date.now();
-    notify(t('end_title', { type, Type }), t('end_body'), 'end');
     beep(3);
-  } else if (alertState.ended && remaining < 0 && Date.now() - alertState.lastRepeat >= 30000) {
-    alertState.lastRepeat = Date.now();
-    beep(2);
   }
 }
 

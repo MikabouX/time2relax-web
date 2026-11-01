@@ -500,7 +500,7 @@ function historyView() {
   const body = entries.length === 0
     ? h('div', { class: 'empty' }, icon('history', 56), h('p', {}, t('history_empty')),
       h('button', { type: 'button', class: 'btn tonal', on: { click: () => editEntry(null) } }, icon('add', 18), t('entry_add')))
-    : [...byDay.entries()].map(([key, list]) => dayBlock(key, list));
+    : [...byDay.entries()].map(([key, list]) => dayBlock(key, list)).concat(h('p', { class: 'small muted note center' }, t('keep_note')));
 
   return h('div', { class: 'page' },
     h('header', { class: 'top' },
@@ -570,7 +570,7 @@ function entryDialog(initial) {
     const defaultMinutes = (v) => (v === 'lunch' ? S.ui.lunchMinutes : S.ui.pauseMinutes);
 
     const date = h('input', {
-      type: 'date', class: 'field', required: true, max: todayCal, 'aria-label': t('entry_date'),
+      type: 'date', class: 'field', required: true, min: oldestKeptDay(), max: todayCal, 'aria-label': t('entry_date'),
       value: initial ? initial.date : todayCal,
     });
     const time = h('input', {
@@ -619,7 +619,7 @@ function entryDialog(initial) {
     const submit = () => {
       error.hidden = true;
       const d = parseDay(date.value);
-      if (!d || dayKey(d) !== date.value || date.value > todayCal) return fail(t('entry_err_date'));
+      if (!d || dayKey(d) !== date.value || date.value > todayCal || date.value < oldestKeptDay()) return fail(t('entry_err_date'));
       if (!/^\d{2}:\d{2}$/.test(time.value)) return fail(t('entry_err_time'));
       const m = mins.value === '' ? 0 : Number(mins.value);
       const s = secs.value === '' ? 0 : Number(secs.value);
@@ -745,16 +745,18 @@ const sectionTitle = (text) => h('h2', { class: 'sec-title' }, text);
 /** Une ligne du planning (lecture seule) : un clic l'ouvre dans la fenêtre d'édition. */
 function planRow(it) {
   const lunch = it.type === 'lunch';
+  const other = it.type === 'other';
+  const name = planName(it.type, it.label);
   return h('button', {
     type: 'button',
     class: 'plan-item',
-    'aria-label': `${typeLabel(it.type)} ${it.time} — ${t('edit')}`,
+    'aria-label': `${name} ${it.time} — ${t('edit')}`,
     on: { click: () => editPlanned(it) },
   },
-  h('span', { class: `plan-badge${lunch ? ' lun' : ''}` }, icon(lunch ? 'restaurant' : 'coffee', 20)),
+  h('span', { class: `plan-badge${lunch ? ' lun' : ''}${other ? ' oth' : ''}` }, icon(other ? 'event' : (lunch ? 'restaurant' : 'coffee'), 20)),
   h('span', { class: 'plan-item-txt' },
     h('span', { class: 'plan-time' }, it.time),
-    h('span', { class: 'small muted block' }, typeLabel(it.type))),
+    h('span', { class: 'small muted block' }, name)),
   icon('edit', 18));
 }
 
@@ -766,25 +768,31 @@ function planDialog(item, type) {
     const segs = h('div', { class: 'segs' });
     const error = h('p', { class: 'small dlg-error', hidden: true, role: 'alert' });
     const save = h('button', { type: 'button', class: 'btn filled' }, t('save'));
+    // « Autre » : un nom libre (meeting, formation…).
+    const name = h('input', { type: 'text', class: 'field', maxlength: String(PLAN_LABEL_MAX), value: item && item.label ? item.label : '', placeholder: t('other_hint'), 'aria-label': t('other_name') });
+    const nameWrap = h('div', { class: 'dlg-fields' }, h('label', { class: 'small muted' }, t('other_name')), name);
     const clash = () => S.plan.items.some((x) => (!item || x.id !== item.id) && x.time === time.value);
     const refresh = () => {
-      segs.replaceChildren(...[['break', 'coffee'], ['lunch', 'restaurant']].map(([v, ic]) => h('button', {
+      segs.replaceChildren(...[['break', 'coffee', typeLabel('break')], ['lunch', 'restaurant', typeLabel('lunch')], ['other', 'event', t('type_other')]].map(([v, ic, label]) => h('button', {
         type: 'button',
         class: `seg${kind === v ? ' on' : ''}`,
         'aria-pressed': String(kind === v),
-        on: { click: () => { kind = v; refresh(); } },
-      }, icon(ic, 18), h('span', {}, typeLabel(v)))));
+        on: { click: () => { kind = v; refresh(); if (v === 'other') name.focus(); } },
+      }, icon(ic, 18), h('span', {}, label))));
+      nameWrap.hidden = kind !== 'other';
       const bad = clash();
       error.textContent = bad ? t('plan_clash') : '';
       error.hidden = !bad;
-      save.disabled = bad || !/^([01]\d|2[0-3]):[0-5]\d$/.test(time.value);
+      save.disabled = bad || !/^([01]\d|2[0-3]):[0-5]\d$/.test(time.value) || (kind === 'other' && !planLabel(name.value));
     };
     time.addEventListener('input', refresh);
-    save.addEventListener('click', () => { if (!save.disabled) close({ action: 'save', type: kind, time: time.value }); });
+    name.addEventListener('input', refresh);
+    save.addEventListener('click', () => { if (!save.disabled) close({ action: 'save', type: kind, time: time.value, label: name.value }); });
     refresh();
     dlg.append(
       h('h2', {}, item ? t('plan_edit_title') : t('plan_new_title')),
       h('div', { class: 'dlg-fields' }, segs, time),
+      nameWrap,
       error,
       h('div', { class: 'dlg-actions wrap' },
         item ? h('button', { type: 'button', class: 'btn text danger-text', on: { click: () => close({ action: 'delete' }) } }, icon('delete', 18), t('delete')) : null,
@@ -798,8 +806,8 @@ async function editPlanned(item, type = 'break') {
   const res = await planDialog(item, type);
   if (!res) return;
   if (res.action === 'delete' && item) removePlanned(item.id);
-  else if (res.action === 'save' && item) savePlanned(item.id, res.type, res.time);
-  else if (res.action === 'save') addPlanned(res.type, res.time);
+  else if (res.action === 'save' && item) savePlanned(item.id, res.type, res.time, res.label);
+  else if (res.action === 'save') addPlanned(res.type, res.time, res.label);
 }
 
 /** « Me prévenir quand l'heure approche » + nombre de minutes. */
@@ -872,7 +880,8 @@ function planView() {
         : h('p', { class: 'muted pad plan-empty' }, t('plan_empty'))),
     h('div', { class: 'plan-add' },
       h('button', { type: 'button', class: 'btn tonal', 'aria-label': t('plan_add_break_long'), on: { click: () => editPlanned(null, 'break') } }, icon('add', 18), t('plan_add_break')),
-      h('button', { type: 'button', class: 'btn tonal', 'aria-label': t('plan_add_lunch_long'), on: { click: () => editPlanned(null, 'lunch') } }, icon('add', 18), t('plan_add_lunch'))),
+      h('button', { type: 'button', class: 'btn tonal', 'aria-label': t('plan_add_lunch_long'), on: { click: () => editPlanned(null, 'lunch') } }, icon('add', 18), t('plan_add_lunch')),
+      h('button', { type: 'button', class: 'btn tonal', 'aria-label': t('plan_add_other_long'), on: { click: () => editPlanned(null, 'other') } }, icon('add', 18), t('type_other'))),
     h('div', { class: 'card' },
       h('label', { class: 'switch-row pad' },
         h('span', { class: 'grow' },
@@ -939,6 +948,8 @@ function settingsView() {
 /** Lien vers le site explicatif (fonctions, téléchargement des applis Android et iPhone). */
 function appsCard() {
   return h('div', { class: 'card pad' },
+    h('p', { class: 'strong' }, t('web_or_app_title')),
+    h('p', { class: 'small muted' }, t('web_or_app_body')),
     h('p', {}, t('apps_intro')),
     h('a', { class: 'btn tonal', href: safeUrl(SITE_URL), target: '_blank', rel: 'noopener noreferrer' }, icon('open_in_new', 18), t('apps_btn')));
 }

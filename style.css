@@ -401,3 +401,7 @@ button.tile { border: 0; font: inherit; cursor: pointer; }
 .chakra-line { margin: 0 0 4px; }
 .chakra-info { margin: 0 0 14px; }
 .chakra-line .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; vertical-align: middle; }
+.plan-badge.oth { background: var(--secondary-c); color: var(--on-secondary-c); }
+.note.center { text-align: center; margin-top: 14px; }
+.plan-add { flex-wrap: wrap; }
+.card.pad > p + p { margin-top: 10px; }

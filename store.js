@@ -122,6 +122,18 @@ function dayKey(d) {
   return `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())}`;
 }
 
+// Historique gardé une semaine : les entrées plus anciennes sont effacées.
+const KEEP_DAYS = 7;
+function oldestKeptDay(now = new Date()) {
+  return dayKey(new Date(now.getFullYear(), now.getMonth(), now.getDate() - KEEP_DAYS));
+}
+function pruneOld() {
+  const oldest = oldestKeptDay();
+  const before = S.entries.length;
+  S.entries = S.entries.filter((e) => e.date >= oldest);
+  if (S.entries.length !== before) saveEntries();
+}
+
 function parseDay(key) {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(key);
   return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null;
@@ -264,8 +276,9 @@ function importEntries(list) {
   const have = new Set(S.entries.map(key));
   let added = 0;
   let skipped = 0;
+  const oldest = oldestKeptDay();
   for (const e of list) {
-    if (have.has(key(e))) { skipped += 1; continue; }
+    if (have.has(key(e)) || e.date < oldest) { skipped += 1; continue; }
     have.add(key(e));
     S.entries.push({ id: uid(), date: e.date, time: e.time, type: e.type, seconds: e.seconds, synced: false });
     added += 1;
