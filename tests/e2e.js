@@ -77,7 +77,7 @@ async function main() {
       eq(await page.locator('.welcome .swatch').count(), 0, 'bienvenue : pas de choix de couleur');
       eq(await page.locator('.welcome').getByRole('button', { name: 'Nederlands' }).count(), 1, 'bienvenue : choix de la langue');
       eq(await page.locator('.welcome .feature-list li').count(), 5, "bienvenue : les fonctions de l'application");
-      eq(await page.locator(`.welcome a[href="${'https://github.com/MikabouX/time2relax-web/releases/latest/download/Time2Relax_v1.0.0.apk'}"]`).count(), 1, 'bienvenue : téléchargement direct Android');
+      eq(await page.locator(`.welcome a[href="${'https://play.google.com/store/apps/details?id=com.mikaboux.time2relax'}"]`).count(), 1, 'bienvenue : Android sur Google Play');
       eq(await page.locator('.welcome a[href="https://testflight.apple.com/join/Net95ZVk"]').count(), 1, 'bienvenue : téléchargement direct iPhone');
       eq(await page.locator('.welcome a[href="https://bardiaux.wordpress.com/"]').count(), 1, 'bienvenue : lien vers la page explicative');
       await page.getByRole('button', { name: 'Continuer avec la version web' }).click();

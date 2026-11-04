@@ -289,7 +289,7 @@ function homeView() {
 
 /** Liens directs vers les applis mobiles. */
 const storeLinks = () => h('div', { class: 'store-links' },
-  h('a', { class: 'btn tonal', href: safeUrl(ANDROID_URL), rel: 'noopener noreferrer' }, icon('phone_android', 18), 'Android'),
+  h('a', { class: 'btn tonal', href: safeUrl(ANDROID_URL), target: '_blank', rel: 'noopener noreferrer' }, icon('phone_android', 18), 'Android'),
   h('a', { class: 'btn tonal', href: safeUrl(IPHONE_URL), target: '_blank', rel: 'noopener noreferrer' }, icon('phone_android', 18), 'iPhone'));
 
 /** Sous le chrono : « Pour plus de fonctionnalités, téléchargez l'application mobile ». */

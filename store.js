@@ -32,7 +32,7 @@ const store = {
 };
 
 const SITE_URL = 'https://bardiaux.wordpress.com/'; // site explicatif : fonctions, téléchargement des applis Android et iPhone
-const ANDROID_URL = 'https://github.com/MikabouX/time2relax-web/releases/latest/download/Time2Relax_v1.0.0.apk'; // dernier APK
+const ANDROID_URL = 'https://play.google.com/store/apps/details?id=com.mikaboux.time2relax'; // Google Play (test fermé pour l'instant)
 const IPHONE_URL = 'https://testflight.apple.com/join/Net95ZVk'; // lien public TestFlight
 const SUGGESTIONS = [
   { name: 'Takeaway.com', url: 'https://www.takeaway.com/be/' },
