@@ -143,7 +143,9 @@ const STRINGS = {
 
     sec_apps: 'Les applications',
     apps_intro: "Time2Relax existe aussi en appli pour Android et pour iPhone. Le site explique toutes les fonctions et permet de télécharger les applis.",
-    android_test_note: 'Android : l’appli est en test sur Google Play. Pour l’installer, demande-moi d’abord l’accès testeur en m’écrivant ton adresse Gmail à mb.technogeek@atomicmail.io.',
+    android_test_note: 'L’appli Android est en test sur Google Play. Pour l’installer, envoie-moi l’adresse Gmail de ton téléphone : je t’ajoute aux testeurs et je t’envoie le lien.',
+    android_banner_title: 'Appli Android en test : rejoins les testeurs !',
+    android_banner_btn: 'Demander l’accès testeur',
     apps_btn: 'Ouvrir le site Time2Relax',
     sec_order: 'Commander à manger',
     order_note: "Touche un site pour le choisir : c'est celui qu'ouvre le bouton « Commander ». Sur l'écran principal, la petite flèche du bouton permet d'en changer rapidement.",
@@ -362,7 +364,9 @@ const STRINGS = {
 
     sec_apps: 'De apps',
     apps_intro: 'Time2Relax bestaat ook als app voor Android en iPhone. De website legt alle functies uit en laat je de apps downloaden.',
-    android_test_note: 'Android: de app wordt getest op Google Play. Vraag eerst testtoegang door je Gmail-adres te sturen naar mb.technogeek@atomicmail.io.',
+    android_test_note: 'De Android-app wordt getest op Google Play. Stuur me het Gmail-adres van je telefoon: ik voeg je toe als tester en stuur je de link.',
+    android_banner_title: 'Android-app in test: word tester!',
+    android_banner_btn: 'Testtoegang vragen',
     apps_btn: 'Time2Relax-website openen',
     sec_order: 'Eten bestellen',
     order_note: 'Tik op een site om hem te kiezen: die opent de knop “Bestellen”. Op het hoofdscherm kun je met het pijltje op die knop snel van site wisselen.',
@@ -580,7 +584,9 @@ const STRINGS = {
 
     sec_apps: 'The apps',
     apps_intro: 'Time2Relax also exists as an app for Android and iPhone. The website explains every feature and lets you download the apps.',
-    android_test_note: 'Android: the app is in testing on Google Play. To install it, first ask me for tester access by emailing your Gmail address to mb.technogeek@atomicmail.io.',
+    android_test_note: 'The Android app is in testing on Google Play. To install it, send me your phone’s Gmail address: I’ll add you as a tester and send you the link.',
+    android_banner_title: 'Android app in testing: join the testers!',
+    android_banner_btn: 'Ask for tester access',
     apps_btn: 'Open the Time2Relax website',
     sec_order: 'Order food',
     order_note: 'Tap a site to choose it: that is the one the “Order” button opens. On the main screen, the small arrow on the button lets you switch quickly.',
@@ -798,7 +804,9 @@ const STRINGS = {
 
     sec_apps: 'Die Apps',
     apps_intro: 'Time2Relax gibt es auch als App für Android und iPhone. Die Website erklärt alle Funktionen und bietet die Apps zum Herunterladen an.',
-    android_test_note: 'Android: Die App ist bei Google Play im Test. Bitte zuerst Testzugang anfragen und deine Gmail-Adresse an mb.technogeek@atomicmail.io schicken.',
+    android_test_note: 'Die Android-App ist bei Google Play im Test. Schick mir die Gmail-Adresse deines Telefons: Ich füge dich als Tester hinzu und schicke dir den Link.',
+    android_banner_title: 'Android-App im Test: werde Tester!',
+    android_banner_btn: 'Testzugang anfragen',
     apps_btn: 'Time2Relax-Website öffnen',
     sec_order: 'Essen bestellen',
     order_note: 'Tippe auf eine Seite, um sie auszuwählen: Diese öffnet der Knopf „Bestellen“. Auf dem Hauptbildschirm kannst du mit dem kleinen Pfeil des Knopfs schnell wechseln.',

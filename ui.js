@@ -22,6 +22,7 @@ function h(tag, props, ...kids) {
 
 // Icônes (Material Design) : chemins fixes écrits ici, jamais construits à partir de texte saisi.
 const ICONS = {
+  mail: 'M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z',
   arrow_back: 'M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z',
   more_vert: 'M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z',
   history: 'M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z',
@@ -271,6 +272,7 @@ const CIRC = 2 * Math.PI * RADIUS;
 
 function homeView() {
   return h('div', { class: 'page' },
+    testBanner(),
     h('header', { class: 'top' },
       h('div', { class: 'grow' },
         h('div', { class: 'muted small' }, greeting()),
@@ -287,9 +289,18 @@ function homeView() {
     settingsSection());
 }
 
+/** Bandeau en haut de page : l'appli Android est en test fermé, il faut demander l'accès. */
+const TESTER_MAIL = 'mb.technogeek@atomicmail.io';
+const testBanner = () => h('div', { class: 'test-banner', role: 'note' },
+  h('div', { class: 'test-banner-title' }, icon('phone_android', 22), t('android_banner_title')),
+  h('p', {}, t('android_test_note')),
+  h('a', {
+    class: 'btn test-banner-btn',
+    href: `mailto:${TESTER_MAIL}?subject=${encodeURIComponent('Time2Relax : accès testeur Android')}`,
+  }, icon('mail', 18), t('android_banner_btn')));
+
 /** Liens directs vers les applis mobiles. */
 const storeLinks = () => h('div', {},
-  h('p', { class: 'small muted android-note' }, t('android_test_note')),
   h('div', { class: 'store-links' },
   h('a', { class: 'btn tonal', href: safeUrl(ANDROID_URL), target: '_blank', rel: 'noopener noreferrer' }, icon('phone_android', 18), 'Android'),
   h('a', { class: 'btn tonal', href: safeUrl(IPHONE_URL), target: '_blank', rel: 'noopener noreferrer' }, icon('phone_android', 18), 'iPhone')));
@@ -306,6 +317,7 @@ function appStrip() {
 function welcomeView() {
   const features = ['app_f1', 'app_f2', 'app_f3', 'app_f4', 'app_f5'];
   return h('div', { class: 'page welcome' },
+    testBanner(),
     h('header', { class: 'top' }, h('h1', { class: 'grow' }, t('welcome_title'))),
     h('p', {}, t('welcome_web')),
     langCard(),
