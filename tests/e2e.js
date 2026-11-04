@@ -77,8 +77,9 @@ async function main() {
       eq(await page.locator('.welcome .swatch').count(), 0, 'bienvenue : pas de choix de couleur');
       eq(await page.locator('.welcome').getByRole('button', { name: 'Nederlands' }).count(), 1, 'bienvenue : choix de la langue');
       eq(await page.locator('.welcome .feature-list li').count(), 5, "bienvenue : les fonctions de l'application");
-      eq(await page.locator(`.welcome a[href="${'https://play.google.com/store/apps/details?id=com.mikaboux.time2relax'}"]`).count(), 1, 'bienvenue : Android sur Google Play');
-      eq(await page.locator('.welcome a[href="https://testflight.apple.com/join/Net95ZVk"]').count(), 1, 'bienvenue : téléchargement direct iPhone');
+      eq(await page.locator(`.welcome a[href="${'https://play.google.com/store/apps/details?id=com.mikaboux.time2relax'}"]`).count(), 2, 'bienvenue : Android sur Google Play (bandeau et bas de page)');
+      eq(await page.locator('.welcome a[href="https://testflight.apple.com/join/Net95ZVk"]').count(), 2, 'bienvenue : iPhone TestFlight (bandeau et bas de page)');
+      check((await text(page, '.test-banner')).includes('TestFlight'), 'bandeau : explication TestFlight');
       eq(await page.locator('.welcome a[href="https://bardiaux.wordpress.com/"]').count(), 1, 'bienvenue : lien vers la page explicative');
       await page.getByRole('button', { name: 'Continuer avec la version web' }).click();
       eq(await text(page, '#ringBig'), '00:00', 'chrono à zéro');

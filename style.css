@@ -380,6 +380,13 @@ button.tile { border: 0; font: inherit; cursor: pointer; }
 .test-banner { background: linear-gradient(135deg, #FFF3D6 0%, #FFE0B2 55%, #D3F1D8 100%); border: 2px solid #F59E0B; border-radius: 18px; padding: 14px 16px; margin: 0 0 16px; color: #3A2A05; }
 .test-banner-title { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 17px; color: #8A4B00; }
 .test-banner p { margin: 6px 0 10px; line-height: 1.4; }
+.test-banner-grid { display: grid; grid-template-columns: 1fr; gap: 14px; margin-top: 8px; }
+@media (min-width: 640px) { .test-banner-grid { grid-template-columns: 1fr 1fr; } }
+.test-banner-col { background: rgba(255, 255, 255, 0.55); border-radius: 14px; padding: 10px 12px; display: flex; flex-direction: column; align-items: flex-start; }
+.test-banner-sub { font-weight: 800; font-size: 15px; color: #8A4B00; }
+.test-banner-steps { margin: 0 0 10px; padding-left: 20px; line-height: 1.4; }
+.test-banner-col .btn { margin-top: 6px; }
+.test-banner-store { color: #3A2A05; }
 .test-banner-btn { background: #E07A0B; color: #FFFFFF; display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
 .store-links { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
 .store-links .btn { flex: 1; justify-content: center; }

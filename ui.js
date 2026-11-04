@@ -292,12 +292,26 @@ function homeView() {
 /** Bandeau en haut de page : l'appli Android est en test fermé, il faut demander l'accès. */
 const TESTER_MAIL = 'mb.technogeek@atomicmail.io';
 const testBanner = () => h('div', { class: 'test-banner', role: 'note' },
-  h('div', { class: 'test-banner-title' }, icon('phone_android', 22), t('android_banner_title')),
-  h('p', {}, t('android_test_note')),
-  h('a', {
-    class: 'btn test-banner-btn',
-    href: `mailto:${TESTER_MAIL}?subject=${encodeURIComponent('Time2Relax : accès testeur Android')}`,
-  }, icon('mail', 18), t('android_banner_btn')));
+  h('div', { class: 'test-banner-title' }, icon('phone_android', 22), t('apps_banner_title')),
+  h('div', { class: 'test-banner-grid' },
+    h('div', { class: 'test-banner-col' },
+      h('div', { class: 'test-banner-sub' }, 'Android'),
+      h('p', {}, t('android_test_note')),
+      h('a', {
+        class: 'btn test-banner-btn',
+        href: `mailto:${TESTER_MAIL}?subject=${encodeURIComponent('Time2Relax : accès testeur Android')}`,
+      }, icon('mail', 18), t('android_banner_btn')),
+      h('a', { class: 'btn tonal test-banner-store', href: safeUrl(ANDROID_URL), target: '_blank', rel: 'noopener noreferrer' },
+        icon('phone_android', 18), t('android_store_btn'))),
+    h('div', { class: 'test-banner-col' },
+      h('div', { class: 'test-banner-sub' }, 'iPhone'),
+      h('p', {}, t('iphone_test_note')),
+      h('ol', { class: 'test-banner-steps' },
+        h('li', {}, t('iphone_step1')),
+        h('li', {}, t('iphone_step2')),
+        h('li', {}, t('iphone_step3'))),
+      h('a', { class: 'btn test-banner-btn', href: safeUrl(IPHONE_URL), target: '_blank', rel: 'noopener noreferrer' },
+        icon('phone_android', 18), t('iphone_store_btn')))));
 
 /** Liens directs vers les applis mobiles. */
 const storeLinks = () => h('div', {},
