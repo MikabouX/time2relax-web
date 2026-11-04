@@ -99,7 +99,7 @@ async function main() {
       await page.locator('.start').click();
       check((await text(page, '#toast')).includes('Break enregistré : 05:12'), 'message « Break enregistré : 05:12 »');
       eq(await text(page, '.stat-label'), 'Breaks · 1', 'compteur de breaks = 1');
-      eq(await text(page, '.stat-val'), '5 min', 'total du jour = 5 min');
+      eq(await text(page, '.stat-val'), '5 min 12 s', 'total du jour = 5 min 12 s (secondes comprises)');
       const entry = await page.evaluate(() => window.t2r.state.entries[0]);
       check(entry.date === '2026-10-29' && entry.time === '10:00' && entry.seconds === 312 && entry.type === 'break', "entrée enregistrée avec la date, l'heure de début et la durée");
 
@@ -341,7 +341,7 @@ async function main() {
       check((await page.locator('.entry').first().innerText()).includes('à 09:15'), "l'entrée est rangée à sa place (la plus récente en haut)");
       await page.getByRole('button', { name: 'Retour' }).click();
       eq(await text(page, '.stat-label'), 'Breaks · 2', 'accueil : compteur de breaks mis à jour');
-      eq(await text(page, '.stat-val'), '22 min', "accueil : total du jour mis à jour (10 min + 12 min 30 s)");
+      eq(await text(page, '.stat-val'), '22 min 30 s', "accueil : total du jour mis à jour (10 min + 12 min 30 s)");
       await page.getByRole('button', { name: 'Historique' }).click();
 
       // --- modification (même identifiant), le type change mais pas la durée saisie
@@ -630,21 +630,15 @@ async function planTests(browser) {
     await context.close();
   }
 
-  // --- couleurs et mode clair / sombre
+  // --- une seule apparence : gris clair, sans réglage de couleur ni de mode
   {
-    const { page, context, errors } = await newPage(browser, { setup: () => localStorage.setItem('t2r.prefs', JSON.stringify({ setupDone: true })) });
+    const { page, context, errors } = await newPage(browser, { setup: () => localStorage.setItem('t2r.prefs', JSON.stringify({ setupDone: true, themeColor: 'crown', themeMode: 'dark' })) });
     const prim = () => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--primary').trim());
-    check((await prim()).startsWith('hsl(110'), 'couleur par défaut : le cœur (vert)');
+    eq(await prim(), '#5B636D', 'gris, même avec une ancienne couleur enregistrée');
+    eq(await page.evaluate(() => document.documentElement.style.colorScheme), 'light', 'jamais de mode sombre');
     await page.getByRole('button', { name: 'Réglages' }).click();
-    await page.getByRole('button', { name: 'Couronne · Sahasrara' }).click();
-    eq(await page.evaluate(() => window.t2r.state.prefs.themeColor), 'crown', 'chakra de la couronne choisi');
-    check((await prim()).startsWith('hsl(293'), 'la couleur principale devient violette');
-    check((await text(page, '.chakra-line')).includes('Connexion à soi'), 'signification du chakra affichée');
-    check((await text(page, '.chakra-info')).includes('Son : AH'), 'position, élément et son affichés');
-    await page.getByRole('button', { name: 'Sombre' }).click();
-    eq(await page.evaluate(() => document.documentElement.style.colorScheme), 'dark', 'mode sombre forcé');
-    await page.reload();
-    check((await prim()).startsWith('hsl(293') && (await page.evaluate(() => document.documentElement.style.colorScheme)) === 'dark', 'couleur et mode gardés après rechargement');
+    check(!(await text(page, '#settings')).includes('Couleur'), 'plus de réglage de couleur');
+    check((await page.locator('.swatch, .theme-modes').count()) === 0, 'ni pastilles ni Auto / Clair / Sombre');
     check(errors.length === 0, `aucune erreur console (${errors.join(' | ')})`);
     await context.close();
   }

@@ -933,9 +933,6 @@ function settingsSection() {
     sectionTitle(t('sec_lang')),
     langCard(),
 
-    sectionTitle(t('sec_colors')),
-    themeCard(),
-
     sectionTitle(t('sec_durations')),
     durationsCard(),
 
@@ -976,38 +973,6 @@ function durationsCard() {
     row('coffee', t('dur_break'), S.ui.pauseMinutes, false),
     row('restaurant', t('dur_lunch'), S.ui.lunchMinutes, true),
     h('p', { class: 'small muted pad' }, t('dur_note')));
-}
-
-function themeCard() {
-  const set = (key, v) => () => { S.prefs[key] = v; savePrefs(); applyTheme(); render(); };
-  const cur = chakraKey(S.prefs.themeColor) || DEFAULT_CHAKRA;
-  const sel = CHAKRAS.find((c) => c.key === cur);
-  return h('div', { class: 'card pad' },
-    // Les 7 chakras, de la racine (à gauche) à la couronne (à droite).
-    h('div', { class: 'swatches chakras', role: 'group', 'aria-label': t('sec_colors') },
-      CHAKRAS.map((c) => h('button', {
-        type: 'button',
-        class: `swatch${cur === c.key ? ' on' : ''}`,
-        style: `background:${c.color}`,
-        title: `${t(`chakra_${c.key}`)} · ${c.sanskrit}`,
-        'aria-pressed': String(cur === c.key),
-        'aria-label': `${t(`chakra_${c.key}`)} · ${c.sanskrit}`,
-        on: { click: set('themeColor', c.key) },
-      }, cur === c.key ? icon('check_circle', 20) : null))),
-    h('p', { class: 'chakra-line' },
-      h('span', { class: 'dot', style: `background:${sel.color}` }),
-      h('strong', {}, `${t(`chakra_${sel.key}`)} · ${sel.sanskrit}`),
-      ` — ${t(`chakra_${sel.key}_m`)}`),
-    h('p', { class: 'small muted chakra-info' },
-      `${t(`chakra_${sel.key}_p`)} · ${t('chakra_element')} : ${t(`chakra_${sel.key}_e`)} · ${t('chakra_sound')} : ${sel.sound}`),
-    h('div', { class: 'segs theme-modes' },
-      [['system', 'mode_auto'], ['light', 'mode_light'], ['dark', 'mode_dark']].map(([v, label]) => h('button', {
-        type: 'button',
-        class: `seg${S.prefs.themeMode === v ? ' on' : ''}`,
-        'aria-pressed': String(S.prefs.themeMode === v),
-        on: { click: set('themeMode', v) },
-      }, t(label)))),
-    h('p', { class: 'small muted' }, t('mode_note')));
 }
 
 function langCard() {

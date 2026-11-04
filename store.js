@@ -110,12 +110,15 @@ function formatDuration(seconds) {
 }
 
 /** Durée lisible : « 42 s », « 12 min », « 1 h 05 ». */
+/** Durée lisible, secondes comprises : « 45 s », « 10 min 03 s », « 1 h 02 min 15 s ». */
 function humanDuration(seconds) {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  if (h > 0) return `${h} ${t('unit_h')} ${two(m)}`;
-  if (m > 0) return `${m} min`;
-  return `${seconds} s`;
+  const v = Math.max(0, Math.floor(seconds));
+  const h = Math.floor(v / 3600);
+  const m = Math.floor((v % 3600) / 60);
+  const s = v % 60;
+  if (h > 0) return `${h} ${t('unit_h')} ${two(m)} min ${two(s)} s`;
+  if (m > 0) return `${m} min ${two(s)} s`;
+  return `${v} s`;
 }
 
 const capitalize = (s) => (s ? s[0].toUpperCase() + s.slice(1) : s);
