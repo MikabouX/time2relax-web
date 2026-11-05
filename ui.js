@@ -285,6 +285,7 @@ function homeView() {
     ringBlock(),
     h('div', { class: 'options' }, S.run ? runningInfo() : timerOptions()),
     startButton(),
+    dogCard(),
     appStrip(),
     settingsSection());
 }

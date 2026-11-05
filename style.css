@@ -397,3 +397,32 @@ button.tile { border: 0; font: inherit; cursor: pointer; }
 .settings-sec { margin-top: 36px; padding-top: 8px; border-top: 1px solid var(--outline); }
 .sec-title.big { font-size: 22px; }
 .welcome a, .app-strip a:not(.btn) { color: var(--primary); font-weight: 600; }
+
+/* « Va chercher mon chrono ! » : le cocker */
+.dog-card { margin-top: 14px; }
+.dog-head { display: flex; align-items: center; gap: 10px; }
+.dog-head .sec-title { margin: 0 0 4px; }
+.dog { flex: none; width: 120px; height: 102px; }
+.dog .dog-tail { transform-origin: 150px 112px; animation: dog-wag 0.9s ease-in-out infinite; }
+.dog .dog-ear { transform-origin: 72px 50px; }
+.dog.running svg { animation: dog-run 1.3s ease-in-out; }
+.dog.running .dog-ear { animation: dog-flap 0.22s ease-in-out infinite alternate; }
+.dog.running .dog-tail { animation-duration: 0.25s; }
+@keyframes dog-wag { 0%, 100% { transform: rotate(-8deg); } 50% { transform: rotate(10deg); } }
+@keyframes dog-flap { from { transform: rotate(-6deg); } to { transform: rotate(6deg); } }
+@keyframes dog-run {
+  0% { transform: translateX(0); }
+  15% { transform: translateX(10px) translateY(-6px); }
+  45% { transform: translateX(240px) translateY(-4px) scaleX(1); opacity: 0; }
+  55% { transform: translateX(240px) scaleX(-1); opacity: 0; }
+  85% { transform: translateX(-6px) translateY(-6px) scaleX(-1); opacity: 1; }
+  100% { transform: translateX(0) scaleX(1); }
+}
+.dog-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.dog-input { flex: 1 1 160px; min-width: 0; font: inherit; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--outline); background: var(--surface); color: var(--text); }
+.dog-msg { margin: 8px 0 0; }
+.dog-msg.strong { font-weight: 700; }
+.dog-msg.warn { color: #B45309; font-weight: 600; }
+.dog-msg.err { color: var(--error); }
+.dog-note { margin-top: 10px; }
+@media (prefers-reduced-motion: reduce) { .dog svg, .dog .dog-tail, .dog .dog-ear { animation: none !important; } }

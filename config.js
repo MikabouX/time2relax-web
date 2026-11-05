@@ -9,3 +9,10 @@ window.T2R_CONFIG = {
   supabaseUrl: '',
   supabaseKey: '',
 };
+
+// Bouton « Va chercher mon chrono ! » (le cocker) : lit, seulement quand on appuie, le chrono en cours et le
+// total du jour enregistrés par l'application sous un nom d'utilisateur. Lecture seule : rien n'est écrit.
+window.T2R_FETCH = {
+  url: 'https://gxftbzbvbveocwpdavtt.supabase.co',
+  key: 'sb_publishable_9fKWGXevueh6hHJpGQvmhg_EFOd_-dR',
+};

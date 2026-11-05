@@ -1,9 +1,9 @@
 // Permet d'ouvrir la page sans réseau. Toujours le réseau d'abord : une mise à jour
 // publiée est visible tout de suite, la copie en mémoire ne sert qu'en secours.
-const CACHE = 't2r-v15';
+const CACHE = 't2r-v16';
 const CORE = [
   './', 'index.html', 'style.css', 'config.js', 'i18n.js', 'store.js', 'theme.js', 'sync.js',
-  'timer.js', 'plan.js', 'ui.js', 'main.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png',
+  'timer.js', 'plan.js', 'ui.js', 'dog.js', 'main.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png',
 ];
 
 self.addEventListener('install', (event) => {

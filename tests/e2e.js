@@ -424,6 +424,9 @@ async function main() {
 
     console.log('K. Breaks prévus : décompte grisé');
     await planTests(browser);
+
+    console.log('M. Le cocker va chercher le chrono du téléphone');
+    await dogTests(browser);
   } finally {
     await browser.close();
     server.kill();
@@ -1539,6 +1542,50 @@ async function sharedRunTests(browser) {
   check(errors0(p, q), `aucune erreur console (${[...p.errors, ...q.errors].join(' | ')})`);
   await p.context.close(); await q.context.close();
 }
+async function dogTests(browser) {
+  const calls = [];
+  let running = true;
+  const { page, context, errors } = await newPage(browser, { setup: () => localStorage.setItem('t2r.prefs', JSON.stringify({ setupDone: true })) });
+  await context.route('**/rest/v1/rpc/**', async (route) => {
+    const fn = route.request().url().split('/rpc/')[1];
+    const body = JSON.parse(route.request().postData() || '{}');
+    calls.push(`${fn}:${body.p_username}:${route.request().method()}`);
+    let data = [];
+    if (fn === 't2r_run_get' && running) data = [{ run_id: 'r1', elapsed_ms: 17 * 60000, kind: 'break', planned_s: 900 }];
+    if (fn === 't2r_list') data = [
+      { id: 'a', date: '2026-10-29', time: '08:30', type: 'break', seconds: 600 },
+      { id: 'b', date: '2026-10-29', time: '12:00', type: 'lunch', seconds: 1800 },
+      { id: 'c', date: '2026-10-28', time: '12:00', type: 'lunch', seconds: 1700 },
+    ];
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(data) });
+  });
+  await page.reload();
+  check(await page.locator('.dog-card svg').isVisible(), 'carte du cocker visible sur l’accueil');
+  eq(calls.length, 0, 'aucune lecture tant qu’on n’appuie pas');
+  await page.locator('.dog-input').fill('  Mika ');
+  await page.locator('.dog-card .btn').click();
+  check(await page.locator('.dog.running').count() === 1, 'le chien court pendant la recherche');
+  await page.waitForSelector('.dog-msg', { timeout: 5000 });
+  const out = await text(page, '.dog-card');
+  check(out.includes('Break en cours depuis 17 min'), `chrono en cours affiché (${out.replace(/\n+/g, ' / ')})`);
+  check(out.includes('Dépassé de 2 min'), 'dépassement signalé');
+  check(out.includes('Aujourd’hui : 10 min 00 s en break, 30 min 00 s en lunch'), 'totaux du jour (hier ignoré)');
+  check(calls.every((c) => c.includes(':mika:POST')) && calls.length === 2, `deux lectures, nom normalisé (${calls.join(', ')})`);
+  check(!calls.some((c) => /push|add|del|set|stop/.test(c)), 'aucune écriture sur le serveur');
+  eq(await page.evaluate(() => localStorage.getItem('t2r.dogName')), 'mika', 'nom retenu dans le navigateur');
+  running = false;
+  await page.reload();
+  eq(await page.locator('.dog-input').inputValue(), 'mika', 'nom prérempli au retour');
+  await page.locator('.dog-card .btn').click();
+  await page.waitForSelector('.dog-msg', { timeout: 5000 });
+  check((await text(page, '.dog-card')).includes('Pas de chrono en cours'), 'pas de chrono : message dédié');
+  await page.locator('.dog-input').fill('x');
+  await page.locator('.dog-card .btn').click();
+  check((await text(page, '.dog-card')).includes('2 à 40 caractères'), 'nom trop court refusé');
+  check(errors.length === 0, `aucune erreur console (${errors.join(' | ')})`);
+  await context.close();
+}
+
 const errors0 = (...devs) => devs.every((d) => d.errors.length === 0);
 
 main().catch((e) => { console.error(e); process.exit(1); });
