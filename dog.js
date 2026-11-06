@@ -88,6 +88,7 @@ async function dogFetch(name, quiet) {
   render();
   const started = Date.now();
   try {
+    await dogPush(n); // les pauses faites ici partent d'abord sous le nom
     const [runs, rows, prefs] = await Promise.all([dogRpc('t2r_run_get', { p_username: n }), dogRpc('t2r_list', { p_username: n }),
       quiet ? Promise.resolve(null) : dogRpc('t2r_settings_get', { p_username: n }).catch(() => null)]);
     // La couleur choisie dans l'appli arrive aussi sur le site.
@@ -102,7 +103,7 @@ async function dogFetch(name, quiet) {
       breaks: sum('break'), nBreaks: day.filter((r) => r.type !== 'lunch').length,
       lunch: sum('lunch'), nLunch: day.filter((r) => r.type === 'lunch').length,
     };
-    mergeProfile(Array.isArray(rows) ? rows : []);
+    dogReconcile(Array.isArray(rows) ? rows : []);
     const r = DOG.result.run;
     phoneFollow(r ? { id: run.run_id, type: r.kind, start: Date.now() - r.elapsed * 1000, planned: r.planned } : null);
   } catch (_) {
@@ -219,6 +220,48 @@ async function phoneStopRemote() {
   render();
   dogFetch(who, true);
   toast(t('phone_stopped', { Type, type: Type.toLowerCase(), dur: humanDuration(secs) }));
+}
+
+/* ---------- Historique synchronisé avec l'appli quand le chien va chercher ----------
+   1. les suppressions et les pauses faites ici (des 7 derniers jours) partent sous le nom ;
+   2. la liste du serveur fait foi pour ces 7 jours : ajouts, modifications et suppressions faits dans
+      l'appli arrivent ici. Les pauses plus anciennes (que le serveur ne garde plus) restent ici. */
+const dogCutoff = () => { const d = new Date(); d.setDate(d.getDate() - 7); return dayKey(d); };
+
+async function dogPush(who) {
+  if (S.deleted.length) {
+    const ids = S.deleted.slice(0, 500);
+    await dogRpc('t2r_delete', { p_username: who, p_ids: ids });
+    S.deleted = S.deleted.filter((id) => !ids.includes(id));
+    saveEntries();
+  }
+  const cut = dogCutoff();
+  const pending = S.entries.filter((e) => !e.synced && e.date >= cut).slice(0, 500);
+  if (!pending.length) return;
+  const rows = pending.map((e) => ({ id: e.id, date: e.date, time: e.time, type: e.type === 'lunch' ? 'lunch' : 'break', seconds: Math.min(e.seconds, 86400) }));
+  await dogRpc('t2r_save', { p_username: who, p_rows: rows });
+  // Modifiée pendant l'envoi : reste « à envoyer ».
+  pending.forEach((e, i) => { const r = rows[i]; if (e.date === r.date && e.time === r.time && e.seconds === r.seconds) e.synced = true; });
+  saveEntries();
+}
+
+function dogReconcile(rows) {
+  const cut = dogCutoff();
+  const gone = new Set(S.deleted);
+  const local = new Set(S.entries.filter((e) => !e.synced).map((e) => e.id));
+  const server = [];
+  for (const r of rows) {
+    const time = String((r && r.time) || '').slice(0, 5);
+    if (!r || !r.id || gone.has(r.id) || local.has(r.id) || !/^\d{4}-\d{2}-\d{2}$/.test(r.date) || !/^\d{2}:\d{2}$/.test(time)) continue;
+    server.push({ id: r.id, date: r.date, time, type: r.type === 'lunch' ? 'lunch' : 'break',
+      seconds: Math.max(0, Math.min(86400, parseInt(r.seconds, 10) || 0)), synced: true });
+  }
+  const ids = new Set(server.map((e) => e.id));
+  // Gardées ici : pas encore envoyées, ou trop anciennes pour le serveur (et pas dans sa liste).
+  const keep = S.entries.filter((e) => !ids.has(e.id) && (!e.synced || e.date < cut));
+  S.entries = keep.concat(server);
+  sortEntries();
+  saveEntries();
 }
 
 /* ---------- Historique du profil ----------

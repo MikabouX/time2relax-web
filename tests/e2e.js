@@ -1560,20 +1560,35 @@ async function dogTests(browser) {
   const calls = [];
   const writes = [];
   let running = true;
-  const { page, context, errors } = await newPage(browser, { setup: () => localStorage.setItem('t2r.prefs', JSON.stringify({ setupDone: true })) });
+  const { page, context, errors } = await newPage(browser, { setup: () => {
+    localStorage.setItem('t2r.prefs', JSON.stringify({ setupDone: true }));
+    // w1 : faite ici (à envoyer) ; z : supprimée dans l'appli ; old : trop ancienne pour le serveur ; gone1 : supprimée ici
+    localStorage.setItem('t2r.entries', JSON.stringify([
+      { id: 'w1', date: '2026-10-29', time: '09:30', type: 'break', seconds: 300, synced: false },
+      { id: 'z', date: '2026-10-28', time: '10:00', type: 'break', seconds: 400, synced: true },
+      { id: 'old', date: '2026-10-01', time: '10:00', type: 'break', seconds: 500, synced: true },
+    ]));
+    localStorage.setItem('t2r.deleted', JSON.stringify(['gone1']));
+  } });
+  const server = [
+    { id: 'a', date: '2026-10-29', time: '08:30', type: 'break', seconds: 600 },
+    { id: 'b', date: '2026-10-29', time: '12:00', type: 'lunch', seconds: 1800 },
+    { id: 'c', date: '2026-10-28', time: '12:00', type: 'lunch', seconds: 1700 },
+  ];
   await context.route('**/rest/v1/rpc/**', async (route) => {
     const fn = route.request().url().split('/rpc/')[1];
     const body = JSON.parse(route.request().postData() || '{}');
-    if (fn === 't2r_save' || fn === 't2r_run_stop') { writes.push({ fn, body }); await route.fulfill({ status: 200, contentType: 'application/json', body: fn === 't2r_save' ? '' : 'true' }); return; }
+    if (fn === 't2r_save' || fn === 't2r_run_stop' || fn === 't2r_delete') {
+      writes.push({ fn, body });
+      if (fn === 't2r_save') for (const r of body.p_rows) { const i = server.findIndex((x) => x.id === r.id); if (i >= 0) server[i] = r; else server.push(r); }
+      await route.fulfill({ status: 200, contentType: 'application/json', body: fn === 't2r_run_stop' ? 'true' : '' });
+      return;
+    }
     calls.push(`${fn}:${body.p_username}:${route.request().method()}`);
     let data = [];
     if (fn === 't2r_run_get' && running) data = [{ run_id: 'r1', elapsed_ms: 17 * 60000, kind: 'break', planned_s: 900 }];
     if (fn === 't2r_settings_get') data = { theme_color: 'throat', lang: 'fr' };
-    if (fn === 't2r_list') data = [
-      { id: 'a', date: '2026-10-29', time: '08:30', type: 'break', seconds: 600 },
-      { id: 'b', date: '2026-10-29', time: '12:00', type: 'lunch', seconds: 1800 },
-      { id: 'c', date: '2026-10-28', time: '12:00', type: 'lunch', seconds: 1700 },
-    ];
+    if (fn === 't2r_list') data = server;
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(data) });
   });
   await page.reload();
@@ -1587,7 +1602,11 @@ async function dogTests(browser) {
   const out = await text(page, '.dog-card');
   check(out.includes('Break en cours depuis 17 min'), `chrono en cours affiché (${out.replace(/\n+/g, ' / ')})`);
   check(out.includes('Dépassé de 2 min'), 'dépassement signalé');
-  check(out.includes('Aujourd’hui : 10 min 00 s en break, 30 min 00 s en lunch'), 'totaux du jour (hier ignoré)');
+  check(out.includes('Aujourd’hui : 15 min 00 s en break, 30 min 00 s en lunch'), `totaux du jour, avec la pause faite ici (hier ignoré) (${out.replace(/\n+/g, ' / ')})`);
+  check(writes.some((w) => w.fn === 't2r_save' && w.body.p_rows.length === 1 && w.body.p_rows[0].id === 'w1'), 'pause faite sur le site envoyée sous le nom');
+  check(writes.some((w) => w.fn === 't2r_delete' && w.body.p_ids.join() === 'gone1'), 'pause supprimée sur le site supprimée en ligne');
+  eq(await page.evaluate(() => window.t2r.state.entries.map((e) => e.id).sort().join()), 'a,b,c,w1', 'historique aligné : supprimée dans l’appli retirée');
+  writes.length = 0;
   check(calls.every((c) => c.includes(':mika:POST')) && calls.length === 3, `trois lectures (chrono, pauses, couleur), nom normalisé (${calls.join(', ')})`);
   // le cadran suit le chrono du téléphone (17 min pour 15 prévues : dépassé de 2 min)
   check((await text(page, '#ringBig')).startsWith('+02:0'), `cadran : dépassement du téléphone (${await text(page, '#ringBig')})`);
@@ -1612,12 +1631,12 @@ async function dogTests(browser) {
   eq(await text(page, '.start'), 'Démarrer le break', 'retour au bouton normal');
   writes.length = 0;
   running = true;
-  check(calls.every((c) => /^t2r_(run_get|list|settings_get):/.test(c)), 'aucune écriture sur le serveur (lectures seulement)');
+  check(calls.every((c) => /^t2r_(run_get|list|settings_get):/.test(c)), 'pas d’autre appel que ceux prévus');
   eq(await page.evaluate(() => localStorage.getItem('t2r.dogName')), 'mika', 'nom retenu dans le navigateur');
   const ids = await page.evaluate(() => window.t2r.state.entries.map((e) => e.id).sort().join());
-  eq(ids, 'a,b,c,r1', 'historique du profil récupéré, plus le break arrêté ici (avec leur identifiant)');
+  eq(ids, 'a,b,c,r1,w1', 'historique du profil récupéré, plus le break arrêté ici (avec leur identifiant)');
   const vals = (await page.locator('.stat-val').allInnerTexts()).join(' / ');
-  check(vals.includes('25'), `le break arrêté depuis le site s'ajoute aux totaux (10 + 15 min : ${vals})`);
+  check(vals.includes('30'), `le break arrêté depuis le site s'ajoute aux totaux (10 + 5 + 15 min : ${vals})`);
   check((await page.locator('.stat-val').allInnerTexts()).every((v) => v.trim() !== '—'), `totaux du jour remplis (${(await page.locator('.stat-val').allInnerTexts()).join(' / ')})`);
   running = false;
   await page.reload();
