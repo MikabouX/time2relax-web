@@ -47,7 +47,21 @@
   window.addEventListener('online', () => { if (syncEnabled() && S.session) { syncNow(); runPoll(); } });
 
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
-    navigator.serviceWorker.register('sw.js').catch(() => { /* hors-ligne indisponible, sans gravité */ });
+    // updateViaCache « none » : le fichier sw.js lui-même est toujours revérifié (sinon le cache du navigateur le garde).
+    const hadSw = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })
+      .then((reg) => {
+        // Vérifie aussi s'il y a une nouvelle version quand on revient sur la page.
+        document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') reg.update().catch(() => {}); });
+      })
+      .catch(() => { /* hors-ligne indisponible, sans gravité */ });
+    // Nouvelle version installée : on recharge une fois (sauf pendant un chrono), pour ne jamais mélanger ancienne et nouvelle.
+    let reloaded = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!hadSw || reloaded) return;
+      reloaded = true;
+      if (!S.run) location.reload();
+    });
   }
 
   // Pour les tests automatiques.

@@ -1,6 +1,6 @@
 // Permet d'ouvrir la page sans réseau. Toujours le réseau d'abord : une mise à jour
 // publiée est visible tout de suite, la copie en mémoire ne sert qu'en secours.
-const CACHE = 't2r-v20';
+const CACHE = 't2r-v21';
 const CORE = [
   './', 'index.html', 'style.css', 'config.js', 'i18n.js', 'store.js', 'theme.js', 'sync.js',
   'timer.js', 'plan.js', 'ui.js', 'dog.js', 'main.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png',
@@ -22,7 +22,9 @@ self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;
   event.respondWith(
-    fetch(req)
+    // « no-cache » : le navigateur redemande toujours au serveur si le fichier a changé (réponse très courte
+    // s'il n'a pas changé). Sans ça, GitHub Pages laisse le navigateur garder 10 minutes une ancienne version.
+    fetch(req, { cache: 'no-cache' })
       .then((res) => {
         const copy = res.clone();
         caches.open(CACHE).then((c) => c.put(req, copy));
