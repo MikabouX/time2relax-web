@@ -31,11 +31,15 @@
     startTicker();
   }
   // Le compte à rebours du prochain break prévu avance aussi sans chrono en cours.
-  setInterval(() => { if (S.view === 'home' && !S.run) updatePlan(); checkPlanReminders(); }, 1000);
+  setInterval(() => {
+    if (S.view === 'home' && !S.run) { if (PHONE) { updateRing(false); updateTitle(); } else updatePlan(); }
+    checkPlanReminders();
+  }, 1000);
 
   if (syncEnabled() && S.session) { syncNow(); startRunPolling(); }
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState !== 'visible') return;
+    if (PHONE && dogName()) dogFetch(dogName(), true); // le chrono du téléphone a pu s'arrêter entre-temps
     pruneOld();
     if (S.view === 'home') render(); // recompte la journée si la date a changé pendant la nuit
     if (syncEnabled() && S.session) { syncNow(); runPoll(); }

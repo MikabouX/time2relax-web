@@ -1564,6 +1564,7 @@ async function dogTests(browser) {
     calls.push(`${fn}:${body.p_username}:${route.request().method()}`);
     let data = [];
     if (fn === 't2r_run_get' && running) data = [{ run_id: 'r1', elapsed_ms: 17 * 60000, kind: 'break', planned_s: 900 }];
+    if (fn === 't2r_settings_get') data = { theme_color: 'throat', lang: 'fr' };
     if (fn === 't2r_list') data = [
       { id: 'a', date: '2026-10-29', time: '08:30', type: 'break', seconds: 600 },
       { id: 'b', date: '2026-10-29', time: '12:00', type: 'lunch', seconds: 1800 },
@@ -1583,8 +1584,15 @@ async function dogTests(browser) {
   check(out.includes('Break en cours depuis 17 min'), `chrono en cours affiché (${out.replace(/\n+/g, ' / ')})`);
   check(out.includes('Dépassé de 2 min'), 'dépassement signalé');
   check(out.includes('Aujourd’hui : 10 min 00 s en break, 30 min 00 s en lunch'), 'totaux du jour (hier ignoré)');
-  check(calls.every((c) => c.includes(':mika:POST')) && calls.length === 2, `deux lectures, nom normalisé (${calls.join(', ')})`);
-  check(!calls.some((c) => /push|add|del|set|stop/.test(c)), 'aucune écriture sur le serveur');
+  check(calls.every((c) => c.includes(':mika:POST')) && calls.length === 3, `trois lectures (chrono, pauses, couleur), nom normalisé (${calls.join(', ')})`);
+  // le cadran suit le chrono du téléphone (17 min pour 15 prévues : dépassé de 2 min)
+  check((await text(page, '#ringBig')).startsWith('+02:0'), `cadran : dépassement du téléphone (${await text(page, '#ringBig')})`);
+  check((await text(page, '#ringCap')).startsWith('📱'), 'cadran : légende « téléphone »');
+  await advance(page, 3000);
+  check((await text(page, '#ringBig')).startsWith('+02:0'), 'le chrono du téléphone avance tout seul ici');
+  const prim = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--primary').trim());
+  check(prim.startsWith('hsl(2'), `couleur de l'appli (bleu) appliquée au site (${prim})`);
+  check(calls.every((c) => /^t2r_(run_get|list|settings_get):/.test(c)), 'aucune écriture sur le serveur (lectures seulement)');
   eq(await page.evaluate(() => localStorage.getItem('t2r.dogName')), 'mika', 'nom retenu dans le navigateur');
   running = false;
   await page.reload();
@@ -1592,6 +1600,7 @@ async function dogTests(browser) {
   await page.locator('.dog-card .btn').first().click();
   await page.waitForSelector('.dog-msg', { timeout: 5000 });
   check((await text(page, '.dog-card')).includes('Pas de chrono en cours'), 'pas de chrono : message dédié');
+  check(!(await text(page, '#ringCap')).startsWith('📱'), 'plus de chrono du téléphone dans le cadran');
   await page.locator('.dog-change').click();
   await page.locator('.dlg .field').fill('x');
   await page.locator('.dlg').getByRole('button', { name: 'Va chercher mon chrono !' }).click();

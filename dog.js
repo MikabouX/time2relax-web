@@ -7,6 +7,34 @@
 const DOG_NAME_KEY = 't2r.dogName';
 const DOG = { busy: false, result: null, error: '' };
 
+/* Chrono du téléphone affiché dans le cadran (lecture seule) : type, heure de départ, durée prévue.
+   Il avance tout seul ici ; le site relit le téléphone seulement à la fin prévue, puis toutes les 2 minutes
+   tant qu'il dépasse (au plus 15 fois), et quand on revient sur la page. */
+let PHONE = null;
+let phoneTimer = null;
+let phoneRechecks = 0;
+
+function phoneFollow(run) {
+  clearTimeout(phoneTimer);
+  PHONE = run;
+  if (!run) return;
+  const left = run.planned > 0 ? run.start + run.planned * 1000 - Date.now() : -1;
+  const wait = left > 0 ? left + 5000 : 120000;
+  if (left <= 0 && phoneRechecks >= 15) return;
+  phoneTimer = setTimeout(() => {
+    if (left <= 0) phoneRechecks += 1;
+    if (dogName()) dogFetch(dogName(), true);
+  }, wait);
+}
+
+function phoneStop() {
+  clearTimeout(phoneTimer);
+  PHONE = null;
+  phoneRechecks = 0;
+  DOG.result = null;
+  render();
+}
+
 /** Cocker dessiné (original) : poil doré, longues oreilles ondulées. */
 const COCKER_SVG = `<svg viewBox="0 0 200 170" width="120" height="102" aria-hidden="true">
   <ellipse cx="104" cy="160" rx="62" ry="7" fill="rgba(0,0,0,.12)"/>
@@ -44,7 +72,7 @@ async function dogRpc(fn, args) {
   return r.json();
 }
 
-async function dogFetch(name) {
+async function dogFetch(name, quiet) {
   const n = String(name || '').trim().toLowerCase().replace(/\s+/g, ' ');
   if (n.length < 2 || n.length > 40) {
     DOG.error = t('dog_bad_name');
@@ -52,13 +80,17 @@ async function dogFetch(name) {
     return;
   }
   try { localStorage.setItem(DOG_NAME_KEY, n); } catch (_) { /* navigateur sans stockage */ }
-  DOG.busy = true;
+  if (!quiet) phoneRechecks = 0;
+  DOG.busy = !quiet;
   DOG.error = '';
-  DOG.result = null;
+  if (!quiet) DOG.result = null;
   render();
   const started = Date.now();
   try {
-    const [runs, rows] = await Promise.all([dogRpc('t2r_run_get', { p_username: n }), dogRpc('t2r_list', { p_username: n })]);
+    const [runs, rows, prefs] = await Promise.all([dogRpc('t2r_run_get', { p_username: n }), dogRpc('t2r_list', { p_username: n }),
+      quiet ? Promise.resolve(null) : dogRpc('t2r_settings_get', { p_username: n }).catch(() => null)]);
+    // La couleur choisie dans l'appli arrive aussi sur le site.
+    if (prefs && typeof prefs === 'object') setPhoneColor(prefs.theme_color);
     const today = dayKey(new Date());
     const day = (Array.isArray(rows) ? rows : []).filter((r) => r.date === today);
     const sum = (k) => day.filter((r) => (k === 'lunch') === (r.type === 'lunch')).reduce((a, r) => a + (r.seconds || 0), 0);
@@ -69,11 +101,13 @@ async function dogFetch(name) {
       breaks: sum('break'), nBreaks: day.filter((r) => r.type !== 'lunch').length,
       lunch: sum('lunch'), nLunch: day.filter((r) => r.type === 'lunch').length,
     };
+    const r = DOG.result.run;
+    phoneFollow(r ? { type: r.kind, start: Date.now() - r.elapsed * 1000, planned: r.planned } : null);
   } catch (_) {
     DOG.error = t('dog_error');
   }
   // Le chien prend au moins le temps d'aller et revenir.
-  const wait = 1300 - (Date.now() - started);
+  const wait = quiet ? 0 : 1300 - (Date.now() - started);
   if (wait > 0) await new Promise((res) => setTimeout(res, wait));
   DOG.busy = false;
   render();
@@ -89,12 +123,10 @@ function dogCard() {
       const extra = Math.round((Date.now() - res.at) / 1000);
       const el = res.run.elapsed + extra;
       lines.push(h('p', { class: 'dog-msg strong' }, t('dog_running', { type: typeLabel(res.run.kind), elapsed: humanDuration(el) })));
-      if (res.run.planned > 0) {
-        lines.push(h('p', { class: 'dog-msg' }, t('dog_planned', { planned: humanDuration(res.run.planned) })));
-        if (el > res.run.planned) {
-          lines.push(h('p', { class: 'dog-msg warn' }, t('dog_over', { over: humanDuration(el - res.run.planned) })));
-        }
+      if (res.run.planned > 0 && el > res.run.planned) {
+        lines.push(h('p', { class: 'dog-msg warn' }, t('dog_over', { over: humanDuration(el - res.run.planned) })));
       }
+      if (PHONE) lines.push(h('button', { type: 'button', class: 'btn text small', on: { click: phoneStop } }, t('dog_unfollow')));
     } else {
       lines.push(h('p', { class: 'dog-msg strong' }, t('dog_none')));
     }
@@ -135,4 +167,14 @@ function askDogName() {
         h('button', { type: 'button', class: 'btn filled', on: { click: go } }, t('dog_btn'))));
     setTimeout(() => input.focus(), 50);
   });
+}
+
+/* ---------- Couleur de l'appli ---------- */
+const PHONE_COLOR_KEY = 't2r.phoneColor';
+function setPhoneColor(v) {
+  const k = colorKey(v);
+  try {
+    if (k) localStorage.setItem(PHONE_COLOR_KEY, k); else localStorage.removeItem(PHONE_COLOR_KEY);
+  } catch (_) { /* navigateur sans stockage */ }
+  applyTheme();
 }

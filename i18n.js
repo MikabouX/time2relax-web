@@ -143,6 +143,7 @@ const STRINGS = {
 
     sec_apps: 'Les applications',
     apps_intro: "Time2Relax existe aussi en appli pour Android et pour iPhone. Le site explique toutes les fonctions et permet de télécharger les applis.",
+    dog_unfollow: 'Ne plus suivre',
     install_btn: 'Installer sur ton téléphone',
     timer_short: 'Minuteur',
     dur_break1: 'Durée du 1er break',
@@ -395,6 +396,7 @@ const STRINGS = {
 
     sec_apps: 'De apps',
     apps_intro: 'Time2Relax bestaat ook als app voor Android en iPhone. De website legt alle functies uit en laat je de apps downloaden.',
+    dog_unfollow: 'Niet meer volgen',
     install_btn: 'Installeren op je telefoon',
     timer_short: 'Timer',
     dur_break1: 'Duur van de 1e break',
@@ -646,6 +648,7 @@ const STRINGS = {
 
     sec_apps: 'The apps',
     apps_intro: 'Time2Relax also exists as an app for Android and iPhone. The website explains every feature and lets you download the apps.',
+    dog_unfollow: 'Stop following',
     install_btn: 'Install on your phone',
     timer_short: 'Timer',
     dur_break1: '1st break length',
@@ -897,6 +900,7 @@ const STRINGS = {
 
     sec_apps: 'Die Apps',
     apps_intro: 'Time2Relax gibt es auch als App für Android und iPhone. Die Website erklärt alle Funktionen und bietet die Apps zum Herunterladen an.',
+    dog_unfollow: 'Nicht mehr folgen',
     install_btn: 'Auf dem Telefon installieren',
     timer_short: 'Timer',
     dur_break1: 'Dauer der 1. Pause',

@@ -424,7 +424,7 @@ function ringBlock() {
   planArc.setAttribute('stroke-dasharray', PLAN_CIRC);
   planArc.setAttribute('transform', `rotate(-90 ${RING / 2} ${RING / 2})`);
   svg.append(planTrack, planArc, circle('ring-track'), arc);
-  const type = S.run ? S.run.type : S.ui.type;
+  const type = S.run ? S.run.type : (PHONE ? PHONE.type : S.ui.type);
   return h('div', { class: 'ring-wrap' },
     h('div', { class: 'ring', role: 'timer', 'aria-live': 'off' },
       svg,

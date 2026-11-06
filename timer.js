@@ -10,7 +10,9 @@ const plannedFor = (type) => (S.ui.useTimer
 
 /** Tout ce qu'il faut pour dessiner l'anneau à l'instant présent. */
 function ringState() {
-  const run = S.run;
+  // Chrono local d'abord ; sinon celui du téléphone rapporté par le cocker (affichage seulement).
+  const phone = !S.run && typeof PHONE !== 'undefined' && PHONE ? PHONE : null;
+  const run = S.run || phone;
   const running = !!run;
   const planned = running ? run.planned : 0;
   const elapsed = running ? Math.max(0, Math.floor((Date.now() - run.start) / 1000)) : 0;
@@ -35,6 +37,7 @@ function ringState() {
     cap = S.ui.useTimer ? t('cap_timer_ready') : t('cap_ready');
     progress = S.ui.useTimer ? 1 : 0;
   }
+  if (phone) cap = `📱 ${cap}`;
   const color = over ? 'var(--error)' : (lastMinute ? 'var(--amber)' : (type === 'lunch' ? 'var(--tertiary)' : 'var(--primary)'));
   return { running, hasTimer, over, lastMinute, type, big, cap, progress, color, elapsed, remaining };
 }
@@ -151,7 +154,7 @@ function stopTicker() {
 
 function updateTitle() {
   let title = 'Time2Relax';
-  if (S.run) {
+  if (S.run || (typeof PHONE !== 'undefined' && PHONE)) {
     const st = ringState();
     title = `${st.over ? '⏰ ' : ''}${st.big} · Time2Relax`;
   }
