@@ -102,6 +102,7 @@ async function dogFetch(name, quiet) {
       breaks: sum('break'), nBreaks: day.filter((r) => r.type !== 'lunch').length,
       lunch: sum('lunch'), nLunch: day.filter((r) => r.type === 'lunch').length,
     };
+    mergeProfile(Array.isArray(rows) ? rows : []);
     const r = DOG.result.run;
     phoneFollow(r ? { id: run.run_id, type: r.kind, start: Date.now() - r.elapsed * 1000, planned: r.planned } : null);
   } catch (_) {
@@ -214,4 +215,26 @@ async function phoneStopRemote() {
   }
   phoneStop();
   toast(t('phone_stopped', { Type, type: Type.toLowerCase(), dur: humanDuration(secs) }));
+}
+
+/* ---------- Historique du profil ----------
+   Les pauses rangées en ligne sous le nom (les 7 derniers jours) rejoignent l'historique du site, avec leur
+   identifiant : jamais en double, une pause supprimée ici ne revient pas, une pause modifiée ici est gardée. */
+function mergeProfile(rows) {
+  const gone = new Set(S.deleted);
+  let changed = false;
+  for (const r of rows) {
+    if (!r || !r.id || gone.has(r.id) || !/^\d{4}-\d{2}-\d{2}$/.test(r.date) || !/^\d{2}:\d{2}$/.test(r.time)) continue;
+    const type = r.type === 'lunch' ? 'lunch' : 'break';
+    const seconds = Math.max(0, Math.min(86400, parseInt(r.seconds, 10) || 0));
+    const e = S.entries.find((x) => x.id === r.id);
+    if (!e) {
+      S.entries.push({ id: r.id, date: r.date, time: r.time, type, seconds, synced: true });
+      changed = true;
+    } else if (e.synced && (e.date !== r.date || e.time !== r.time || e.type !== type || e.seconds !== seconds)) {
+      Object.assign(e, { date: r.date, time: r.time, type, seconds });
+      changed = true;
+    }
+  }
+  if (changed) { sortEntries(); saveEntries(); }
 }

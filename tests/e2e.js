@@ -271,7 +271,7 @@ async function main() {
       const prefs0 = await page.evaluate(() => window.t2r.state.prefs);
       check(!('homeAddr' in prefs0) && !('workAddr' in prefs0) && !('navApp' in prefs0), "anciens réglages d'itinéraire ignorés");
       eq(await page.locator('input[placeholder*="dresse"]').count(), 0, "pas de champs d'adresse");
-      await page.getByRole('button', { name: 'Réglages', exact: true }).click();
+      await page.evaluate(() => document.getElementById('settings').scrollIntoView()); // plus d'icône réglages : tout est en bas de l'accueil
       await page.waitForTimeout(600);
       check(await page.locator('#settings').isVisible(), 'la roue dentée descend jusqu\'aux réglages');
       // réinitialisation
@@ -515,8 +515,8 @@ async function planTests(browser) {
     check(await page.locator('#planLine').evaluate((e) => e.hidden), 'sans horaire : aucune ligne grise');
     eq(await page.locator('#planTrack').evaluate((e) => e.style.opacity), '0', 'sans horaire : aucun cercle gris');
     const labels = await page.locator('.icon-btn').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')));
-    eq(labels.slice(0, 3).join(' | '), 'Historique | Breaks prévus | Réglages', "icône calendrier entre l'historique et les réglages");
-    await page.getByRole('button', { name: 'Breaks prévus' }).click();
+    eq(labels.slice(0, 3).join(' | '), 'Historique', "accueil : seule l’icône Historique reste (plus de planning ni de réglages)");
+    await page.evaluate(() => go('plan')); // plus d'icône planning sur l'accueil
     eq(await text(page, 'h1'), 'Breaks prévus', 'la page des breaks prévus');
     check(await page.locator('.plan-empty').isVisible(), 'liste vide : message');
     const dlg = page.locator('.dlg');
@@ -572,7 +572,7 @@ async function planTests(browser) {
     await page.evaluate(() => window.t2r.checkPlanReminders());
     eq((await notes()).length, 0, 'après rechargement non plus');
     // la case et les minutes dans la page
-    await page.getByRole('button', { name: 'Breaks prévus' }).click();
+    await page.evaluate(() => go('plan')); // plus d'icône planning sur l'accueil
     check(await page.getByRole('checkbox', { name: "Me prévenir quand l'heure approche" }).isChecked(), 'case « Me prévenir quand l\'heure approche » cochée');
     await page.locator('.lead-row').click();
     await page.locator('.dlg').getByRole('button', { name: '10 min' }).click();
@@ -598,7 +598,7 @@ async function planTests(browser) {
     await de.context.close();
     const es = await newPage(browser, { lang: 'es-ES', setup: () => localStorage.setItem('t2r.prefs', JSON.stringify({ setupDone: true })) });
     eq(await es.page.evaluate(() => LANG), 'en', 'langue non proposée (espagnol) : anglais');
-    await es.page.getByRole('button', { name: 'Settings', exact: true }).click();
+    await es.page.evaluate(() => document.getElementById('settings').scrollIntoView()); // plus d'icône réglages : tout est en bas de l'accueil
     await es.page.getByRole('button', { name: 'Deutsch' }).click();
     eq(await text(es.page, '#settings h2'), 'Einstellungen', 'choix « Deutsch » dans les réglages');
     // durées dans les réglages
@@ -613,7 +613,7 @@ async function planTests(browser) {
   // --- moment « Autre » nommé (meeting, formation…)
   {
     const { page, context, errors } = await newPage(browser, { setup: eval(planSetup([{ id: 'a', time: '10:15', type: 'break' }])) });
-    await page.getByRole('button', { name: 'Breaks prévus' }).click();
+    await page.evaluate(() => go('plan')); // plus d'icône planning sur l'accueil
     const dlg = page.locator('.dlg');
     await page.getByRole('button', { name: /Ajouter un autre moment/ }).click();
     await dlg.locator('input[type=time]').fill('10:05');
@@ -649,7 +649,7 @@ async function planTests(browser) {
     const prim = () => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--primary').trim());
     eq(await prim(), '#5B636D', 'gris, même avec une ancienne couleur enregistrée');
     eq(await page.evaluate(() => document.documentElement.style.colorScheme), 'light', 'jamais de mode sombre');
-    await page.getByRole('button', { name: 'Réglages', exact: true }).click();
+    await page.evaluate(() => document.getElementById('settings').scrollIntoView()); // plus d'icône réglages : tout est en bas de l'accueil
     check(!(await text(page, '#settings')).includes('Couleur'), 'plus de réglage de couleur');
     check((await page.locator('.swatch, .theme-modes').count()) === 0, 'ni pastilles ni Auto / Clair / Sombre');
     check(errors.length === 0, `aucune erreur console (${errors.join(' | ')})`);
@@ -718,7 +718,7 @@ async function planTests(browser) {
     // Jours au choix : un samedi, la page explique pourquoi rien ne s'affiche, et cocher « Sam » règle tout
     {
       const d = await newPage(browser, { setup: eval(planSetup(PLAN3)), startIso: '2026-10-31T10:00:00+01:00' });
-      await d.page.getByRole('button', { name: 'Breaks prévus' }).click();
+      await d.page.evaluate(() => go('plan')); // plus d'icône planning sur l'accueil
       eq(await d.page.locator('.plan-days .chip').allInnerTexts().then((a) => a.join(' ')), 'Lun Mar Mer Jeu Ven Sam Dim', 'sept jours à cocher');
       eq(await d.page.locator('.plan-days .chip.on').allInnerTexts().then((a) => a.join(' ')), 'Lun Mar Mer Jeu Ven', 'par défaut : du lundi au vendredi');
       check((await text(d.page, '.plan-hint')).includes("Rien n'est affiché aujourd'hui (samedi)"), "samedi, jour non coché : une phrase explique pourquoi rien ne s'affiche");
@@ -729,7 +729,7 @@ async function planTests(browser) {
       check(!(await d.page.locator('#planLine').evaluate((e) => e.hidden)), 'samedi coché : le décompte gris apparaît');
       await d.page.reload();
       check(!(await d.page.locator('#planLine').evaluate((e) => e.hidden)), 'et reste après rechargement');
-      await d.page.getByRole('button', { name: 'Breaks prévus' }).click();
+      await d.page.evaluate(() => go('plan')); // plus d'icône planning sur l'accueil
       await d.page.locator('.plan-days .chip', { hasText: 'Sam' }).click();
       await d.page.locator('.plan-days .chip', { hasText: 'Dim' }).click();
       await d.page.locator('.plan-days .chip', { hasText: 'Jeu' }).click();
@@ -740,7 +740,7 @@ async function planTests(browser) {
       check(!(await old.page.locator('#planLine').evaluate((e) => e.hidden)), 'et un vendredi, ça s\'affiche');
       await old.context.close();
       const nlp = await newPage(browser, { setup: eval(planSetup(PLAN3)), lang: 'nl-BE', startIso: '2026-10-31T10:00:00+01:00' });
-      await nlp.page.getByRole('button', { name: 'Geplande breaks' }).click();
+      await nlp.page.evaluate(() => go('plan')); // plus d'icône planning sur l'accueil
       eq(await nlp.page.locator('.plan-days .chip').allInnerTexts().then((a) => a.join(' ')), 'Ma Di Wo Do Vr Za Zo', 'néerlandais : jours');
       check((await text(nlp.page, '.plan-hint')).includes('Vandaag (zaterdag) wordt niets getoond'), 'néerlandais : explication du week-end');
       await nlp.context.close();
@@ -778,7 +778,7 @@ async function planTests(browser) {
     await nl.context.close();
 
     const rs = await newPage(browser, { setup: eval(planSetup(PLAN3)) });
-    await rs.page.getByRole('button', { name: 'Réglages', exact: true }).click();
+    await rs.page.evaluate(() => document.getElementById('settings').scrollIntoView()); // plus d'icône réglages : tout est en bas de l'accueil
     await openGrp(rs.page, 'Réglages spéciaux');
     await rs.page.getByRole('button', { name: 'Réinitialiser cette page' }).click();
     await rs.page.getByRole('button', { name: 'Tout effacer' }).click();
@@ -908,7 +908,7 @@ async function settingsSyncTests(browser) {
   // Appareil B (neuf) : même nom → retrouve les réglages
   const B = await open('2026-10-30T09:00:00+01:00');
   await B.page.getByRole('button', { name: 'Continuer' }).click();
-  await B.page.getByRole('button', { name: 'Réglages', exact: true }).click();
+  await B.page.evaluate(() => document.getElementById('settings').scrollIntoView()); // plus d'icône réglages : tout est en bas de l'accueil
   await signInAs(B.page, 'RÉGLAGES-1');
   await B.page.waitForFunction(() => window.t2r.state.prefs.lang === 'nl', null, { timeout: 10000 });
   const bs = await B.page.evaluate(() => { const s = window.t2r.state; return { night: s.prefs.nightMode, cut: s.prefs.nightCutoff, shop: s.prefs.shops[0].name, days: s.plan.days.join(','), items: s.plan.items.length, timer: s.ui.useTimer, pm: s.ui.pauseMinutes }; });
@@ -951,7 +951,7 @@ async function settingsSyncTests(browser) {
   db2.noSettings = true;
   const C = await openWithMock(browser, db2, '2026-10-29T10:00:00+01:00');
   await C.page.getByRole('button', { name: 'Continuer' }).click();
-  await C.page.getByRole('button', { name: 'Réglages', exact: true }).click();
+  await C.page.evaluate(() => document.getElementById('settings').scrollIntoView()); // plus d'icône réglages : tout est en bas de l'accueil
   await signInAs(C.page, 'sans-sql');
   await idle(C.page);
   eq(await C.page.evaluate(() => window.t2r.state.sync.error), '', 'fonctions de réglages absentes : aucune erreur affichée');
@@ -981,7 +981,7 @@ async function settingsSyncTests(browser) {
   // Un autre appareil qui se connecte sous ce nom ne retrouve plus de réglages
   const D2 = await open('2026-10-29T10:00:00+01:00');
   await D2.page.getByRole('button', { name: 'Continuer' }).click();
-  await D2.page.getByRole('button', { name: 'Réglages', exact: true }).click();
+  await D2.page.evaluate(() => document.getElementById('settings').scrollIntoView()); // plus d'icône réglages : tout est en bas de l'accueil
   await signInAs(D2.page, 'réglages-1');
   await idle(D2.page);
   eq(await D2.page.evaluate(() => window.t2r.state.prefs.shops.length), 0, 'sous ce nom, plus aucun réglage à retrouver (aucun site)');
@@ -1038,7 +1038,7 @@ async function syncTests(browser) {
   await a.page.locator('.start').click();
   await advance(a.page, 61000);
   await a.page.locator('.start').click();
-  await a.page.getByRole('button', { name: 'Réglages', exact: true }).click();
+  await a.page.evaluate(() => document.getElementById('settings').scrollIntoView()); // plus d'icône réglages : tout est en bas de l'accueil
   check(await a.page.locator('#acctCard').isVisible(), "carte « Nom d'utilisateur » visible quand la synchro est configurée");
   eq(await a.page.locator('input[type=password], input[type=email]').count(), 0, 'ni mot de passe ni e-mail à saisir');
 
@@ -1067,7 +1067,7 @@ async function syncTests(browser) {
   // Poste 2 (autre navigateur) : même nom, écrit avec des majuscules
   const b = await open('2026-10-30T09:00:00+01:00');
   await b.page.getByRole('button', { name: 'Continuer' }).click();
-  await b.page.getByRole('button', { name: 'Réglages', exact: true }).click();
+  await b.page.evaluate(() => document.getElementById('settings').scrollIntoView()); // plus d'icône réglages : tout est en bas de l'accueil
   await signInAs(b.page, 'MICHAËL-1234');
   await b.page.waitForFunction(() => window.t2r.state.entries.length === 2, null, { timeout: 8000 });
   check(true, 'le second poste retrouve les 2 entrées avec le même nom (majuscules sans importance)');
@@ -1078,7 +1078,7 @@ async function syncTests(browser) {
   await c.page.locator('.start').click();
   await advance(c.page, 90000);
   await c.page.locator('.start').click();
-  await c.page.getByRole('button', { name: 'Réglages', exact: true }).click();
+  await c.page.evaluate(() => document.getElementById('settings').scrollIntoView()); // plus d'icône réglages : tout est en bas de l'accueil
   await signInAs(c.page, 'collègue-42');
   await allSynced(c.page);
   eq(db.of('collègue-42').length, 1, 'autre nom : son historique est séparé');
@@ -1106,7 +1106,7 @@ async function syncTests(browser) {
   check(true, 'le poste 1 voit la suppression après rechargement');
 
   // Déconnexion : l'historique local est effacé mais reste enregistré sous le nom
-  await a.page.getByRole('button', { name: 'Réglages', exact: true }).click();
+  await a.page.evaluate(() => document.getElementById('settings').scrollIntoView()); // plus d'icône réglages : tout est en bas de l'accueil
   await a.page.getByRole('button', { name: 'Se déconnecter' }).click();
   await a.page.locator('.dlg').getByRole('button', { name: 'Se déconnecter' }).click();
   await a.page.waitForSelector('#acctName');
@@ -1127,7 +1127,7 @@ async function syncTests(browser) {
   });
   await d.page.reload();
   eq(await d.page.evaluate(() => window.t2r.state.session), null, "ancienne session (e-mail) abandonnée");
-  await d.page.getByRole('button', { name: 'Réglages', exact: true }).click();
+  await d.page.evaluate(() => document.getElementById('settings').scrollIntoView()); // plus d'icône réglages : tout est en bas de l'accueil
   await signInAs(d.page, 'migration-1');
   await allSynced(d.page);
   eq(db.of('migration-1').length, 4, "l'historique déjà présent dans le navigateur est envoyé sous le nouveau nom");
@@ -1137,7 +1137,7 @@ async function syncTests(browser) {
   const e = await open('2026-10-30T09:00:00+01:00');
   await e.page.getByRole('button', { name: 'Continuer' }).click();
   await e.context.route('https://mock.supabase.test/**', (r) => r.abort());
-  await e.page.getByRole('button', { name: 'Réglages', exact: true }).click();
+  await e.page.evaluate(() => document.getElementById('settings').scrollIntoView()); // plus d'icône réglages : tout est en bas de l'accueil
   await signInAs(e.page, 'hors-ligne-1');
   await e.page.waitForFunction(() => document.getElementById('syncStatus') && document.getElementById('syncStatus').textContent.includes('Hors ligne'), null, { timeout: 8000 });
   check(true, 'hors ligne : message clair, la page reste utilisable');
@@ -1173,7 +1173,7 @@ async function editSyncTests(browser) {
   };
 
   await page.getByRole('button', { name: 'Continuer' }).click();
-  await page.getByRole('button', { name: 'Réglages', exact: true }).click();
+  await page.evaluate(() => document.getElementById('settings').scrollIntoView()); // plus d'icône réglages : tout est en bas de l'accueil
   await signInAs(page, 'modif-test');
   await page.waitForSelector('#syncStatus');
   await page.waitForFunction(() => !window.t2r.state.sync.busy && window.t2r.state.sync.last);
@@ -1214,7 +1214,7 @@ async function editSyncTests(browser) {
   await editFirst(50);
   await waitFor(() => posts() > before2);
   await page.getByRole('button', { name: 'Retour' }).click();
-  await page.getByRole('button', { name: 'Réglages', exact: true }).click();
+  await page.evaluate(() => document.getElementById('settings').scrollIntoView()); // plus d'icône réglages : tout est en bas de l'accueil
   await page.getByRole('button', { name: 'Se déconnecter' }).click();
   await page.locator('.dlg').getByRole('button', { name: 'Se déconnecter' }).click();
   await page.waitForSelector('#acctName');
@@ -1232,7 +1232,7 @@ async function stopTests(browser) {
   const db = makeMockSupabase();
   const { page, context, errors } = await openWithMock(browser, db, '2026-10-29T10:00:00+01:00');
   await page.getByRole('button', { name: 'Continuer' }).click();
-  await page.getByRole('button', { name: 'Réglages', exact: true }).click();
+  await page.evaluate(() => document.getElementById('settings').scrollIntoView()); // plus d'icône réglages : tout est en bas de l'accueil
   await signInAs(page, 'reprise-test');
   await page.waitForFunction(() => !window.t2r.state.sync.busy && window.t2r.state.sync.last);
   await page.getByRole('button', { name: 'Retour' }).click();
@@ -1275,7 +1275,7 @@ async function stopTests(browser) {
   check(db.of('reprise-test').length === 1 && db.of('reprise-test')[0].seconds === list[0].seconds, 'une seule ligne en ligne, même durée');
 
   // Option « Confirmer avant de terminer »
-  await page.getByRole('button', { name: 'Réglages', exact: true }).click();
+  await page.evaluate(() => document.getElementById('settings').scrollIntoView()); // plus d'icône réglages : tout est en bas de l'accueil
   await openGrp(page, 'Planning');
   await page.locator('.switch-row', { hasText: 'Confirmer avant de terminer' }).click();
   eq(await page.evaluate(() => window.t2r.state.prefs.confirmStop), true, 'option de confirmation activée');
@@ -1303,7 +1303,7 @@ async function stopTests(browser) {
 async function joinAs(browser, db, name, opts) {
   const dev = await openWithMock(browser, db, '2026-10-29T10:00:00+01:00', opts);
   await dev.page.getByRole('button', { name: 'Continuer' }).click();
-  await dev.page.getByRole('button', { name: 'Réglages', exact: true }).click();
+  await dev.page.evaluate(() => document.getElementById('settings').scrollIntoView()); // plus d'icône réglages : tout est en bas de l'accueil
   await signInAs(dev.page, name);
   await dev.page.waitForFunction(() => !window.t2r.state.sync.busy && window.t2r.state.sync.last);
   await dev.page.getByRole('button', { name: 'Retour' }).click();
@@ -1517,7 +1517,7 @@ async function sharedRunTests(browser) {
   // 9. Se déconnecter : le chrono en cours reste ici, il n'est plus relu
   await a.page.locator('.start').click();
   await waitRunPushed(a.page);
-  await a.page.getByRole('button', { name: 'Réglages', exact: true }).click();
+  await a.page.evaluate(() => document.getElementById('settings').scrollIntoView()); // plus d'icône réglages : tout est en bas de l'accueil
   await a.page.getByRole('button', { name: 'Se déconnecter' }).click();
   await a.page.locator('.dlg').getByRole('button', { name: 'Se déconnecter' }).click();
   await a.page.waitForFunction(() => !window.t2r.state.session, null, { timeout: 5000 });
@@ -1609,6 +1609,9 @@ async function dogTests(browser) {
   running = true;
   check(calls.every((c) => /^t2r_(run_get|list|settings_get):/.test(c)), 'aucune écriture sur le serveur (lectures seulement)');
   eq(await page.evaluate(() => localStorage.getItem('t2r.dogName')), 'mika', 'nom retenu dans le navigateur');
+  const ids = await page.evaluate(() => window.t2r.state.entries.map((e) => e.id).sort().join());
+  eq(ids, 'a,b,c', 'historique du profil récupéré (3 pauses, avec leur identifiant)');
+  check((await page.locator('.stat-val').allInnerTexts()).every((v) => v.trim() !== '—'), `totaux du jour remplis (${(await page.locator('.stat-val').allInnerTexts()).join(' / ')})`);
   running = false;
   await page.reload();
   check((await text(page, '.dog-change')).includes('mika'), 'nom retenu au retour');
