@@ -86,7 +86,9 @@ async function main() {
       eq(await page.locator('.welcome a[href="https://testflight.apple.com/join/Net95ZVk"]').count(), 2, 'bienvenue : iPhone TestFlight (bandeau et bas de page)');
       check((await text(page, '.test-banner')).includes('TestFlight'), 'bandeau : explication TestFlight');
       eq(await page.locator('.welcome a[href="https://bardiaux.wordpress.com/"]').count(), 1, 'bienvenue : lien vers la page explicative');
-      await page.getByRole('button', { name: 'Continuer avec la version web' }).click();
+      eq(await page.locator('.welcome .web-btn svg').count(), 1, 'bienvenue : grande case navigateur avec la tête du chien');
+      check((await text(page, '.welcome .web-btn')).includes('fonctions limitées'), 'bienvenue : navigateur (fonctions limitées)');
+      await page.locator('.welcome .web-btn').click();
       eq(await text(page, '#ringBig'), '00:00', 'chrono à zéro');
       eq(await text(page, '#ringCap'), 'Prêt à démarrer', 'légende « prêt »');
       check((await text(page, '.date')).toLowerCase().includes('jeudi 29 octobre'), 'date du jour en français');
@@ -1595,7 +1597,8 @@ async function dogTests(browser) {
   const prim = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--primary').trim());
   check(prim.startsWith('hsl(2'), `couleur de l'appli (bleu) appliquée au site (${prim})`);
   // arrêter le chrono du téléphone depuis le site : la pause est enregistrée puis le chrono partagé arrêté
-  eq(await text(page, '.start'), 'Terminer le break du téléphone', 'bouton « Terminer le break du téléphone »');
+  check((await text(page, '.start')).startsWith('Terminer le break du téléphone'), 'bouton « Terminer le break du téléphone »');
+  check((await text(page, '.start .stop-note')) === 'Les alarmes pourraient encore sonner', 'bouton stop : les alarmes pourraient encore sonner');
   await page.locator('.start').click();
   check((await text(page, '.dlg')).includes('Fini à l\'heure (15 min'), 'dépassement : choix « Fini à l’heure »');
   await page.locator('.dlg').getByRole('button', { name: /Fini à l/ }).click();

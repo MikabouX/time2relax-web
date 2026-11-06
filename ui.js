@@ -348,10 +348,32 @@ function welcomeView() {
       h('ul', { class: 'feature-list' }, features.map((k) => h('li', {}, t(k))))),
     h('div', { class: 'card pad' },
       h('div', { class: 'strong' }, t('download_title')),
-      storeLinks()),
-    h('p', { class: 'center' }, h('a', { href: safeUrl(SITE_URL), target: '_blank', rel: 'noopener noreferrer' }, t('learn_more'))),
-    h('div', { class: 'center' },
-      h('button', { type: 'button', class: 'btn text small-btn', on: { click: () => { S.prefs.setupDone = true; savePrefs(); go('home', false); } } }, t('continue_web'))));
+      storeLinks(),
+      webButton()),
+    h('p', { class: 'center' }, h('a', { href: safeUrl(SITE_URL), target: '_blank', rel: 'noopener noreferrer' }, t('learn_more'))));
+}
+
+/** Tête du cocker (dessin fixe) pour le bouton « Utiliser sur navigateur ». */
+const DOG_HEAD_SVG = `<svg viewBox="12 24 118 112" width="44" height="42" aria-hidden="true">
+  <ellipse cx="72" cy="70" rx="40" ry="38" fill="#D39A52"/>
+  <ellipse cx="50" cy="88" rx="22" ry="17" fill="#E6B877"/>
+  <path d="M 40 54 q -26 10 -24 48 q 2 22 16 30 q 10 4 14 -6 q 6 -16 4 -34 q -2 -26 -10 -38 z" fill="#9C5F27"/>
+  <path d="M 104 52 q 22 10 22 46 q 0 22 -12 30 q -10 4 -14 -6 q -4 -16 -2 -34 q 0 -26 6 -36 z" fill="#9C5F27"/>
+  <ellipse cx="60" cy="66" rx="6" ry="7" fill="#2A1A10"/><circle cx="62" cy="64" r="2" fill="#fff"/>
+  <ellipse cx="88" cy="66" rx="6" ry="7" fill="#2A1A10"/><circle cx="90" cy="64" r="2" fill="#fff"/>
+  <ellipse cx="44" cy="82" rx="8" ry="6" fill="#2A1A10"/>
+  <path d="M 44 88 q 2 8 10 8" stroke="#2A1A10" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <path d="M 48 94 q 4 12 12 6 q 2 -4 -2 -8 z" fill="#E9707A"/>
+</svg>`;
+
+/** Grande case sous Android / iPhone : continuer dans le navigateur. */
+function webButton() {
+  const head = h('span', { class: 'web-dog' });
+  head.innerHTML = DOG_HEAD_SVG; // dessin fixe, aucun texte saisi
+  return h('button', { type: 'button', class: 'btn tonal web-btn',
+    on: { click: () => { S.prefs.setupDone = true; savePrefs(); go('home', false); } } },
+    head,
+    h('span', { class: 'web-txt' }, h('span', { class: 'strong' }, t('web_use')), h('span', { class: 'small' }, t('web_limited'))));
 }
 
 function statBlock(iconName, label, agg) {
@@ -526,7 +548,8 @@ function startButton() {
   if (!S.run && PHONE) {
     const Type = typeLabel(PHONE.type);
     return h('button', { type: 'button', class: 'start stop', on: { click: phoneStopRemote } },
-      icon('stop', 26), h('span', {}, t('phone_stop_btn', { type: Type.toLowerCase(), Type })));
+      icon('stop', 26), h('span', { class: 'stop-txt' }, h('span', {}, t('phone_stop_btn', { type: Type.toLowerCase(), Type })),
+        h('span', { class: 'stop-note' }, t('phone_stop_alarm'))));
   }
   const running = !!S.run;
   const name = typeLabel(running ? S.run.type : S.ui.type);
