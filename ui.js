@@ -274,7 +274,6 @@ const CIRC = 2 * Math.PI * RADIUS;
 
 function homeView() {
   return h('div', { class: 'page' },
-    testBanner(),
     h('header', { class: 'top' },
       h('div', { class: 'grow' },
         h('div', { class: 'muted small' }, greeting()),

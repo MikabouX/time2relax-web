@@ -97,6 +97,7 @@ async function main() {
       check((await text(page, '.dlg')).includes('TestFlight'), 'bouton « Installer sur ton téléphone » : explications Android et iPhone');
       eq(await page.locator('.dlg a[href="https://testflight.apple.com/join/Net95ZVk"]').count(), 1, 'fenêtre d’installation : lien TestFlight');
       await page.locator('.dlg').getByRole('button', { name: 'OK' }).click();
+      eq(await page.locator('.page:not(.welcome) > .test-banner').count(), 0, 'plus de bandeau d’installation sur l’écran principal');
       eq(await page.locator('.tile-wrap').count(), 0, 'plus de bouton « Commander »');
 
       await page.locator('.start').click();
