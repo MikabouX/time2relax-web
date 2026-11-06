@@ -426,3 +426,38 @@ button.tile { border: 0; font: inherit; cursor: pointer; }
 .dog-msg.err { color: var(--error); }
 .dog-note { margin-top: 10px; }
 @media (prefers-reduced-motion: reduce) { .dog svg, .dog .dog-tail, .dog .dog-ear { animation: none !important; } }
+
+/* Options du minuteur : deux cases côte à côte, comme dans l'appli */
+.timer-opts.two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 10px; background: transparent; }
+.opt-box { background: var(--low); border-radius: 18px; padding: 10px 12px; display: flex; flex-direction: column; justify-content: center; gap: 6px; min-height: 96px; }
+.opt-box .switch-row { padding: 0; gap: 8px; }
+.opt-box .switch-row .strong { flex: 1; }
+.opt-box .chips { margin-top: 0; gap: 6px; }
+.opt-box .chip { padding: 6px 12px; }
+.install-btn { width: 100%; justify-content: center; white-space: normal; text-align: center; line-height: 1.2; }
+@media (max-width: 360px) { .timer-opts.two { grid-template-columns: 1fr; } }
+
+/* Le cocker, en petit à gauche */
+.dog.small { width: 52px; height: 44px; flex: none; }
+.dog.small svg { width: 52px; height: 44px; }
+.dog-line { display: flex; align-items: center; gap: 12px; }
+.dog-line .btn { justify-content: center; }
+.dog-change { margin-top: 4px; padding: 4px 8px; }
+.dog.small.running svg { animation: dog-run-small 1.3s ease-in-out; }
+@keyframes dog-run-small {
+  0% { transform: translateX(0); } 40% { transform: translateX(160px); opacity: 0; }
+  55% { transform: translateX(160px) scaleX(-1); opacity: 0; } 100% { transform: translateX(0); opacity: 1; }
+}
+
+/* Réglages : langue, groupes repliables */
+.seg { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid var(--outline); border-radius: 999px; overflow: hidden; margin: 8px 0 4px; }
+.seg-btn { background: transparent; border: 0; border-left: 1px solid var(--outline); padding: 10px 0; font: inherit; font-weight: 700; color: var(--text); cursor: pointer; }
+.seg-btn:first-child { border-left: 0; }
+.seg-btn.on { background: var(--secondary-c); color: var(--on-secondary-c); }
+.grp { border: 1px solid var(--outline-variant, var(--outline)); border-radius: 22px; margin-top: 12px; overflow: hidden; }
+.grp.open { border-color: var(--primary); }
+.grp-head { display: flex; align-items: center; gap: 12px; width: 100%; background: transparent; border: 0; padding: 14px 16px; font: inherit; color: var(--text); text-align: left; cursor: pointer; }
+.grp-head > .ico:first-child { color: var(--primary); }
+.grp-title { font-size: 17px; }
+.grp-body { padding: 0 12px 16px; display: flex; flex-direction: column; gap: 10px; }
+.report-btn { margin-top: 18px; justify-content: center; }

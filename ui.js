@@ -48,6 +48,8 @@ const ICONS = {
   event: 'M17 12h-5v5h5v-5zM16 1v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2h-1V1h-2zm3 18H5V8h14v11z',
   phone_android: 'M17 1.01L7 1c-1.1 0-2 .9-2 2v18c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V3c0-1.1-.9-1.99-2-1.99zM17 19H7V5h10v14z',
   open_in_new: 'M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z',
+  expand_less: 'M12 8l-6 6 1.41 1.41L12 10.83l4.59 4.58L18 14z',
+  build: 'M22.7 19l-9.1-9.1c.9-2.3.4-5-1.5-6.9-2-2-5-2.4-7.4-1.3L9 6 6 9 1.6 4.7C.4 7.1.9 10.1 2.9 12.1c1.9 1.9 4.6 2.4 6.9 1.5l9.1 9.1c.4.4 1 .4 1.4 0l2.3-2.3c.5-.4.5-1.1.1-1.4z',
   cloud: 'M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z',
 };
 
@@ -286,7 +288,6 @@ function homeView() {
     h('div', { class: 'options' }, S.run ? runningInfo() : timerOptions()),
     startButton(),
     dogCard(),
-    appStrip(),
     settingsSection());
 }
 
@@ -313,6 +314,15 @@ const testBanner = () => h('div', { class: 'test-banner', role: 'note' },
         h('li', {}, t('iphone_step3'))),
       h('a', { class: 'btn test-banner-btn', href: safeUrl(IPHONE_URL), target: '_blank', rel: 'noopener noreferrer' },
         icon('phone_android', 18), t('iphone_store_btn')))));
+
+/** « Installer sur ton téléphone » : les mêmes explications que le bandeau, dans une fenêtre. */
+function installDialog() {
+  return openDialog((dlg, close) => {
+    dlg.append(
+      testBanner(),
+      h('div', { class: 'dlg-actions' }, h('button', { type: 'button', class: 'btn text', on: { click: () => close(null) } }, t('ok'))));
+  });
+}
 
 /** Liens directs vers les applis mobiles. */
 const storeLinks = () => h('div', {},
@@ -458,7 +468,6 @@ function runningInfo() {
 
 function timerOptions() {
   const lunch = S.ui.type === 'lunch';
-  const sub = S.ui.useTimer ? (lunch ? t('lunch_duration') : t('break_duration')) : t('stopwatch_only');
   const box = h('input', {
     type: 'checkbox',
     class: 'switch',
@@ -474,23 +483,45 @@ function timerOptions() {
       },
     },
   });
-  // Une seule pastille : la durée choisie par l'utilisateur ; un clic permet de la changer.
-  const chips = [h('button', {
-    type: 'button',
-    class: 'chip on dur-chip',
-    title: t('dur_edit'),
-    'aria-label': `${t('dur_edit')} : ${t('minutes_n', { m: lunch ? S.ui.lunchMinutes : S.ui.pauseMinutes })}`,
-    on: { click: () => editDuration(lunch) },
-  }, t('minutes_n', { m: lunch ? S.ui.lunchMinutes : S.ui.pauseMinutes }), ' ', icon('edit', 16))];
-  return h('div', { class: 'card timer-opts' },
-    h('label', { class: 'switch-row' },
-      icon('timer', 24),
-      h('span', { class: 'grow' },
-        h('span', { class: 'strong block' }, t('timer_switch')),
-        h('span', { class: 'small muted block' }, sub)),
-      box),
-    S.ui.useTimer ? h('div', { class: 'chips scroll' }, chips) : null,
-    h('div', { class: 'timer-note small muted' }, icon('timer', 18), h('span', {}, t('timer_web_note'))));
+  const pill = (label, on, fn, aria) => h('button', {
+    type: 'button', class: `chip${on ? ' on' : ''}`, 'aria-label': aria || label, on: { click: fn },
+  }, label);
+  const setChoice = (c) => () => { S.ui.breakChoice = c; saveUi(); render(); };
+  // Comme dans l'appli : lunch = sa durée ; break = deux durées au choix et un crayon.
+  const chips = lunch
+    ? [pill(`${S.ui.lunchMinutes}'  ✎`, true, () => editDuration(true), t('dur_edit'))]
+    : [pill(`${S.ui.pauseMinutes}'`, S.ui.breakChoice !== 1, setChoice(0)),
+      pill(`${S.ui.pause2Minutes}'`, S.ui.breakChoice === 1, setChoice(1)),
+      pill('✎', false, editBreaks, t('dur_edit'))];
+  return h('div', { class: 'card timer-opts two' },
+    h('div', { class: 'opt-box' },
+      h('label', { class: 'switch-row' }, icon('timer', 22), h('span', { class: 'strong' }, t('timer_short')), box),
+      S.ui.useTimer ? h('div', { class: 'chips' }, chips) : h('div', { class: 'small muted' }, t('stopwatch_only'))),
+    h('div', { class: 'opt-box' },
+      h('button', { type: 'button', class: 'btn tonal install-btn', on: { click: installDialog } },
+        icon('phone_android', 20), t('install_btn'))));
+}
+
+/** Crayon des breaks : changer la 1re ou la 2e durée. */
+async function editBreaks() {
+  const which = await openDialog((dlg, close) => {
+    dlg.append(
+      h('h2', {}, t('dur_edit')),
+      h('div', { class: 'pick-list' },
+        h('button', { type: 'button', class: 'pick-item', on: { click: () => close(0) } },
+          icon('coffee', 22), h('span', { class: 'grow' }, t('dur_break1')), h('span', { class: 'strong' }, t('minutes_n', { m: S.ui.pauseMinutes }))),
+        h('button', { type: 'button', class: 'pick-item', on: { click: () => close(1) } },
+          icon('coffee', 22), h('span', { class: 'grow' }, t('dur_break2')), h('span', { class: 'strong' }, t('minutes_n', { m: S.ui.pause2Minutes })))),
+      h('div', { class: 'dlg-actions' }, h('button', { type: 'button', class: 'btn text', on: { click: () => close(null) } }, t('cancel'))));
+  });
+  if (which === null || which === undefined) return;
+  const m = await minutesDialog({ title: t('dur_break_title'), value: which ? S.ui.pause2Minutes : S.ui.pauseMinutes,
+    min: BREAK_MIN, max: BREAK_MAX, presets: [5, 10, 15, 20, 30] });
+  if (m === null || m === undefined) return;
+  if (which) S.ui.pause2Minutes = m; else S.ui.pauseMinutes = m;
+  S.ui.breakChoice = which;
+  saveUi();
+  render();
 }
 
 function startButton() {
@@ -954,34 +985,44 @@ function planView() {
 }
 
 /** Réglages, en bas de l'accueil (on y descend en faisant défiler, ou avec la roue dentée). */
+/** Groupe de réglages repliable (un seul ouvert à la fois), comme dans l'appli. */
+let openGroup = null;
+function group(id, title, sub, ic, kids) {
+  const open = openGroup === id;
+  return h('div', { class: `grp${open ? ' open' : ''}` },
+    h('button', {
+      type: 'button', class: 'grp-head', 'aria-expanded': open ? 'true' : 'false',
+      on: { click: () => { openGroup = open ? null : id; render(); } },
+    }, icon(ic, 24), h('span', { class: 'grow' }, h('span', { class: 'strong block grp-title' }, title), h('span', { class: 'small muted block' }, sub)),
+    icon(open ? 'expand_less' : 'expand_more', 24)),
+    open ? h('div', { class: 'grp-body' }, kids) : null);
+}
+
 function settingsSection() {
   return h('section', { id: 'settings', class: 'settings-sec' },
     h('h2', { class: 'sec-title big' }, t('settings')),
-    h('p', { class: 'small muted note' }, t('settings_auto')),
-
-    sectionTitle(t('sec_lang')),
     langCard(),
-
-    sectionTitle(t('sec_durations')),
-    durationsCard(),
-
-    sectionTitle(t('sec_history')),
-    confirmStopCard(),
-    nightCard(),
-    h('div', { class: 'card pad' },
-      h('div', { class: 'strong' }, t('backup_title')),
-      h('p', { class: 'small muted' }, t('backup_note')),
-      h('div', { class: 'row' },
-        h('button', { type: 'button', class: 'btn tonal', on: { click: doExport } }, icon('download', 18), t('btn_export')),
-        h('button', { type: 'button', class: 'btn tonal', on: { click: pickImportFile } }, icon('upload', 18), t('btn_import')))),
-
-    sectionTitle(t('sec_apps')),
-    appsCard(),
-
-    sectionTitle(t('sec_danger')),
-    h('button', { type: 'button', class: 'btn danger-outline wide', on: { click: resetAll } }, icon('delete_forever', 20), t('reset_btn')),
-    h('p', { class: 'small muted note' }, t('reset_note')),
-
+    group('planning', t('grp_planning'), t('grp_planning_sub'), 'event', [
+      sectionTitle(t('sec_durations')),
+      durationsCard(),
+      confirmStopCard(),
+    ]),
+    group('special', t('grp_special'), t('grp_special_sub'), 'build', [
+      h('div', { class: 'card pad' },
+        h('div', { class: 'strong' }, t('backup_title')),
+        h('p', { class: 'small muted' }, t('backup_note')),
+        h('div', { class: 'row' },
+          h('button', { type: 'button', class: 'btn tonal', on: { click: doExport } }, icon('download', 18), t('btn_export')),
+          h('button', { type: 'button', class: 'btn tonal', on: { click: pickImportFile } }, icon('upload', 18), t('btn_import')))),
+      nightCard(),
+      sectionTitle(t('sec_danger')),
+      h('button', { type: 'button', class: 'btn danger-outline wide', on: { click: resetAll } }, icon('delete_forever', 20), t('reset_btn')),
+      h('p', { class: 'small muted note' }, t('reset_note')),
+    ]),
+    h('a', {
+      class: 'btn tonal wide report-btn',
+      href: `mailto:${TESTER_MAIL}?subject=${encodeURIComponent('Time2Relax web')}`,
+    }, icon('mail', 18), t('report_btn')),
     h('p', { class: 'footer' }, `✦ ${t('footer')}`));
 }
 
@@ -999,9 +1040,17 @@ function durationsCard() {
     on: { click: () => editDuration(lunch) },
   }, icon(ic, 22), h('span', { class: 'grow strong' }, label), h('span', { class: 'strong' }, t('minutes_n', { m })), ' ', icon('edit', 16));
   return h('div', { class: 'card' },
-    row('coffee', t('dur_break'), S.ui.pauseMinutes, false),
-    row('restaurant', t('dur_lunch'), S.ui.lunchMinutes, true),
-    h('p', { class: 'small muted pad' }, t('dur_note')));
+    row('coffee', t('dur_break1'), S.ui.pauseMinutes, false),
+    h('button', {
+      type: 'button',
+      class: 'shop-main pad dur-row-btn',
+      on: { click: async () => {
+        const m = await minutesDialog({ title: t('dur_break_title'), value: S.ui.pause2Minutes, min: BREAK_MIN, max: BREAK_MAX, presets: [5, 10, 15, 20, 30] });
+        if (m === null || m === undefined) return;
+        S.ui.pause2Minutes = m; saveUi(); render();
+      } },
+    }, icon('coffee', 22), h('span', { class: 'grow strong' }, t('dur_break2')), h('span', { class: 'strong' }, t('minutes_n', { m: S.ui.pause2Minutes })), ' ', icon('edit', 16)),
+    row('restaurant', t('dur_lunch'), S.ui.lunchMinutes, true));
 }
 
 function langCard() {
@@ -1011,13 +1060,11 @@ function langCard() {
     savePrefs();
     render();
   };
-  return h('div', { class: 'card pad' },
-    h('div', { class: 'chips' },
-      chip('Français', LANG === 'fr', pick('fr')),
-      chip('Nederlands', LANG === 'nl', pick('nl')),
-      chip('English', LANG === 'en', pick('en')),
-      chip('Deutsch', LANG === 'de', pick('de'))),
-    h('p', { class: 'small muted' }, t('lang_note')));
+  return h('div', { class: 'seg lang-seg', role: 'group', 'aria-label': 'Langue · Taal · Language · Sprache' },
+    [['fr', 'Français'], ['en', 'English'], ['nl', 'Nederlands'], ['de', 'Deutsch']].map(([c, name]) => h('button', {
+      type: 'button', class: `seg-btn${LANG === c ? ' on' : ''}`, 'aria-pressed': LANG === c ? 'true' : 'false',
+      'aria-label': name, title: name, on: { click: pick(c) },
+    }, c.toUpperCase())));
 }
 
 function shopsCard() {
@@ -1085,8 +1132,7 @@ function confirmStopCard() {
   return h('div', { class: 'card' },
     h('label', { class: 'switch-row pad' },
       h('span', { class: 'grow' },
-        h('span', { class: 'strong block' }, t('confirm_stop_title')),
-        h('span', { class: 'small muted block' }, t('confirm_stop_note'))),
+        h('span', { class: 'strong block' }, t('confirm_stop_title'))),
       box));
 }
 
@@ -1141,7 +1187,7 @@ async function resetAll() {
   S.deleted = [];
   S.run = null;
   S.session = null;
-  S.ui = { type: 'break', useTimer: false, pauseMinutes: 15 };
+  S.ui = { type: 'break', useTimer: false, pauseMinutes: 15, pause2Minutes: 10, breakChoice: 0, lunchMinutes: 30 };
   S.sync = { busy: false, last: null, error: '' };
   S.view = 'welcome';
   render();

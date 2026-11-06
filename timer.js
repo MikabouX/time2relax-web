@@ -4,7 +4,9 @@
    Le temps écoulé est toujours recalculé à partir de l'heure de départ : même si
    le navigateur ralentit un onglet en arrière-plan, le chrono reste exact. */
 
-const plannedFor = (type) => (S.ui.useTimer ? (type === 'lunch' ? S.ui.lunchMinutes : S.ui.pauseMinutes) * 60 : 0);
+const plannedFor = (type) => (S.ui.useTimer
+  ? (type === 'lunch' ? S.ui.lunchMinutes : (S.ui.breakChoice === 1 ? S.ui.pause2Minutes : S.ui.pauseMinutes)) * 60
+  : 0);
 
 /** Tout ce qu'il faut pour dessiner l'anneau à l'instant présent. */
 function ringState() {

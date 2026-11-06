@@ -104,22 +104,35 @@ function dogCard() {
     })));
     out = h('div', {}, lines);
   }
-  const input = h('input', {
-    type: 'text', class: 'dog-input', value: dogName(), autocomplete: 'off', autocapitalize: 'none', spellcheck: 'false',
-    placeholder: t('dog_name_ph'), 'aria-label': t('dog_name_ph'),
-  });
-  const dog = h('div', { class: `dog${DOG.busy ? ' running' : ''}` });
+  const dog = h('div', { class: `dog small${DOG.busy ? ' running' : ''}` });
   dog.innerHTML = COCKER_SVG; // dessin fixe, aucun texte saisi
+  const name = dogName();
   return h('section', { class: 'card pad dog-card' },
-    h('div', { class: 'dog-head' }, dog,
-      h('div', { class: 'grow' },
-        h('h2', { class: 'sec-title' }, t('dog_title')),
-        h('p', { class: 'small muted' }, t('dog_intro')))),
-    h('div', { class: 'dog-row' }, input,
+    h('div', { class: 'dog-line' }, dog,
       h('button', {
-        type: 'button', class: 'btn primary', disabled: DOG.busy ? '' : null,
-        on: { click: () => dogFetch(input.value) },
+        type: 'button', class: 'btn tonal grow', disabled: DOG.busy ? '' : null,
+        on: { click: () => (name ? dogFetch(name) : askDogName()) },
       }, DOG.busy ? t('dog_busy') : t('dog_btn'))),
-    out,
-    h('p', { class: 'small muted dog-note' }, t('dog_note')));
+    name ? h('button', { type: 'button', class: 'btn text small dog-change', on: { click: askDogName } },
+      t('dog_change', { name })) : null,
+    out);
+}
+
+/** Le nom d'utilisateur de l'appli, demandé dans une fenêtre à part (puis retenu dans ce navigateur). */
+function askDogName() {
+  return openDialog((dlg, close) => {
+    const input = h('input', {
+      type: 'text', class: 'field', value: dogName(), autocomplete: 'off', autocapitalize: 'none', spellcheck: 'false',
+      maxlength: '40', placeholder: t('dog_name_ph'), 'aria-label': t('dog_name_ph'),
+    });
+    const go = () => { const v = input.value; close(null); dogFetch(v); };
+    dlg.append(
+      h('h2', {}, t('dog_ask_title')),
+      h('form', { class: 'dlg-fields', on: { submit: (e) => { e.preventDefault(); go(); } } }, input),
+      h('p', { class: 'small muted' }, t('dog_note')),
+      h('div', { class: 'dlg-actions' },
+        h('button', { type: 'button', class: 'btn text', on: { click: () => close(null) } }, t('cancel')),
+        h('button', { type: 'button', class: 'btn filled', on: { click: go } }, t('dog_btn'))));
+    setTimeout(() => input.focus(), 50);
+  });
 }

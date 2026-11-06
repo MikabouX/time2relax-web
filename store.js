@@ -84,12 +84,14 @@ const S = {
   entries: store.get('t2r.entries', []),
   deleted: store.get('t2r.deleted', []),
   run: store.get('t2r.run', null),
-  ui: Object.assign({ type: 'break', useTimer: false, pauseMinutes: 15, lunchMinutes: 30 }, store.get('t2r.ui', {})),
+  ui: Object.assign({ type: 'break', useTimer: false, pauseMinutes: 15, pause2Minutes: 10, breakChoice: 0, lunchMinutes: 30 }, store.get('t2r.ui', {})),
   session: store.get('t2r.session', null),
   sync: { busy: false, last: store.get('t2r.lastSync', null), error: '' },
 };
 
 S.ui.pauseMinutes = clampInt(S.ui.pauseMinutes, BREAK_MIN, BREAK_MAX, 15);
+S.ui.pause2Minutes = clampInt(S.ui.pause2Minutes, BREAK_MIN, BREAK_MAX, 10);
+S.ui.breakChoice = S.ui.breakChoice === 1 ? 1 : 0;
 S.ui.lunchMinutes = clampInt(S.ui.lunchMinutes, LUNCH_MIN, LUNCH_MAX, 30);
 
 const savePrefs = () => { store.set('t2r.prefs', S.prefs); if (typeof settingsChanged === 'function') settingsChanged(); };

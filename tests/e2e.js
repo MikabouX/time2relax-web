@@ -61,6 +61,11 @@ async function newPage(browser, { startIso = '2026-10-29T10:00:00+01:00', lang =
 
 const text = (page, sel) => page.locator(sel).first().innerText();
 const tick = (page) => page.evaluate(() => window.t2r.tick());
+/** Ouvre un groupe de réglages (s'il est fermé). */
+async function openGrp(page, name) {
+  const head = page.locator('.grp-head', { hasText: name });
+  if ((await head.getAttribute('aria-expanded')) !== 'true') await head.click();
+}
 const advance = async (page, ms) => { await page.evaluate((m) => window.__advance(m), ms); await tick(page); };
 
 async function main() {
@@ -86,14 +91,16 @@ async function main() {
       eq(await text(page, '#ringCap'), 'Prêt à démarrer', 'légende « prêt »');
       check((await text(page, '.date')).toLowerCase().includes('jeudi 29 octobre'), 'date du jour en français');
       eq(await text(page, '.stat-val'), '—', 'compteur du jour vide');
-      // sous le minuteur : l'alerte écran éteint demande l'appli mobile (pas de minuteur « OS » sur le web)
-      check((await text(page, '.timer-note')).includes('30 secondes avant la fin'), 'sous le minuteur : alerte 30 s avant la fin');
-      check((await text(page, '.app-strip')).includes('Pour plus de fonctionnalités'), "sous le chrono : « pour plus de fonctionnalités, télécharge l'application »");
-      eq(await page.locator('.app-strip a').count(), 2, 'deux liens : Android et iPhone');
+      // à la place du minuteur « OS » de l'appli : un bouton vers l'installation sur le téléphone
+      eq(await page.locator('.app-strip').count(), 0, 'plus de bande « télécharge l’application » sous le chrono');
+      await page.locator('.install-btn').click();
+      check((await text(page, '.dlg')).includes('TestFlight'), 'bouton « Installer sur ton téléphone » : explications Android et iPhone');
+      eq(await page.locator('.dlg a[href="https://testflight.apple.com/join/Net95ZVk"]').count(), 1, 'fenêtre d’installation : lien TestFlight');
+      await page.locator('.dlg').getByRole('button', { name: 'OK' }).click();
       eq(await page.locator('.tile-wrap').count(), 0, 'plus de bouton « Commander »');
 
       await page.locator('.start').click();
-      eq(await page.locator('.timer-note').count(), 0, 'pendant un chrono, le message disparaît avec les options');
+      eq(await page.locator('.install-btn').count(), 0, 'pendant un chrono, le bouton disparaît avec les options');
       await advance(page, 312000);
       eq(await text(page, '#ringBig'), '05:12', 'chrono après 5 min 12 s');
       check((await page.title()).startsWith('05:12'), "le titre de l'onglet affiche le chrono");
@@ -125,7 +132,8 @@ async function main() {
       // Minuteur break de 10 minutes puis rechargement en plein chrono
       await page.locator('.seg').nth(0).click();
       // la durée du break se choisit librement (pastille → boîte de minutes)
-      await page.locator('.dur-chip').click();
+      await page.getByRole('button', { name: 'Changer la durée' }).click();
+      await page.locator('.dlg .pick-item').first().click();
       await page.locator('.dlg').getByRole('button', { name: '10 min' }).click();
       await page.locator('.dlg').getByRole('button', { name: 'OK' }).click();
       eq(await page.evaluate(() => window.t2r.state.ui.pauseMinutes), 10, 'durée du break choisie : 10 min');
@@ -226,13 +234,11 @@ async function main() {
       // néerlandais : les réglages sont en bas de l'accueil
       await page.getByRole('button', { name: 'Retour' }).click();
       check(await page.locator('#settings').isVisible(), "réglages en bas de l'accueil");
-      const siteLink = page.locator('#settings a[href="https://bardiaux.wordpress.com/"]');
-      eq(await siteLink.count(), 1, 'réglages : un lien vers le site explicatif');
-      eq(await siteLink.getAttribute('target'), '_blank', 'le lien du site s\'ouvre dans un nouvel onglet');
+      check(await page.locator('#settings .seg-btn', { hasText: 'FR' }).isVisible(), 'réglages : langue FR EN NL DE tout en haut');
+      eq(await page.locator('#settings .grp').count(), 2, 'réglages : deux groupes repliables');
       eq(await page.locator('#settings').getByText('Commander à manger').count(), 0, 'plus de sites de commande dans les réglages');
       await page.locator('#settings').getByRole('button', { name: 'Nederlands' }).click();
       eq(await text(page, '#settings h2'), 'Instellingen', 'titre des réglages en néerlandais');
-      eq((await siteLink.innerText()).trim(), 'Time2Relax-website openen', 'texte du lien du site en néerlandais');
       check((await text(page, '.date')).toLowerCase().includes('donderdag 29 oktober'), 'date en néerlandais');
       eq(await text(page, '.start'), 'Break starten', 'bouton de démarrage en néerlandais');
       await page.locator('.start').click();
@@ -264,10 +270,11 @@ async function main() {
       const prefs0 = await page.evaluate(() => window.t2r.state.prefs);
       check(!('homeAddr' in prefs0) && !('workAddr' in prefs0) && !('navApp' in prefs0), "anciens réglages d'itinéraire ignorés");
       eq(await page.locator('input[placeholder*="dresse"]').count(), 0, "pas de champs d'adresse");
-      await page.getByRole('button', { name: 'Réglages' }).click();
+      await page.getByRole('button', { name: 'Réglages', exact: true }).click();
       await page.waitForTimeout(600);
       check(await page.locator('#settings').isVisible(), 'la roue dentée descend jusqu\'aux réglages');
       // réinitialisation
+      await openGrp(page, 'Réglages spéciaux');
       await page.getByRole('button', { name: 'Réinitialiser cette page' }).click();
       await page.getByRole('button', { name: 'Tout effacer' }).click();
       check(await page.locator('.welcome').isVisible(), 'après réinitialisation : retour à la page de bienvenue');
@@ -590,11 +597,12 @@ async function planTests(browser) {
     await de.context.close();
     const es = await newPage(browser, { lang: 'es-ES', setup: () => localStorage.setItem('t2r.prefs', JSON.stringify({ setupDone: true })) });
     eq(await es.page.evaluate(() => LANG), 'en', 'langue non proposée (espagnol) : anglais');
-    await es.page.getByRole('button', { name: 'Settings' }).click();
+    await es.page.getByRole('button', { name: 'Settings', exact: true }).click();
     await es.page.getByRole('button', { name: 'Deutsch' }).click();
     eq(await text(es.page, '#settings h2'), 'Einstellungen', 'choix « Deutsch » dans les réglages');
     // durées dans les réglages
-    await es.page.locator('.dur-row-btn').nth(1).click();
+    await openGrp(es.page, 'Planung');
+    await es.page.locator('.dur-row-btn').nth(2).click();
     await es.page.locator('.dlg').getByRole('button', { name: '45 Min.' }).click();
     await es.page.locator('.dlg').getByRole('button', { name: 'OK' }).click();
     eq(await es.page.evaluate(() => window.t2r.state.ui.lunchMinutes), 45, 'durée du lunch choisie dans les réglages : 45 min');
@@ -640,7 +648,7 @@ async function planTests(browser) {
     const prim = () => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--primary').trim());
     eq(await prim(), '#5B636D', 'gris, même avec une ancienne couleur enregistrée');
     eq(await page.evaluate(() => document.documentElement.style.colorScheme), 'light', 'jamais de mode sombre');
-    await page.getByRole('button', { name: 'Réglages' }).click();
+    await page.getByRole('button', { name: 'Réglages', exact: true }).click();
     check(!(await text(page, '#settings')).includes('Couleur'), 'plus de réglage de couleur');
     check((await page.locator('.swatch, .theme-modes').count()) === 0, 'ni pastilles ni Auto / Clair / Sombre');
     check(errors.length === 0, `aucune erreur console (${errors.join(' | ')})`);
@@ -769,7 +777,8 @@ async function planTests(browser) {
     await nl.context.close();
 
     const rs = await newPage(browser, { setup: eval(planSetup(PLAN3)) });
-    await rs.page.getByRole('button', { name: 'Réglages' }).click();
+    await rs.page.getByRole('button', { name: 'Réglages', exact: true }).click();
+    await openGrp(rs.page, 'Réglages spéciaux');
     await rs.page.getByRole('button', { name: 'Réinitialiser cette page' }).click();
     await rs.page.getByRole('button', { name: 'Tout effacer' }).click();
     eq(await rs.page.evaluate(() => window.t2r.state.plan.items.length), 0, 'réinitialiser la page efface aussi les horaires prévus');
@@ -898,7 +907,7 @@ async function settingsSyncTests(browser) {
   // Appareil B (neuf) : même nom → retrouve les réglages
   const B = await open('2026-10-30T09:00:00+01:00');
   await B.page.getByRole('button', { name: 'Continuer' }).click();
-  await B.page.getByRole('button', { name: 'Réglages' }).click();
+  await B.page.getByRole('button', { name: 'Réglages', exact: true }).click();
   await signInAs(B.page, 'RÉGLAGES-1');
   await B.page.waitForFunction(() => window.t2r.state.prefs.lang === 'nl', null, { timeout: 10000 });
   const bs = await B.page.evaluate(() => { const s = window.t2r.state; return { night: s.prefs.nightMode, cut: s.prefs.nightCutoff, shop: s.prefs.shops[0].name, days: s.plan.days.join(','), items: s.plan.items.length, timer: s.ui.useTimer, pm: s.ui.pauseMinutes }; });
@@ -941,7 +950,7 @@ async function settingsSyncTests(browser) {
   db2.noSettings = true;
   const C = await openWithMock(browser, db2, '2026-10-29T10:00:00+01:00');
   await C.page.getByRole('button', { name: 'Continuer' }).click();
-  await C.page.getByRole('button', { name: 'Réglages' }).click();
+  await C.page.getByRole('button', { name: 'Réglages', exact: true }).click();
   await signInAs(C.page, 'sans-sql');
   await idle(C.page);
   eq(await C.page.evaluate(() => window.t2r.state.sync.error), '', 'fonctions de réglages absentes : aucune erreur affichée');
@@ -971,13 +980,14 @@ async function settingsSyncTests(browser) {
   // Un autre appareil qui se connecte sous ce nom ne retrouve plus de réglages
   const D2 = await open('2026-10-29T10:00:00+01:00');
   await D2.page.getByRole('button', { name: 'Continuer' }).click();
-  await D2.page.getByRole('button', { name: 'Réglages' }).click();
+  await D2.page.getByRole('button', { name: 'Réglages', exact: true }).click();
   await signInAs(D2.page, 'réglages-1');
   await idle(D2.page);
   eq(await D2.page.evaluate(() => window.t2r.state.prefs.shops.length), 0, 'sous ce nom, plus aucun réglage à retrouver (aucun site)');
   await D2.context.close();
   // Fonction d'effacement absente du serveur (404) : la réinitialisation se fait quand même
   await C.page.evaluate(() => go('settings'));
+  await openGrp(C.page, 'Réglages spéciaux');
   await C.page.getByRole('button', { name: 'Réinitialiser cette page' }).click();
   await C.page.getByRole('button', { name: 'Tout effacer' }).click();
   await C.page.waitForFunction(() => window.t2r.state.session === null);
@@ -1027,7 +1037,7 @@ async function syncTests(browser) {
   await a.page.locator('.start').click();
   await advance(a.page, 61000);
   await a.page.locator('.start').click();
-  await a.page.getByRole('button', { name: 'Réglages' }).click();
+  await a.page.getByRole('button', { name: 'Réglages', exact: true }).click();
   check(await a.page.locator('#acctCard').isVisible(), "carte « Nom d'utilisateur » visible quand la synchro est configurée");
   eq(await a.page.locator('input[type=password], input[type=email]').count(), 0, 'ni mot de passe ni e-mail à saisir');
 
@@ -1056,7 +1066,7 @@ async function syncTests(browser) {
   // Poste 2 (autre navigateur) : même nom, écrit avec des majuscules
   const b = await open('2026-10-30T09:00:00+01:00');
   await b.page.getByRole('button', { name: 'Continuer' }).click();
-  await b.page.getByRole('button', { name: 'Réglages' }).click();
+  await b.page.getByRole('button', { name: 'Réglages', exact: true }).click();
   await signInAs(b.page, 'MICHAËL-1234');
   await b.page.waitForFunction(() => window.t2r.state.entries.length === 2, null, { timeout: 8000 });
   check(true, 'le second poste retrouve les 2 entrées avec le même nom (majuscules sans importance)');
@@ -1067,7 +1077,7 @@ async function syncTests(browser) {
   await c.page.locator('.start').click();
   await advance(c.page, 90000);
   await c.page.locator('.start').click();
-  await c.page.getByRole('button', { name: 'Réglages' }).click();
+  await c.page.getByRole('button', { name: 'Réglages', exact: true }).click();
   await signInAs(c.page, 'collègue-42');
   await allSynced(c.page);
   eq(db.of('collègue-42').length, 1, 'autre nom : son historique est séparé');
@@ -1095,7 +1105,7 @@ async function syncTests(browser) {
   check(true, 'le poste 1 voit la suppression après rechargement');
 
   // Déconnexion : l'historique local est effacé mais reste enregistré sous le nom
-  await a.page.getByRole('button', { name: 'Réglages' }).click();
+  await a.page.getByRole('button', { name: 'Réglages', exact: true }).click();
   await a.page.getByRole('button', { name: 'Se déconnecter' }).click();
   await a.page.locator('.dlg').getByRole('button', { name: 'Se déconnecter' }).click();
   await a.page.waitForSelector('#acctName');
@@ -1116,7 +1126,7 @@ async function syncTests(browser) {
   });
   await d.page.reload();
   eq(await d.page.evaluate(() => window.t2r.state.session), null, "ancienne session (e-mail) abandonnée");
-  await d.page.getByRole('button', { name: 'Réglages' }).click();
+  await d.page.getByRole('button', { name: 'Réglages', exact: true }).click();
   await signInAs(d.page, 'migration-1');
   await allSynced(d.page);
   eq(db.of('migration-1').length, 4, "l'historique déjà présent dans le navigateur est envoyé sous le nouveau nom");
@@ -1126,7 +1136,7 @@ async function syncTests(browser) {
   const e = await open('2026-10-30T09:00:00+01:00');
   await e.page.getByRole('button', { name: 'Continuer' }).click();
   await e.context.route('https://mock.supabase.test/**', (r) => r.abort());
-  await e.page.getByRole('button', { name: 'Réglages' }).click();
+  await e.page.getByRole('button', { name: 'Réglages', exact: true }).click();
   await signInAs(e.page, 'hors-ligne-1');
   await e.page.waitForFunction(() => document.getElementById('syncStatus') && document.getElementById('syncStatus').textContent.includes('Hors ligne'), null, { timeout: 8000 });
   check(true, 'hors ligne : message clair, la page reste utilisable');
@@ -1162,7 +1172,7 @@ async function editSyncTests(browser) {
   };
 
   await page.getByRole('button', { name: 'Continuer' }).click();
-  await page.getByRole('button', { name: 'Réglages' }).click();
+  await page.getByRole('button', { name: 'Réglages', exact: true }).click();
   await signInAs(page, 'modif-test');
   await page.waitForSelector('#syncStatus');
   await page.waitForFunction(() => !window.t2r.state.sync.busy && window.t2r.state.sync.last);
@@ -1203,7 +1213,7 @@ async function editSyncTests(browser) {
   await editFirst(50);
   await waitFor(() => posts() > before2);
   await page.getByRole('button', { name: 'Retour' }).click();
-  await page.getByRole('button', { name: 'Réglages' }).click();
+  await page.getByRole('button', { name: 'Réglages', exact: true }).click();
   await page.getByRole('button', { name: 'Se déconnecter' }).click();
   await page.locator('.dlg').getByRole('button', { name: 'Se déconnecter' }).click();
   await page.waitForSelector('#acctName');
@@ -1221,7 +1231,7 @@ async function stopTests(browser) {
   const db = makeMockSupabase();
   const { page, context, errors } = await openWithMock(browser, db, '2026-10-29T10:00:00+01:00');
   await page.getByRole('button', { name: 'Continuer' }).click();
-  await page.getByRole('button', { name: 'Réglages' }).click();
+  await page.getByRole('button', { name: 'Réglages', exact: true }).click();
   await signInAs(page, 'reprise-test');
   await page.waitForFunction(() => !window.t2r.state.sync.busy && window.t2r.state.sync.last);
   await page.getByRole('button', { name: 'Retour' }).click();
@@ -1264,7 +1274,8 @@ async function stopTests(browser) {
   check(db.of('reprise-test').length === 1 && db.of('reprise-test')[0].seconds === list[0].seconds, 'une seule ligne en ligne, même durée');
 
   // Option « Confirmer avant de terminer »
-  await page.getByRole('button', { name: 'Réglages' }).click();
+  await page.getByRole('button', { name: 'Réglages', exact: true }).click();
+  await openGrp(page, 'Planning');
   await page.locator('.switch-row', { hasText: 'Confirmer avant de terminer' }).click();
   eq(await page.evaluate(() => window.t2r.state.prefs.confirmStop), true, 'option de confirmation activée');
   await page.getByRole('button', { name: 'Retour' }).click();
@@ -1291,7 +1302,7 @@ async function stopTests(browser) {
 async function joinAs(browser, db, name, opts) {
   const dev = await openWithMock(browser, db, '2026-10-29T10:00:00+01:00', opts);
   await dev.page.getByRole('button', { name: 'Continuer' }).click();
-  await dev.page.getByRole('button', { name: 'Réglages' }).click();
+  await dev.page.getByRole('button', { name: 'Réglages', exact: true }).click();
   await signInAs(dev.page, name);
   await dev.page.waitForFunction(() => !window.t2r.state.sync.busy && window.t2r.state.sync.last);
   await dev.page.getByRole('button', { name: 'Retour' }).click();
@@ -1505,7 +1516,7 @@ async function sharedRunTests(browser) {
   // 9. Se déconnecter : le chrono en cours reste ici, il n'est plus relu
   await a.page.locator('.start').click();
   await waitRunPushed(a.page);
-  await a.page.getByRole('button', { name: 'Réglages' }).click();
+  await a.page.getByRole('button', { name: 'Réglages', exact: true }).click();
   await a.page.getByRole('button', { name: 'Se déconnecter' }).click();
   await a.page.locator('.dlg').getByRole('button', { name: 'Se déconnecter' }).click();
   await a.page.waitForFunction(() => !window.t2r.state.session, null, { timeout: 5000 });
@@ -1562,8 +1573,9 @@ async function dogTests(browser) {
   await page.reload();
   check(await page.locator('.dog-card svg').isVisible(), 'carte du cocker visible sur l’accueil');
   eq(calls.length, 0, 'aucune lecture tant qu’on n’appuie pas');
-  await page.locator('.dog-input').fill('  Mika ');
-  await page.locator('.dog-card .btn').click();
+  await page.locator('.dog-card .btn').first().click(); // pas encore de nom : il est demandé dans une fenêtre
+  await page.locator('.dlg .field').fill('  Mika ');
+  await page.locator('.dlg').getByRole('button', { name: 'Va chercher mon chrono !' }).click();
   check(await page.locator('.dog.running').count() === 1, 'le chien court pendant la recherche');
   await page.waitForSelector('.dog-msg', { timeout: 5000 });
   const out = await text(page, '.dog-card');
@@ -1575,12 +1587,13 @@ async function dogTests(browser) {
   eq(await page.evaluate(() => localStorage.getItem('t2r.dogName')), 'mika', 'nom retenu dans le navigateur');
   running = false;
   await page.reload();
-  eq(await page.locator('.dog-input').inputValue(), 'mika', 'nom prérempli au retour');
-  await page.locator('.dog-card .btn').click();
+  check((await text(page, '.dog-change')).includes('mika'), 'nom retenu au retour');
+  await page.locator('.dog-card .btn').first().click();
   await page.waitForSelector('.dog-msg', { timeout: 5000 });
   check((await text(page, '.dog-card')).includes('Pas de chrono en cours'), 'pas de chrono : message dédié');
-  await page.locator('.dog-input').fill('x');
-  await page.locator('.dog-card .btn').click();
+  await page.locator('.dog-change').click();
+  await page.locator('.dlg .field').fill('x');
+  await page.locator('.dlg').getByRole('button', { name: 'Va chercher mon chrono !' }).click();
   check((await text(page, '.dog-card')).includes('2 à 40 caractères'), 'nom trop court refusé');
   check(errors.length === 0, `aucune erreur console (${errors.join(' | ')})`);
   await context.close();
