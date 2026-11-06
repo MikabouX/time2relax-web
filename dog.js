@@ -214,6 +214,10 @@ async function phoneStopRemote() {
     return;
   }
   phoneStop();
+  // La pause rejoint tout de suite l'historique et les totaux du jour (ici et dans la carte du chien).
+  mergeProfile([row]);
+  render();
+  dogFetch(who, true);
   toast(t('phone_stopped', { Type, type: Type.toLowerCase(), dur: humanDuration(secs) }));
 }
 

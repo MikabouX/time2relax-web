@@ -1601,8 +1601,10 @@ async function dogTests(browser) {
   check((await text(page, '.start .stop-note')) === 'Les alarmes pourraient encore sonner', 'bouton stop : les alarmes pourraient encore sonner');
   await page.locator('.start').click();
   check((await text(page, '.dlg')).includes('Fini à l\'heure (15 min'), 'dépassement : choix « Fini à l’heure »');
+  running = false; // côté serveur, le chrono partagé est arrêté
   await page.locator('.dlg').getByRole('button', { name: /Fini à l/ }).click();
   await page.waitForFunction(() => document.getElementById('toast').textContent.includes('terminé'));
+  await page.waitForTimeout(300);
   const saved = writes.find((w) => w.fn === 't2r_save');
   check(saved && saved.body.p_rows[0].id === 'r1' && saved.body.p_rows[0].seconds === 900 && saved.body.p_rows[0].type === 'break',
     `pause enregistrée sous le même identifiant que le chrono, à la durée prévue (${JSON.stringify(saved && saved.body)})`);
@@ -1613,7 +1615,9 @@ async function dogTests(browser) {
   check(calls.every((c) => /^t2r_(run_get|list|settings_get):/.test(c)), 'aucune écriture sur le serveur (lectures seulement)');
   eq(await page.evaluate(() => localStorage.getItem('t2r.dogName')), 'mika', 'nom retenu dans le navigateur');
   const ids = await page.evaluate(() => window.t2r.state.entries.map((e) => e.id).sort().join());
-  eq(ids, 'a,b,c', 'historique du profil récupéré (3 pauses, avec leur identifiant)');
+  eq(ids, 'a,b,c,r1', 'historique du profil récupéré, plus le break arrêté ici (avec leur identifiant)');
+  const vals = (await page.locator('.stat-val').allInnerTexts()).join(' / ');
+  check(vals.includes('25'), `le break arrêté depuis le site s'ajoute aux totaux (10 + 15 min : ${vals})`);
   check((await page.locator('.stat-val').allInnerTexts()).every((v) => v.trim() !== '—'), `totaux du jour remplis (${(await page.locator('.stat-val').allInnerTexts()).join(' / ')})`);
   running = false;
   await page.reload();
