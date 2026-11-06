@@ -1556,11 +1556,13 @@ async function sharedRunTests(browser) {
 }
 async function dogTests(browser) {
   const calls = [];
+  const writes = [];
   let running = true;
   const { page, context, errors } = await newPage(browser, { setup: () => localStorage.setItem('t2r.prefs', JSON.stringify({ setupDone: true })) });
   await context.route('**/rest/v1/rpc/**', async (route) => {
     const fn = route.request().url().split('/rpc/')[1];
     const body = JSON.parse(route.request().postData() || '{}');
+    if (fn === 't2r_save' || fn === 't2r_run_stop') { writes.push({ fn, body }); await route.fulfill({ status: 200, contentType: 'application/json', body: fn === 't2r_save' ? '' : 'true' }); return; }
     calls.push(`${fn}:${body.p_username}:${route.request().method()}`);
     let data = [];
     if (fn === 't2r_run_get' && running) data = [{ run_id: 'r1', elapsed_ms: 17 * 60000, kind: 'break', planned_s: 900 }];
@@ -1592,6 +1594,19 @@ async function dogTests(browser) {
   check((await text(page, '#ringBig')).startsWith('+02:0'), 'le chrono du téléphone avance tout seul ici');
   const prim = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--primary').trim());
   check(prim.startsWith('hsl(2'), `couleur de l'appli (bleu) appliquée au site (${prim})`);
+  // arrêter le chrono du téléphone depuis le site : la pause est enregistrée puis le chrono partagé arrêté
+  eq(await text(page, '.start'), 'Terminer le break du téléphone', 'bouton « Terminer le break du téléphone »');
+  await page.locator('.start').click();
+  check((await text(page, '.dlg')).includes('Fini à l\'heure (15 min'), 'dépassement : choix « Fini à l’heure »');
+  await page.locator('.dlg').getByRole('button', { name: /Fini à l/ }).click();
+  await page.waitForFunction(() => document.getElementById('toast').textContent.includes('terminé'));
+  const saved = writes.find((w) => w.fn === 't2r_save');
+  check(saved && saved.body.p_rows[0].id === 'r1' && saved.body.p_rows[0].seconds === 900 && saved.body.p_rows[0].type === 'break',
+    `pause enregistrée sous le même identifiant que le chrono, à la durée prévue (${JSON.stringify(saved && saved.body)})`);
+  check(writes.some((w) => w.fn === 't2r_run_stop' && w.body.p_id === 'r1'), 'chrono partagé arrêté');
+  eq(await text(page, '.start'), 'Démarrer le break', 'retour au bouton normal');
+  writes.length = 0;
+  running = true;
   check(calls.every((c) => /^t2r_(run_get|list|settings_get):/.test(c)), 'aucune écriture sur le serveur (lectures seulement)');
   eq(await page.evaluate(() => localStorage.getItem('t2r.dogName')), 'mika', 'nom retenu dans le navigateur');
   running = false;

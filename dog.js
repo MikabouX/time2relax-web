@@ -69,7 +69,8 @@ async function dogRpc(fn, args) {
     body: JSON.stringify(args),
   });
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
-  return r.json();
+  const txt = await r.text(); // t2r_save ne renvoie rien
+  return txt ? JSON.parse(txt) : null;
 }
 
 async function dogFetch(name, quiet) {
@@ -102,7 +103,7 @@ async function dogFetch(name, quiet) {
       lunch: sum('lunch'), nLunch: day.filter((r) => r.type === 'lunch').length,
     };
     const r = DOG.result.run;
-    phoneFollow(r ? { type: r.kind, start: Date.now() - r.elapsed * 1000, planned: r.planned } : null);
+    phoneFollow(r ? { id: run.run_id, type: r.kind, start: Date.now() - r.elapsed * 1000, planned: r.planned } : null);
   } catch (_) {
     DOG.error = t('dog_error');
   }
@@ -177,4 +178,40 @@ function setPhoneColor(v) {
     if (k) localStorage.setItem(PHONE_COLOR_KEY, k); else localStorage.removeItem(PHONE_COLOR_KEY);
   } catch (_) { /* navigateur sans stockage */ }
   applyTheme();
+}
+
+/* ---------- Arrêter le chrono du téléphone depuis le site ----------
+   Comme l'appli : la pause est enregistrée sous le nom (même identifiant que le chrono, donc jamais en double),
+   puis le chrono partagé est arrêté. Le téléphone s'aligne quand l'appli se rouvre. */
+async function phoneStopRemote() {
+  const ph = PHONE;
+  const who = dogName();
+  if (!ph || !ph.id || !who) return;
+  const elapsed = Math.max(0, Math.round((Date.now() - ph.start) / 1000));
+  const over = ph.planned > 0 && elapsed > ph.planned;
+  const Type = typeLabel(ph.type);
+  // Dépassement : on peut aussi l'enregistrer « fini à l'heure » (durée prévue), comme dans l'appli.
+  const choice = await openDialog((dlg, close) => {
+    dlg.append(
+      h('h2', {}, t('phone_stop_title', { Type, type: Type.toLowerCase() })),
+      h('p', {}, t('phone_stop_body', { elapsed: humanDuration(elapsed) })),
+      h('div', { class: 'dlg-actions wrap' },
+        h('button', { type: 'button', class: 'btn text', on: { click: () => close(null) } }, t('cancel')),
+        over ? h('button', { type: 'button', class: 'btn tonal', on: { click: () => close('on_time') } },
+          t('phone_stop_on_time', { planned: humanDuration(ph.planned) })) : null,
+        h('button', { type: 'button', class: 'btn filled danger', on: { click: () => close('now') } }, t('phone_stop_ok'))));
+  });
+  if (!choice) return;
+  const secs = choice === 'on_time' ? ph.planned : elapsed;
+  const d = new Date(ph.start);
+  const row = { id: ph.id, date: dayKey(d), time: `${two(d.getHours())}:${two(d.getMinutes())}`, type: ph.type === 'lunch' ? 'lunch' : 'break', seconds: Math.min(secs, 86400) };
+  try {
+    await dogRpc('t2r_save', { p_username: who, p_rows: [row] });
+    await dogRpc('t2r_run_stop', { p_username: who, p_id: ph.id });
+  } catch (_) {
+    toast(t('phone_stop_failed'));
+    return;
+  }
+  phoneStop();
+  toast(t('phone_stopped', { Type, type: Type.toLowerCase(), dur: humanDuration(secs) }));
 }

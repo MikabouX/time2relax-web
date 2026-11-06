@@ -524,6 +524,12 @@ async function editBreaks() {
 }
 
 function startButton() {
+  // Chrono du téléphone suivi (et aucun ici) : le bouton sert à l'arrêter.
+  if (!S.run && PHONE) {
+    const Type = typeLabel(PHONE.type);
+    return h('button', { type: 'button', class: 'start stop', on: { click: phoneStopRemote } },
+      icon('stop', 26), h('span', {}, t('phone_stop_btn', { type: Type.toLowerCase(), Type })));
+  }
   const running = !!S.run;
   const name = typeLabel(running ? S.run.type : S.ui.type);
   const vars = { type: name.toLowerCase(), Type: name };
