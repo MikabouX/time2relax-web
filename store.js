@@ -31,6 +31,7 @@ const store = {
   },
 };
 
+const KOFI_URL = 'https://ko-fi.com/michaelbardiaux'; // soutien (dons)
 const SITE_URL = 'https://bardiaux.wordpress.com/'; // site explicatif : fonctions, téléchargement des applis Android et iPhone
 const ANDROID_URL = 'https://play.google.com/apps/testing/com.mikaboux.time2relax'; // inscription au test fermé (à remplacer par la fiche Google Play à la sortie publique)
 const IPHONE_URL = 'https://apps.apple.com/app/id6829148802'; // App Store

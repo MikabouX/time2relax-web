@@ -317,6 +317,10 @@ function installDialog() {
   });
 }
 
+/** Petit lien discret vers la page de soutien (Ko-fi). */
+const supportLink = () => h('p', { class: 'center support-link' },
+  h('a', { href: safeUrl(KOFI_URL), target: '_blank', rel: 'noopener noreferrer' }, t('support_btn')));
+
 /** Liens directs vers les applis mobiles. */
 const storeLinks = () => h('div', {},
   h('div', { class: 'store-links' },
@@ -346,7 +350,8 @@ function welcomeView() {
       h('div', { class: 'strong' }, t('download_title')),
       storeLinks(),
       webButton()),
-    h('p', { class: 'center' }, h('a', { href: safeUrl(SITE_URL), target: '_blank', rel: 'noopener noreferrer' }, t('learn_more'))));
+    h('p', { class: 'center' }, h('a', { href: safeUrl(SITE_URL), target: '_blank', rel: 'noopener noreferrer' }, t('learn_more'))),
+    supportLink());
 }
 
 /** Tête du cocker (dessin fixe) pour le bouton « Utiliser sur navigateur ». */
@@ -1045,6 +1050,7 @@ function settingsSection() {
       class: 'btn tonal wide report-btn',
       href: `mailto:${TESTER_MAIL}?subject=${encodeURIComponent('Time2Relax web')}`,
     }, icon('mail', 18), t('report_btn')),
+    supportLink(),
     h('p', { class: 'footer' }, `✦ ${t('footer')}`));
 }
 
