@@ -33,7 +33,7 @@ const store = {
 
 const SITE_URL = 'https://bardiaux.wordpress.com/'; // site explicatif : fonctions, téléchargement des applis Android et iPhone
 const ANDROID_URL = 'https://play.google.com/apps/testing/com.mikaboux.time2relax'; // inscription au test fermé (à remplacer par la fiche Google Play à la sortie publique)
-const IPHONE_URL = 'https://testflight.apple.com/join/Net95ZVk'; // lien public TestFlight
+const IPHONE_URL = 'https://apps.apple.com/app/id6829148802'; // App Store
 const SUGGESTIONS = [
   { name: 'Takeaway.com', url: 'https://www.takeaway.com/be/' },
   { name: 'Uber Eats', url: 'https://www.ubereats.com/be' },

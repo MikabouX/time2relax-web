@@ -83,8 +83,8 @@ async function main() {
       eq(await page.locator('.welcome').getByRole('button', { name: 'Nederlands' }).count(), 1, 'bienvenue : choix de la langue');
       eq(await page.locator('.welcome .feature-list li').count(), 5, "bienvenue : les fonctions de l'application");
       eq(await page.locator(`.welcome a[href="${'https://play.google.com/apps/testing/com.mikaboux.time2relax'}"]`).count(), 2, 'bienvenue : Android sur Google Play (bandeau et bas de page)');
-      eq(await page.locator('.welcome a[href="https://testflight.apple.com/join/Net95ZVk"]').count(), 2, 'bienvenue : iPhone TestFlight (bandeau et bas de page)');
-      check((await text(page, '.test-banner')).includes('TestFlight'), 'bandeau : explication TestFlight');
+      eq(await page.locator('.welcome a[href="https://apps.apple.com/app/id6829148802"]').count(), 2, 'bienvenue : iPhone App Store (bandeau et bas de page)');
+      check((await text(page, '.test-banner')).includes('App Store'), 'bandeau : iPhone sur l’App Store');
       eq(await page.locator('.welcome a[href="https://bardiaux.wordpress.com/"]').count(), 1, 'bienvenue : lien vers la page explicative');
       eq(await page.locator('.welcome .web-btn svg').count(), 1, 'bienvenue : grande case navigateur avec la tête du chien');
       check((await text(page, '.welcome .web-btn')).includes('fonctions limitées'), 'bienvenue : navigateur (fonctions limitées)');
@@ -96,8 +96,8 @@ async function main() {
       // à la place du minuteur « OS » de l'appli : un bouton vers l'installation sur le téléphone
       eq(await page.locator('.app-strip').count(), 0, 'plus de bande « télécharge l’application » sous le chrono');
       await page.locator('.install-btn').click();
-      check((await text(page, '.dlg')).includes('TestFlight'), 'bouton « Installer sur ton téléphone » : explications Android et iPhone');
-      eq(await page.locator('.dlg a[href="https://testflight.apple.com/join/Net95ZVk"]').count(), 1, 'fenêtre d’installation : lien TestFlight');
+      check((await text(page, '.dlg')).includes('App Store'), 'bouton « Installer sur ton téléphone » : explications Android et iPhone');
+      eq(await page.locator('.dlg a[href="https://apps.apple.com/app/id6829148802"]').count(), 1, 'fenêtre d’installation : lien App Store');
       await page.locator('.dlg').getByRole('button', { name: 'OK' }).click();
       eq(await page.locator('.page:not(.welcome) > .test-banner').count(), 0, 'plus de bandeau d’installation sur l’écran principal');
       eq(await page.locator('.tile-wrap').count(), 0, 'plus de bouton « Commander »');

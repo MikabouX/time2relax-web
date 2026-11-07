@@ -305,10 +305,6 @@ const testBanner = () => h('div', { class: 'test-banner', role: 'note' },
     h('div', { class: 'test-banner-col' },
       h('div', { class: 'test-banner-sub' }, 'iPhone'),
       h('p', {}, t('iphone_test_note')),
-      h('ol', { class: 'test-banner-steps' },
-        h('li', {}, t('iphone_step1')),
-        h('li', {}, t('iphone_step2')),
-        h('li', {}, t('iphone_step3'))),
       h('a', { class: 'btn test-banner-btn', href: safeUrl(IPHONE_URL), target: '_blank', rel: 'noopener noreferrer' },
         icon('phone_android', 18), t('iphone_store_btn')))));
 
