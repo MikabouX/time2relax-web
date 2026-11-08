@@ -278,6 +278,7 @@ function homeView() {
       h('div', { class: 'grow' },
         h('div', { class: 'muted small' }, greeting()),
         h('div', { class: 'date' }, capitalize(dateLong(new Date())))),
+      supportChip(),
       iconBtn('history', t('history'), () => go('history'))),
     todayCard(),
     typeSelector(),
@@ -317,9 +318,10 @@ function installDialog() {
   });
 }
 
-/** Petit lien discret vers la page de soutien (Ko-fi). */
-const supportLink = () => h('p', { class: 'center support-link' },
-  h('a', { href: safeUrl(KOFI_URL), target: '_blank', rel: 'noopener noreferrer' }, t('support_btn')));
+/** Lien de soutien (Ko-fi) : discret, mais tout en haut de la page, dans l'en-tête. */
+const supportChip = () => h('a', {
+  class: 'support-chip', href: safeUrl(KOFI_URL), target: '_blank', rel: 'noopener noreferrer',
+}, t('support_btn'));
 
 /** Liens directs vers les applis mobiles. */
 const storeLinks = () => h('div', {},
@@ -340,7 +342,7 @@ function welcomeView() {
   const features = ['app_f1', 'app_f2', 'app_f3', 'app_f4', 'app_f5'];
   return h('div', { class: 'page welcome' },
     testBanner(),
-    h('header', { class: 'top' }, h('h1', { class: 'grow' }, t('welcome_title'))),
+    h('header', { class: 'top' }, h('h1', { class: 'grow' }, t('welcome_title')), supportChip()),
     h('p', {}, t('welcome_web')),
     langCard(),
     h('div', { class: 'card pad' },
@@ -350,8 +352,7 @@ function welcomeView() {
       h('div', { class: 'strong' }, t('download_title')),
       storeLinks(),
       webButton()),
-    h('p', { class: 'center' }, h('a', { href: safeUrl(SITE_URL), target: '_blank', rel: 'noopener noreferrer' }, t('learn_more'))),
-    supportLink());
+    h('p', { class: 'center' }, h('a', { href: safeUrl(SITE_URL), target: '_blank', rel: 'noopener noreferrer' }, t('learn_more'))));
 }
 
 /** Tête du cocker (dessin fixe) pour le bouton « Utiliser sur navigateur ». */
@@ -1050,7 +1051,6 @@ function settingsSection() {
       class: 'btn tonal wide report-btn',
       href: `mailto:${TESTER_MAIL}?subject=${encodeURIComponent('Time2Relax web')}`,
     }, icon('mail', 18), t('report_btn')),
-    supportLink(),
     h('p', { class: 'footer' }, `✦ ${t('footer')}`));
 }
 
