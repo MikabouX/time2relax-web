@@ -175,9 +175,17 @@ returns jsonb
 language plpgsql security definer set search_path = public as $$
 declare
   u text := lower(trim(p_username));
+  -- Réglages non sensibles seulement : jamais les adresses, le planning importé ni les sites de commande.
+  -- (Même liste que SettingsSync dans l'appli ; mise à jour en ligne le 8 novembre 2026.)
   allowed text[] := array['lang', 'theme_color', 'theme_mode', 'confirm_stop', 'night_mode', 'night_cutoff', 'use_timer',
-                          'pause_minutes', 'lunch_minutes', 'plan_notify', 'plan_notify_lead',
-                          'os_lead', 'nav_app', 'shops', 'shop_index', 'plan'];
+                          'pause_minutes', 'pause2_minutes', 'lunch_minutes', 'plan_notify', 'plan_notify_lead',
+                          'os_lead', 'os_lead_lunch', 'nav_app', 'plan',
+                          -- 1.8 : rappels, jours fériés, chrono oublié, jour de paye, pointeuse
+                          'notify_each', 'notify_each_lead', 'notify_day', 'notify_day_lead',
+                          'holiday_country', 'holiday_work', 'auto_stop', 'auto_stop_grace',
+                          'pay_mode', 'pay_day', 'pay_shift',
+                          'clock_on', 'clock_remote', 'clock_nav_home', 'clock_site_minutes', 'clock_paid_lunch',
+                          'clock_plan_days'];
   clean jsonb;
   res jsonb;
 begin
