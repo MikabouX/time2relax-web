@@ -185,7 +185,7 @@ declare
                           'holiday_country', 'holiday_work', 'auto_stop', 'auto_stop_grace',
                           'pay_mode', 'pay_day', 'pay_shift',
                           'clock_on', 'clock_remote', 'clock_nav_home', 'clock_site_minutes', 'clock_paid_lunch',
-                          'clock_plan_days', 'clock_remote_days'];
+                          'clock_plan_days', 'clock_remote_days', 'clock_remote_periods'];
   clean jsonb;
   res jsonb;
 begin
