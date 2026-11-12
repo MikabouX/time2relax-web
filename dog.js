@@ -61,8 +61,35 @@ function dogName() {
   try { return localStorage.getItem(DOG_NAME_KEY) || ''; } catch (_) { return ''; }
 }
 
+/* Code de récupération d'un nom protégé (affiché dans les réglages de l'appli), retenu dans ce navigateur
+   pour ce nom seulement. Sans lui, le serveur refuse tout ce qui concerne ce nom. */
+const DOG_KEY_KEY = 't2r.dogKey';
+function dogKey(n) {
+  try {
+    const j = JSON.parse(localStorage.getItem(DOG_KEY_KEY) || 'null');
+    return j && j.name === n && typeof j.key === 'string' ? j.key : '';
+  } catch (_) { return ''; }
+}
+function dogSetKey(n, k) {
+  try {
+    if (k) localStorage.setItem(DOG_KEY_KEY, JSON.stringify({ name: n, key: k }));
+    else localStorage.removeItem(DOG_KEY_KEY);
+  } catch (_) { /* navigateur sans stockage */ }
+}
+/** Code tapé ou scanné : majuscules, sans espaces ni tirets (« t2r:nom:CODE » accepté). */
+function normKey(v) {
+  let s = String(v || '').trim();
+  const i = s.lastIndexOf(':');
+  if (i >= 0) s = s.slice(i + 1);
+  return s.toUpperCase().replace(/[^A-Z0-9]/g, '');
+}
+
 async function dogRpc(fn, args) {
   const C = window.T2R_FETCH || {};
+  if (args && args.p_username && !('p_key' in args)) {
+    const k = dogKey(args.p_username);
+    if (k) args = { ...args, p_key: k };
+  }
   const r = await fetch(`${C.url}/rest/v1/rpc/${fn}`, {
     method: 'POST',
     headers: { apikey: C.key, Authorization: `Bearer ${C.key}`, 'Content-Type': 'application/json' },
@@ -89,9 +116,15 @@ async function dogFetch(name, quiet) {
   const started = Date.now();
   try {
     // Seulement un nom qui existe déjà dans l'appli : sinon, l'envoi ci-dessous créerait un nom tout neuf.
-    if (await dogRpc('t2r_name_exists', { p_username: n }) === false) {
+    // Un nom protégé demande son code de récupération.
+    const st = await dogRpc('t2r_name_check', { p_username: n, p_key: dogKey(n) || null });
+    if (st === 'unknown' || st === 'locked' || st === 'wrong') {
       DOG.busy = false;
-      DOG.error = t('dog_unknown_name');
+      if (st === 'unknown') DOG.error = t('dog_unknown_name');
+      else {
+        if (st === 'wrong') dogSetKey(n, '');
+        if (!quiet) askDogKey(n, st === 'wrong');
+      }
       render();
       return;
     }
@@ -158,6 +191,31 @@ function dogCard() {
     name ? h('button', { type: 'button', class: 'btn text small dog-change', on: { click: askDogName } },
       t('dog_change', { name })) : null,
     out);
+}
+
+/** Code de récupération d'un nom protégé (Réglages de l'appli → Code de récupération). */
+function askDogKey(n, wrong) {
+  return openDialog((dlg, close) => {
+    const input = h('input', {
+      type: 'text', class: 'field', autocomplete: 'off', autocapitalize: 'characters', spellcheck: 'false',
+      maxlength: '40', placeholder: 'ABCD-EFGH-JKLM-NPQR-STUV', 'aria-label': t('dog_key_title'),
+    });
+    const go = () => {
+      const k = normKey(input.value);
+      close(null);
+      if (k.length < 16) return;
+      dogSetKey(n, k);
+      dogFetch(n);
+    };
+    dlg.append(
+      h('h2', {}, t('dog_key_title')),
+      h('p', {}, wrong ? t('dog_key_wrong') : t('dog_key_note', { name: n })),
+      h('form', { class: 'dlg-fields', on: { submit: (e) => { e.preventDefault(); go(); } } }, input),
+      h('div', { class: 'dlg-actions' },
+        h('button', { type: 'button', class: 'btn text', on: { click: () => close(null) } }, t('cancel')),
+        h('button', { type: 'button', class: 'btn filled', on: { click: go } }, t('dog_btn'))));
+    setTimeout(() => input.focus(), 50);
+  });
 }
 
 /** Le nom d'utilisateur de l'appli, demandé dans une fenêtre à part (puis retenu dans ce navigateur). */
