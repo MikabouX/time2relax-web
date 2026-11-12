@@ -251,3 +251,80 @@ $$;
 revoke all on function public.t2r_purge_old() from public, anon, authenticated;
 
 select cron.schedule('t2r-purge-7-jours', '15 2 * * *', 'select public.t2r_purge_old()');
+
+-- ---------------------------------------------------------------------------
+-- Time2Relax — registre des noms d'utilisateur (12 novembre 2026)
+-- Appliqué sur Supabase (migration « t2r_users_registry »).
+-- Un nom n'appartient qu'à un seul compte : il est réservé en une seule étape (contrainte d'unicité),
+-- et il reste réservé même quand l'historique de plus de 7 jours est effacé.
+
+create table if not exists public.t2r_users (
+  username   text primary key check (char_length(username) between 2 and 40),
+  created_at timestamptz not null default now()
+);
+alter table public.t2r_users enable row level security; -- aucun accès direct : seulement les fonctions ci-dessous
+
+-- Noms déjà utilisés (historique, réglages, chrono en cours).
+insert into public.t2r_users (username)
+  select username from public.pauses
+  union select username from public.settings
+  union select username from public.runs
+on conflict do nothing;
+
+-- Les anciennes versions de l'appli (sans réservation) inscrivent quand même leur nom dès le premier envoi.
+create or replace function public.t2r_users_touch() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  insert into public.t2r_users (username) values (new.username) on conflict do nothing;
+  return null;
+end $$;
+revoke all on function public.t2r_users_touch() from public, anon, authenticated;
+
+drop trigger if exists t2r_users_touch on public.pauses;
+create trigger t2r_users_touch after insert on public.pauses for each row execute function public.t2r_users_touch();
+drop trigger if exists t2r_users_touch on public.settings;
+create trigger t2r_users_touch after insert on public.settings for each row execute function public.t2r_users_touch();
+drop trigger if exists t2r_users_touch on public.runs;
+create trigger t2r_users_touch after insert on public.runs for each row execute function public.t2r_users_touch();
+
+-- Ce nom existe-t-il ? (« J'ai déjà un nom »)
+create or replace function public.t2r_name_exists(p_username text) returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists(select 1 from public.t2r_users where username = lower(trim(p_username)))
+$$;
+
+-- Réserve un nouveau nom. Vrai : il est à toi. Faux : déjà pris (même si quelqu'un l'a pris à la même seconde).
+create or replace function public.t2r_name_reserve(p_username text) returns boolean
+language plpgsql security definer set search_path = public as $$
+declare
+  u text := lower(trim(p_username));
+  k integer;
+begin
+  if char_length(u) < 2 or char_length(u) > 40 then
+    raise exception 'nom invalide';
+  end if;
+  insert into public.t2r_users (username) values (u) on conflict do nothing;
+  get diagnostics k = row_count;
+  return k = 1;
+end $$;
+
+grant execute on function public.t2r_name_exists(text) to anon, authenticated;
+grant execute on function public.t2r_name_reserve(text) to anon, authenticated;
+
+-- « Supprimer l'utilisateur » libère aussi le nom.
+create or replace function public.t2r_user_delete(p_username text) returns integer
+language plpgsql security definer set search_path = public as $$
+declare
+  u text := lower(trim(p_username));
+  n integer := 0;
+  k integer;
+begin
+  if char_length(u) < 2 or char_length(u) > 40 then
+    raise exception 'nom invalide';
+  end if;
+  delete from public.pauses where username = u; get diagnostics k = row_count; n := n + k;
+  delete from public.settings where username = u; get diagnostics k = row_count; n := n + k;
+  delete from public.runs where username = u; get diagnostics k = row_count; n := n + k;
+  delete from public.t2r_users where username = u;
+  return n;
+end $$;

@@ -88,6 +88,13 @@ async function dogFetch(name, quiet) {
   render();
   const started = Date.now();
   try {
+    // Seulement un nom qui existe déjà dans l'appli : sinon, l'envoi ci-dessous créerait un nom tout neuf.
+    if (await dogRpc('t2r_name_exists', { p_username: n }) === false) {
+      DOG.busy = false;
+      DOG.error = t('dog_unknown_name');
+      render();
+      return;
+    }
     await dogPush(n); // les pauses faites ici partent d'abord sous le nom
     const [runs, rows, prefs] = await Promise.all([dogRpc('t2r_run_get', { p_username: n }), dogRpc('t2r_list', { p_username: n }),
       quiet ? Promise.resolve(null) : dogRpc('t2r_settings_get', { p_username: n }).catch(() => null)]);
