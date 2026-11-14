@@ -352,7 +352,8 @@ function welcomeView() {
       h('div', { class: 'strong' }, t('download_title')),
       storeLinks(),
       webButton()),
-    h('p', { class: 'center' }, h('a', { href: safeUrl(SITE_URL), target: '_blank', rel: 'noopener noreferrer' }, t('learn_more'))));
+    h('p', { class: 'center' }, h('a', { href: safeUrl(SITE_URL), target: '_blank', rel: 'noopener noreferrer' }, t('learn_more'))),
+    privacyLink());
 }
 
 /** Tête du cocker (dessin fixe) pour le bouton « Utiliser sur navigateur ». */
@@ -1051,8 +1052,13 @@ function settingsSection() {
       class: 'btn tonal wide report-btn',
       href: `mailto:${TESTER_MAIL}?subject=${encodeURIComponent('Time2Relax web')}`,
     }, icon('mail', 18), t('report_btn')),
-    h('p', { class: 'footer' }, `✦ ${t('footer')}`));
+    h('p', { class: 'footer' }, `✦ ${t('footer')}`),
+    privacyLink());
 }
+
+/** Lien vers la page Confidentialité et mentions (éditeur, données, droits). */
+const privacyLink = () => h('p', { class: 'center small' },
+  h('a', { href: `https://time2relax.app/confidentialite/?l=${LANG}`, target: '_blank', rel: 'noopener' }, t('privacy_link')));
 
 /** Lien vers le site explicatif (fonctions, téléchargement des applis Android et iPhone). */
 function appsCard() {
