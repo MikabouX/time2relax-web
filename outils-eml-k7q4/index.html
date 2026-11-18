@@ -68,6 +68,7 @@
     <div><b>Choisis un fichier .eml ou .msg</b> ou glisse-le ici</div>
     <small>Tout reste sur ton ordinateur : rien n'est envoyé sur internet.</small>
   </label>
+  <div id="status" style="display:none;margin-top:12px;padding:10px 14px;border-radius:10px;background:#fef3c7;color:#78350f;font-size:14px"></div>
   <div id="files"></div>
   <section id="mail">
     <div class="head">
@@ -78,6 +79,7 @@
     <div class="bar" id="bar">Images externes bloquées pour ta vie privée. <button id="showImg">Les afficher</button></div>
     <div id="body"></div>
   </section>
+  <p style="margin-top:28px;color:var(--muted);font-size:12px;text-align:center">Lecteur EML / MSG · version 3</p>
 </main>
 
 <script>
@@ -408,8 +410,8 @@ function openFile(file){
     try {
       if(u8[0]===0xD0&&u8[1]===0xCF&&u8[2]===0x11&&u8[3]===0xE0){ const c=cfb(u8); mail=msgToMail(c,c.root,32); }
       else mail=emlToMail(bytesToBin(u8));
-    } catch(e){ mail={subject:file.name, text:'Impossible de lire ce fichier ('+e.message+').', att:[], cid:{}}; }
-    addMail(mail, file.name);
+      addMail(mail, file.name);
+    } catch(e){ status('Impossible d\'afficher « '+file.name+' » : '+e.message); }
   };
   r.readAsArrayBuffer(file);
 }
@@ -429,9 +431,20 @@ $('tipsOk').onclick=()=>{ $('tips').style.display='none'; try{ localStorage.setI
 window.addEventListener('appinstalled', ()=>{ $('install').style.display='none'; showTips(); });
 if (matchMedia('(display-mode: standalone)').matches) showTips();
 // Fichier ouvert depuis Windows (double-clic, « Ouvrir avec », UDA…)
-if ('launchQueue' in window) launchQueue.setConsumer(async params=>{
-  for (const h of (params.files||[])) { try { openFile(await h.getFile()); } catch(e){} }
-});
+function status(msg){ const el=$('status'); el.textContent=msg; el.style.display=msg?'block':'none'; }
+if ('launchQueue' in window) {
+  launchQueue.setConsumer(async params=>{
+    const list=params.files||[];
+    if(!list.length) return;
+    status('');
+    for (const h of list) {
+      try { const f=await h.getFile(); openFile(f); }
+      catch(e){ status('Le fichier a bien été transmis, mais Windows ou Edge en a refusé la lecture ('+(e.name||'')+' '+(e.message||'')+'). As-tu cliqué sur « Autoriser » ?'); }
+    }
+  });
+} else if (matchMedia('(display-mode: standalone)').matches) {
+  status("Ce navigateur ne transmet pas les fichiers aux applications installées. Glisse le fichier dans la fenêtre, ou installe l'appli avec Microsoft Edge ou Google Chrome à jour.");
+}
 </script>
 </body>
 </html>
