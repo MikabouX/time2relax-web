@@ -5,7 +5,41 @@
    l'application. Rien n'est écrit sur le serveur, rien n'est relu en arrière-plan. */
 
 const DOG_NAME_KEY = 't2r.dogName';
-const DOG = { busy: false, result: null, error: '' };
+const DOG = { busy: false, result: null, error: '', lastAt: 0, prefsAt: 0 };
+
+/* Comme un autre téléphone : le site relit le nom à l'ouverture de la page et quand on y revient (au plus
+   toutes les 2 minutes), jamais en continu. Les réglages de l'appli : au plus toutes les 30 minutes. */
+const DOG_AUTO_MS = 120000;
+const DOG_PREFS_MS = 1800000;
+function dogAutoFetch() {
+  const n = dogName();
+  if (!n || DOG.busy || Date.now() - DOG.lastAt < DOG_AUTO_MS) return;
+  dogFetch(n, true);
+}
+
+/* Réglages de l'appli repris ici (durées, minuteur, breaks prévus, rappel, mode nuit, clair/sombre…). Un
+   réglage changé ici depuis la dernière lecture garde le choix d'ici. Rien n'est écrit sur le serveur. */
+const DOG_SET_KEYS = ['theme_mode', 'confirm_stop', 'night_mode', 'night_cutoff', 'use_timer', 'pause_minutes', 'lunch_minutes',
+  'plan_notify', 'plan_notify_lead', 'plan'];
+const DOG_SEEN_KEY = 't2r.dogSeen';
+function applyPhoneSettings(srv) {
+  if (!srv || typeof srv !== 'object' || Array.isArray(srv)) return false;
+  let seen = {};
+  try { seen = JSON.parse(localStorage.getItem(DOG_SEEN_KEY) || '{}') || {}; } catch (_) { seen = {}; }
+  let changed = false;
+  for (const k of DOG_SET_KEYS) {
+    if (!(k in srv)) continue;
+    const v = cleanSetting(k, srv[k]);
+    if (v === undefined) continue;
+    const here = readSetting(k);
+    if (k in seen && !sameValue(here, seen[k])) continue; // changé ici : on garde
+    if (!sameValue(here, v)) { applySetting(k, v); changed = true; }
+    seen[k] = readSetting(k);
+  }
+  try { localStorage.setItem(DOG_SEEN_KEY, JSON.stringify(seen)); } catch (_) { /* navigateur sans stockage */ }
+  if (changed) { savePrefs(); saveUi(); savePlan(); }
+  return changed;
+}
 
 /* Chrono du téléphone affiché dans le cadran (lecture seule) : type, heure de départ, durée prévue.
    Il avance tout seul ici ; le site relit le téléphone seulement à la fin prévue, puis toutes les 2 minutes
@@ -114,6 +148,7 @@ async function dogFetch(name, quiet) {
   if (!quiet) DOG.result = null;
   render();
   const started = Date.now();
+  DOG.lastAt = started;
   try {
     // Seulement un nom qui existe déjà dans l'appli : sinon, l'envoi ci-dessous créerait un nom tout neuf.
     // Un nom protégé demande son code de récupération.
@@ -129,10 +164,15 @@ async function dogFetch(name, quiet) {
       return;
     }
     await dogPush(n); // les pauses faites ici partent d'abord sous le nom
+    const wantPrefs = !quiet || Date.now() - DOG.prefsAt > DOG_PREFS_MS;
     const [runs, rows, prefs] = await Promise.all([dogRpc('t2r_run_get', { p_username: n }), dogRpc('t2r_list', { p_username: n }),
-      quiet ? Promise.resolve(null) : dogRpc('t2r_settings_get', { p_username: n }).catch(() => null)]);
-    // La couleur choisie dans l'appli arrive aussi sur le site.
-    if (prefs && typeof prefs === 'object') setPhoneColor(prefs.theme_color);
+      wantPrefs ? dogRpc('t2r_settings_get', { p_username: n }).catch(() => null) : Promise.resolve(null)]);
+    // La couleur et les réglages choisis dans l'appli arrivent aussi sur le site.
+    if (prefs && typeof prefs === 'object') {
+      DOG.prefsAt = Date.now();
+      setPhoneColor(prefs.theme_color);
+      applyPhoneSettings(prefs);
+    }
     const today = dayKey(new Date());
     const day = (Array.isArray(rows) ? rows : []).filter((r) => r.date === today);
     const sum = (k) => day.filter((r) => (k === 'lunch') === (r.type === 'lunch')).reduce((a, r) => a + (r.seconds || 0), 0);

@@ -437,6 +437,8 @@ async function main() {
 
     console.log('M. Le cocker va chercher le chrono du téléphone');
     await dogTests(browser);
+    console.log('Horaires reçus, lecture automatique du nom, réglages de l’appli');
+    await followsTests(browser);
   } finally {
     await browser.close();
     server.kill();
@@ -517,7 +519,7 @@ async function planTests(browser) {
     check(await page.locator('#planLine').evaluate((e) => e.hidden), 'sans horaire : aucune ligne grise');
     eq(await page.locator('#planTrack').evaluate((e) => e.style.opacity), '0', 'sans horaire : aucun cercle gris');
     const labels = await page.locator('.icon-btn').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')));
-    eq(labels.slice(0, 3).join(' | '), 'Historique', "accueil : seule l’icône Historique reste (plus de planning ni de réglages)");
+    eq(labels.slice(0, 3).join(' | '), 'Horaires reçus | Historique', "accueil : Horaires reçus et Historique (plus de planning ni de réglages)");
     await page.evaluate(() => go('plan')); // plus d'icône planning sur l'accueil
     eq(await text(page, 'h1'), 'Breaks prévus', 'la page des breaks prévus');
     check(await page.locator('.plan-empty').isVisible(), 'liste vide : message');
@@ -1607,7 +1609,7 @@ async function dogTests(browser) {
   check(writes.some((w) => w.fn === 't2r_delete' && w.body.p_ids.join() === 'gone1'), 'pause supprimée sur le site supprimée en ligne');
   eq(await page.evaluate(() => window.t2r.state.entries.map((e) => e.id).sort().join()), 'a,b,c,w1', 'historique aligné : supprimée dans l’appli retirée');
   writes.length = 0;
-  check(calls.every((c) => c.includes(':mika:POST')) && calls.length === 3, `trois lectures (chrono, pauses, couleur), nom normalisé (${calls.join(', ')})`);
+  check(calls.every((c) => c.includes(':mika:POST')) && calls.length === 4, `quatre lectures (nom, chrono, pauses, réglages), nom normalisé (${calls.join(', ')})`);
   // le cadran suit le chrono du téléphone (17 min pour 15 prévues : dépassé de 2 min)
   check((await text(page, '#ringBig')).startsWith('+02:0'), `cadran : dépassement du téléphone (${await text(page, '#ringBig')})`);
   check((await text(page, '#ringCap')).startsWith('📱'), 'cadran : légende « téléphone »');
@@ -1631,7 +1633,7 @@ async function dogTests(browser) {
   eq(await text(page, '.start'), 'Démarrer le break', 'retour au bouton normal');
   writes.length = 0;
   running = true;
-  check(calls.every((c) => /^t2r_(run_get|list|settings_get):/.test(c)), 'pas d’autre appel que ceux prévus');
+  check(calls.every((c) => /^t2r_(name_check|run_get|list|settings_get):/.test(c)), 'pas d’autre appel que ceux prévus');
   eq(await page.evaluate(() => localStorage.getItem('t2r.dogName')), 'mika', 'nom retenu dans le navigateur');
   const ids = await page.evaluate(() => window.t2r.state.entries.map((e) => e.id).sort().join());
   eq(ids, 'a,b,c,r1,w1', 'historique du profil récupéré, plus le break arrêté ici (avec leur identifiant)');
@@ -1650,6 +1652,85 @@ async function dogTests(browser) {
   await page.locator('.dlg').getByRole('button', { name: 'Va chercher mon chrono !' }).click();
   check((await text(page, '.dog-card')).includes('2 à 40 caractères'), 'nom trop court refusé');
   check(errors.length === 0, `aucune erreur console (${errors.join(' | ')})`);
+  await context.close();
+}
+
+async function followsTests(browser) {
+  const calls = [];
+  // Partage reçu : lundi 26 → mercredi 28 octobre 2026 (sur site avec breaks seuls, télétravail avec activités, férié)
+  const share = {
+    updated: '2026-10-29T08:00:00Z',
+    payload: { v: 1, weeks: [{ monday: '2026-10-26', days: [
+      { d: '2026-10-26', k: 'site', s: '08:00', e: '16:30', items: [{ t: '10:00', m: 15, y: 'break' }, { t: '12:00', m: 30, y: 'lunch' }] },
+      { d: '2026-10-27', k: 'remote', s: '09:00', e: '17:00', items: [{ t: '09:00', m: 60, y: 'other', l: 'Phone' }, { t: '10:00', m: 60, y: 'other', l: 'Meeting' }, { t: '11:00', m: 300, y: 'other', l: 'Phone' }] },
+      { d: '2026-10-28', k: 'off', off: 'holiday', h: 'Toussaint' },
+      { d: '2026-10-29', k: 'off', off: 'absent' },
+    ] }] },
+  };
+  const { page, context, errors } = await newPage(browser, { setup: () => {
+    localStorage.setItem('t2r.prefs', JSON.stringify({ setupDone: true }));
+    localStorage.setItem('t2r.dogName', 'mika');
+  } });
+  let offline = false;
+  await context.route('**/rest/v1/rpc/**', async (route) => {
+    const fn = route.request().url().split('/rpc/')[1];
+    const body = JSON.parse(route.request().postData() || '{}');
+    calls.push(fn);
+    if (offline) { await route.abort(); return; }
+    let data = [];
+    if (fn === 't2r_name_check') data = 'open';
+    if (fn === 't2r_settings_get') data = { pause_minutes: 12, use_timer: true, theme_color: 'throat' };
+    if (fn === 't2r_share_get') data = body.p_code === '1234123412341234' ? share : null;
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(data) });
+  });
+  await page.reload();
+  await page.waitForTimeout(500);
+  check(calls.includes('t2r_run_get') && calls.includes('t2r_list'), `lecture du nom à l’ouverture, sans appuyer (${calls.join(', ')})`);
+  eq(await page.evaluate(() => window.t2r.state.ui.pauseMinutes), 12, 'durée du break reprise de l’appli');
+  // retour sur l'onglet tout de suite : pas de nouvelle lecture (au plus toutes les 2 minutes)
+  const before = calls.length;
+  await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+  await page.waitForTimeout(300);
+  eq(calls.length, before, 'retour sur la page juste après : aucune lecture en plus');
+  // réglage changé ici : gardé à la lecture suivante
+  await page.evaluate(() => { window.t2r.state.ui.pauseMinutes = 20; saveUi(); });
+  await page.evaluate(() => { DOG.lastAt = 0; DOG.prefsAt = 0; dogAutoFetch(); });
+  await page.waitForTimeout(500);
+  eq(await page.evaluate(() => window.t2r.state.ui.pauseMinutes), 20, 'réglage changé sur le site : gardé');
+
+  await page.locator('.icon-btn[title="Horaires reçus"]').click();
+  check((await text(page, '.page')).includes("Entre le code d'invitation"), 'horaires reçus : invitation à entrer un code');
+  await page.locator('.icon-btn[title="Ajouter un code"]').click();
+  await page.locator('.dlg .field').first().fill('1111 2222 3333 4444');
+  await page.locator('.dlg').getByRole('button', { name: 'Ajouter', exact: true }).click();
+  await page.waitForFunction(() => document.querySelector('.dlg').textContent.includes('Code inconnu'), null, { timeout: 3000 }).catch(() => {});
+  check((await text(page, '.dlg')).includes('Code inconnu'), 'code inconnu refusé');
+  await page.locator('.dlg .field').first().fill('1234 1234 1234 1234');
+  await page.locator('.dlg .field').nth(1).fill('Julie');
+  await page.locator('.dlg').getByRole('button', { name: 'Ajouter', exact: true }).click();
+  await page.waitForSelector('.fw-grid');
+  eq(await page.locator('.fw-blk.brk').count(), 1, 'break du lundi affiché');
+  eq(await page.locator('.fw-blk.lun').count(), 1, 'lunch du lundi affiché');
+  eq(await page.locator('.fw-blk.main').count(), 3, 'journée du lundi en fond + Phone du mardi (2 blocs)');
+  eq(await page.locator('.fw-blk.oth').count(), 1, 'meeting du mardi');
+  const offs = await page.locator('.fw-off').allInnerTexts();
+  eq(offs.join(' | '), 'Toussaint | Absent', 'férié et absence');
+  eq(await page.locator('.fw-place.site svg').count(), 1, 'sur site : voiture');
+  eq(await page.locator('.fw-place.remote svg').count(), 1, 'télétravail : maison');
+  check((await text(page, '.fw-legend')).includes('Phone'), 'légende : activité principale');
+  eq(await page.locator('.fw-now').count(), 1, 'ligne « maintenant » sur aujourd’hui');
+  eq(await page.evaluate(() => JSON.parse(localStorage.getItem('t2r.follows'))[0].name), 'Julie', 'code et nom gardés dans le navigateur');
+  // sans connexion : la dernière copie
+  offline = true;
+  await page.locator('.icon-btn[title="Actualiser"]').click();
+  await page.waitForTimeout(400);
+  check((await text(page, '.fw-card')).includes('dernière copie'), 'sans connexion : dernière copie reçue');
+  eq(await page.locator('.fw-blk.brk').count(), 1, 'sans connexion : horaire toujours affiché');
+  // semaine suivante : rien
+  await page.locator('.icon-btn[title="Semaine suivante"]').click();
+  check((await text(page, '.fw-card')).includes('Rien de partagé'), 'semaine suivante : rien de partagé');
+  const real = errors.filter((e) => !e.includes('ERR_FAILED')); // l'appel coupé exprès (sans connexion)
+  check(real.length === 0, `aucune erreur console (${real.join(' | ')})`);
   await context.close();
 }
 

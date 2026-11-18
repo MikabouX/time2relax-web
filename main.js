@@ -37,9 +37,16 @@
   }, 1000);
 
   if (syncEnabled() && S.session) { syncNow(); startRunPolling(); }
+  // Comme un autre téléphone : lecture à l'ouverture de la page (si le nom de l'appli est connu).
+  dogAutoFetch();
+  if (S.view === 'follows') followsMaybeFetch();
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState !== 'visible') return;
-    if (PHONE && dogName()) dogFetch(dogName(), true); // le chrono du téléphone a pu s'arrêter entre-temps
+    // Retour sur la page : le chrono du téléphone a pu changer (au plus une lecture toutes les 2 minutes,
+    // tout de suite si on suit un chrono du téléphone).
+    if (PHONE && dogName()) dogFetch(dogName(), true);
+    else dogAutoFetch();
+    if (S.view === 'follows') followsMaybeFetch();
     pruneOld();
     if (S.view === 'home') render(); // recompte la journée si la date a changé pendant la nuit
     if (syncEnabled() && S.session) { syncNow(); runPoll(); }

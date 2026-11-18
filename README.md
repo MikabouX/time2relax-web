@@ -15,6 +15,13 @@ Chrono de break et de lunch, minuteur avec alertes, historique (avec ajout et mo
 entrée oubliée), commande de repas, mode nuit, français, néerlandais, anglais et allemand. Même esprit que l'appli
 Android, dans un navigateur : **rien à installer**. (Pas de liens Waze / Google Maps : inutiles sur PC.)
 
+> **1.9.2 (18 novembre 2026)** : la page se comporte comme un autre téléphone, sans jamais lire en continu.
+> Avec le nom de l'appli (bouton du cocker), elle relit le chrono, les pauses et les réglages de l'appli à
+> l'ouverture et quand on revient sur l'onglet (au plus toutes les 2 minutes ; réglages au plus toutes les
+> 30 minutes ; un réglage changé ici est gardé). Nouvelle page « Horaires reçus » (icône personnes) : codes
+> d'invitation gardés dans le navigateur, même grille que le planning de l'appli, lue à l'ouverture (au plus
+> toutes les 5 minutes) ou sur « Actualiser », dernière copie sans connexion.
+
 ## Utiliser la page
 
 - **Un seul fichier** : ouvre `dist/time2relax.html` (double-clic) dans Edge ou Chrome.
