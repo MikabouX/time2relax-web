@@ -41,6 +41,11 @@
   #install { display:none; margin: 0 0 16px; padding: 12px 14px; border-radius: 10px; background: var(--card); border:1px solid var(--line); font-size: 14px; align-items:center; gap:12px; flex-wrap:wrap; }
   #install button { font:inherit; font-weight:600; color:#fff; background:var(--accent); border:none; border-radius:8px; padding:7px 14px; cursor:pointer; }
   #install span { color: var(--muted); }
+  #tips { display:none; margin: 0 0 16px; padding: 14px 16px; border-radius: 10px; background: var(--card); border:1px solid var(--accent); font-size: 14px; }
+  #tips strong { display:block; margin-bottom:6px; }
+  #tips ol { margin: 6px 0 10px; padding-left: 20px; }
+  #tips li { margin: 3px 0; }
+  #tips button { font:inherit; color:var(--accent); background:none; border:1px solid var(--accent); border-radius:8px; padding:4px 12px; cursor:pointer; }
   pre { margin:0; padding: 18px; white-space: pre-wrap; word-break: break-word; font: 14px/1.55 ui-monospace, Menlo, Consolas, monospace; }
 </style>
 </head>
@@ -48,6 +53,16 @@
 <main>
   <h1>📧 Lecteur EML / MSG</h1>
   <div id="install"><button id="installBtn">Installer l'application</button><span>Ensuite, les fichiers .eml et .msg pourront s'ouvrir directement avec elle.</span></div>
+  <div id="tips">
+    <strong>✅ Application installée ! Pour ouvrir tes mails directement avec elle :</strong>
+    <ol>
+      <li>Fais un clic droit sur un fichier <b>.msg</b> → <b>Ouvrir avec</b> → <b>Choisir une autre application</b>.</li>
+      <li>Choisis <b>Lecteur EML / MSG</b>, puis clique sur <b>Toujours</b>.</li>
+      <li>Fais la même chose avec un fichier <b>.eml</b>.</li>
+      <li>La première fois, si Edge demande d'autoriser l'ouverture du fichier, clique sur <b>Autoriser</b>.</li>
+    </ol>
+    <button id="tipsOk">Compris</button>
+  </div>
   <label id="drop">
     <input type="file" id="pick" accept=".eml,.msg,message/rfc822" multiple hidden>
     <div><b>Choisis un fichier .eml ou .msg</b> ou glisse-le ici</div>
@@ -409,7 +424,10 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catc
 let installEvt=null;
 window.addEventListener('beforeinstallprompt', e=>{ e.preventDefault(); installEvt=e; $('install').style.display='flex'; });
 $('installBtn').onclick=async()=>{ if(!installEvt) return; installEvt.prompt(); try{ await installEvt.userChoice; }catch(e){} installEvt=null; $('install').style.display='none'; };
-window.addEventListener('appinstalled', ()=>{ $('install').style.display='none'; });
+const showTips=()=>{ let seen=false; try{ seen=localStorage.getItem('lecteurTipsVus')==='1'; }catch(e){} if(!seen) $('tips').style.display='block'; };
+$('tipsOk').onclick=()=>{ $('tips').style.display='none'; try{ localStorage.setItem('lecteurTipsVus','1'); }catch(e){} };
+window.addEventListener('appinstalled', ()=>{ $('install').style.display='none'; showTips(); });
+if (matchMedia('(display-mode: standalone)').matches) showTips();
 // Fichier ouvert depuis Windows (double-clic, « Ouvrir avec », UDA…)
 if ('launchQueue' in window) launchQueue.setConsumer(async params=>{
   for (const h of (params.files||[])) { try { openFile(await h.getFile()); } catch(e){} }
