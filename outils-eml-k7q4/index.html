@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow, noarchive">
-<title>Lecteur EML</title>
+<title>Lecteur EML / MSG</title>
 <style>
   :root { --bg:#f5f5f4; --card:#fff; --ink:#1c1917; --muted:#78716c; --line:#e7e5e4; --accent:#2563eb; }
   @media (prefers-color-scheme: dark) {
@@ -39,10 +39,10 @@
 </head>
 <body>
 <main>
-  <h1>📧 Lecteur EML</h1>
+  <h1>📧 Lecteur EML / MSG</h1>
   <label id="drop">
-    <input type="file" id="pick" accept=".eml,message/rfc822" multiple hidden>
-    <div><b>Choisis un fichier .eml</b> ou glisse-le ici</div>
+    <input type="file" id="pick" accept=".eml,.msg,message/rfc822" multiple hidden>
+    <div><b>Choisis un fichier .eml ou .msg</b> ou glisse-le ici</div>
     <small>Tout reste sur ton ordinateur : rien n'est envoyé sur internet.</small>
   </label>
   <div id="files"></div>
@@ -148,14 +148,190 @@ function walk(p, out){
     const data=p.data||'';
     if (cid && p.type.startsWith('image/')) out.cid[cid]='data:'+p.type+';base64,'+btoa(data);
     const ext = p.type==='message/rfc822' ? '.eml' : '';
-    out.att.push({ name: fname || ('piece-jointe-'+(out.att.length+1)+ext), cid, size:data.length,
-      url: URL.createObjectURL(new Blob([binToBytes(data)],{type:p.type})) });
+    const a = { name: fname || ('piece-jointe-'+(out.att.length+1)+ext), cid, size:data.length,
+      url: URL.createObjectURL(new Blob([binToBytes(data)],{type:p.type})) };
+    if (p.type==='message/rfc822') { try { a.mail=emlToMail(data); } catch(e){} }
+    out.att.push(a);
   }
+}
+
+function emlToMail(bin){
+  const root=parsePart(bin);
+  const H=k=>decodeWords(decodeCharset(root.h[k]||'','utf-8'));
+  const out={html:null,text:null,att:[],cid:{}};
+  walk(root,out);
+  return { subject:H('subject'), from:H('from'), to:H('to'), cc:H('cc'), date:fmtDate(H('date')), ...out };
+}
+function fmtDate(v){
+  if(!v) return '';
+  const d = v instanceof Date ? v : new Date(v);
+  return isNaN(d) ? String(v) : d.toLocaleString('fr-BE',{dateStyle:'full',timeStyle:'short'});
+}
+
+// ---------- fichiers Outlook .msg (format « Compound File » de Microsoft) ----------
+function cfb(u8){
+  const dv=new DataView(u8.buffer,u8.byteOffset,u8.byteLength);
+  const ss=1<<dv.getUint16(0x1E,true), mss=1<<dv.getUint16(0x20,true);
+  const nFat=dv.getUint32(0x2C,true), dirStart=dv.getUint32(0x30,true), cutoff=dv.getUint32(0x38,true);
+  const mfStart=dv.getUint32(0x3C,true), dfStart=dv.getUint32(0x44,true), nDf=dv.getUint32(0x48,true);
+  const END=0xFFFFFFFA, off=s=>(s+1)*ss;
+  const u32=o=> o+4<=u8.length ? dv.getUint32(o,true) : 0xFFFFFFFE;
+  const fatSecs=[];
+  for(let i=0;i<109&&fatSecs.length<nFat;i++) fatSecs.push(u32(0x4C+i*4));
+  for(let d=dfStart,k=0;k<nDf&&d<END;k++){ const o=off(d);
+    for(let i=0;i<ss/4-1&&fatSecs.length<nFat;i++) fatSecs.push(u32(o+i*4));
+    d=u32(o+ss-4); }
+  const fat=new Uint32Array(fatSecs.length*ss/4); let fi=0;
+  for(const s of fatSecs){ const o=off(s); for(let i=0;i<ss/4;i++) fat[fi++]=u32(o+i*4); }
+  const readChain=(s,size)=>{ const c=[], seen=new Set();
+    while(s<END&&s<fat.length&&!seen.has(s)){ seen.add(s); c.push(s); s=fat[s]; }
+    const out=new Uint8Array(c.length*ss);
+    c.forEach((x,i)=>out.set(u8.subarray(off(x),Math.min(off(x)+ss,u8.length)),i*ss));
+    return size!=null ? out.subarray(0,size) : out; };
+  const dirB=readChain(dirStart), ddv=new DataView(dirB.buffer), ents=[];
+  for(let o=0;o+128<=dirB.length;o+=128){
+    const nl=ddv.getUint16(o+0x40,true); let name='';
+    for(let i=0;i<nl-2&&i<64;i+=2) name+=String.fromCharCode(ddv.getUint16(o+i,true));
+    ents.push({name, type:dirB[o+0x42], l:ddv.getUint32(o+0x44,true), r:ddv.getUint32(o+0x48,true),
+      c:ddv.getUint32(o+0x4C,true), start:ddv.getUint32(o+0x74,true), size:ddv.getUint32(o+0x78,true)});
+  }
+  const root=ents[0], mini=readChain(root.start,root.size);
+  const mfat = mfStart<END ? new DataView(readChain(mfStart).buffer) : null;
+  const readMini=(s,size)=>{ const out=new Uint8Array(size), seen=new Set(); let p=0;
+    while(mfat&&s<END&&p<size&&!seen.has(s)&&(s*4+4)<=mfat.byteLength){ seen.add(s);
+      const n=Math.min(mss,size-p); out.set(mini.subarray(s*mss,s*mss+n),p); p+=n; s=mfat.getUint32(s*4,true); }
+    return out; };
+  return {
+    root,
+    data: e => e.size<cutoff ? readMini(e.start,e.size) : readChain(e.start,e.size),
+    kids: e => { if(e._k) return e._k; const r={}, seen=new Set();
+      const visit=i=>{ if(i>=ents.length||seen.has(i)) return; seen.add(i); const x=ents[i];
+        visit(x.l); r[x.name.toLowerCase()]=x; visit(x.r); };
+      visit(e.c); return e._k=r; }
+  };
+}
+function cpLabel(cp){
+  if(!cp) return 'windows-1252';
+  if(cp===65001) return 'utf-8';
+  if(cp>=28591&&cp<=28605) return 'iso-8859-'+(cp-28590);
+  if(cp===20127) return 'windows-1252';
+  return 'windows-'+cp;
+}
+function msgStore(c, node, hdr){
+  const k=c.kids(node), P={};
+  const ps=k['__properties_version1.0'];
+  if(ps){ const b=c.data(ps), dv=new DataView(b.buffer,b.byteOffset,b.byteLength);
+    for(let o=hdr;o+16<=b.length;o+=16){ const tag=dv.getUint32(o,true);
+      P[(tag>>>16).toString(16).padStart(4,'0')]={lo:dv.getUint32(o+8,true),hi:dv.getUint32(o+12,true)}; } }
+  const cp=cpLabel(P['3ffd']&&P['3ffd'].lo);
+  const st=n=>k['__substg1.0_'+n];
+  return { k, P,
+    S(id){ let e=st(id+'001f'); if(e) return new TextDecoder('utf-16le').decode(c.data(e)).replace(/\0+$/,'');
+      e=st(id+'001e'); if(e) return decodeCharset(bytesToBin(c.data(e)),cp).replace(/\0+$/,''); return ''; },
+    B(id){ const e=st(id+'0102'); return e ? c.data(e) : null; } };
+}
+const RTF_INIT='{\\rtf1\\ansi\\mac\\deff0\\deftab720{\\fonttbl;}{\\f0\\fnil \\froman \\fswiss \\fmodern \\fscript \\fdecor MS Sans SerifSymbolArialTimes New RomanCourier{\\colortbl\\red0\\green0\\blue0\r\n\\par \\pard\\plain\\f0\\fs20\\b\\i\\u\\tab\\tx';
+function lzfu(u8){
+  if(u8.length<16) return new Uint8Array(0);
+  const dv=new DataView(u8.buffer,u8.byteOffset,u8.byteLength);
+  const comp=dv.getUint32(0,true), raw=dv.getUint32(4,true), type=dv.getUint32(8,true);
+  if(type===0x414C454D) return u8.subarray(16,16+raw);          // « MELA » : pas compressé
+  const dict=new Uint8Array(4096); for(let i=0;i<RTF_INIT.length;i++) dict[i]=RTF_INIT.charCodeAt(i);
+  let wp=RTF_INIT.length, p=16; const end=Math.min(u8.length,comp+4), out=new Uint8Array(raw+16); let n=0;
+  const put=b=>{ if(n<out.length) out[n++]=b; dict[wp]=b; wp=(wp+1)&4095; };
+  outer: while(p<end){ const ctrl=u8[p++];
+    for(let b=0;b<8;b++){ if(p>=end) break outer;
+      if(ctrl&(1<<b)){ const tok=(u8[p]<<8)|u8[p+1]; p+=2; const o=tok>>4, len=(tok&15)+2;
+        if(o===wp) break outer; for(let i=0;i<len;i++) put(dict[(o+i)&4095]); }
+      else put(u8[p++]); } }
+  return out.subarray(0,n);
+}
+// Extrait le HTML (ou le texte) caché dans le RTF d'Outlook
+function rtfExtract(rtf){
+  const cpm=/\\ansicpg(\d+)/.exec(rtf), cp=cpLabel(cpm?+cpm[1]:1252);
+  const SKIP=/^(fonttbl|colortbl|stylesheet|info|pict|object|header|footer|listtable|listoverridetable|rsidtbl|generator|themedata|colorschememapping|latentstyles|datastore|xmlnstbl|mhtmltag|filetbl|revtbl)$/;
+  let res='', buf='', st={skip:false,html:false,uc:1}, stack=[], ucSkip=0, i=0, gs=false, star=false;
+  const flush=()=>{ if(buf){ res+=decodeCharset(buf,cp); buf=''; } };
+  const vis=()=>!st.skip&&!st.html;
+  const byte=ch=>{ if(ucSkip>0){ucSkip--;return;} if(vis()) buf+=ch; };
+  const str=s=>{ if(vis()){ flush(); res+=s; } };
+  while(i<rtf.length){
+    const ch=rtf[i];
+    if(ch==='{'){ stack.push(st); st={...st}; gs=true; star=false; i++; continue; }
+    if(ch==='}'){ st=stack.pop()||st; gs=false; i++; continue; }
+    if(ch==='\r'||ch==='\n'){ i++; continue; }
+    if(ch!=='\\'){ gs=false; byte(ch); i++; continue; }
+    const nx=rtf[i+1];
+    if(nx==='\\'||nx==='{'||nx==='}'){ gs=false; byte(nx); i+=2; continue; }
+    if(nx==="'"){ gs=false; byte(String.fromCharCode(parseInt(rtf.substr(i+2,2),16)||0)); i+=4; continue; }
+    if(nx==='*'){ star=true; i+=2; continue; }
+    if(nx==='~'){ str(' '); i+=2; continue; }
+    if(nx==='\r'||nx==='\n'){ str('\r\n'); i+=2; continue; }
+    const m=/^\\([a-zA-Z]+)(-?\d+)? ?/.exec(rtf.substr(i,48));
+    if(!m){ i+=2; continue; }
+    i+=m[0].length; const w=m[1], prm=m[2]!==undefined?+m[2]:null;
+    if(gs){ gs=false;
+      if(star){ if(w==='htmltag'){ st.skip=false; st.html=false; continue; } st.skip=true; continue; }
+      if(SKIP.test(w)){ st.skip=true; continue; } }
+    star=false;
+    if(w==='htmlrtf') st.html = prm!==0;
+    else if(w==='par'||w==='line') str('\r\n');
+    else if(w==='tab') str('\t');
+    else if(w==='uc') st.uc=prm||0;
+    else if(w==='u'){ if(vis()){ flush(); res+=String.fromCharCode(prm<0?prm+65536:prm); } ucSkip=st.uc; continue; }
+    else if(w==='bin'&&prm) i+=prm;
+    if(w!=='u') ucSkip=0;
+  }
+  flush(); return res;
+}
+function guessMime(name){
+  const e=(name.split('.').pop()||'').toLowerCase();
+  return {png:'image/png',jpg:'image/jpeg',jpeg:'image/jpeg',gif:'image/gif',bmp:'image/bmp',webp:'image/webp',pdf:'application/pdf'}[e]||'application/octet-stream';
+}
+function msgToMail(c, node, hdr){
+  const m=msgStore(c,node,hdr), mail={html:null,text:null,att:[],cid:{}};
+  const who=(n,e)=>{ e=e&&e.includes('@')?e:''; return n&&e&&n!==e ? `${n} <${e}>` : (n||e); };
+  mail.subject=m.S('0037');
+  mail.from=who(m.S('0c1a')||m.S('0042'), m.S('5d01')||m.S('0c1f')||m.S('0065'));
+  const to=[], cc=[];
+  for(const [name,e] of Object.entries(m.k)){
+    if(name.startsWith('__recip_version1.0_')){ const r=msgStore(c,e,8);
+      const s=who(r.S('3001'), r.S('39fe')||r.S('3003')); const t=r.P['0c15']?r.P['0c15'].lo:1;
+      if(s) (t===2?cc:t===1?to:[]).push(s); } }
+  mail.to=to.join(', ')||m.S('0e04'); mail.cc=cc.join(', ')||m.S('0e03');
+  const t=m.P['0039']||m.P['0e06'];
+  if(t&&(t.lo||t.hi)) mail.date=fmtDate(new Date((t.hi*4294967296+t.lo)/1e4-11644473600000));
+  else { const h=/^Date:\s*(.+)$/mi.exec(m.S('007d')); mail.date=h?fmtDate(h[1].trim()):''; }
+  // corps : HTML direct, sinon HTML caché dans le RTF, sinon texte
+  const hb=m.B('1013');
+  if(hb){ const head=bytesToBin(hb.subarray(0,3000)); const cs=/charset=["']?([\w-]+)/i.exec(head);
+    const cpid=m.P['3fde']&&m.P['3fde'].lo; let h=null;
+    if(!cs&&!cpid){ try{ h=new TextDecoder('utf-8',{fatal:true}).decode(hb); }catch(e){} }
+    mail.html = h!=null ? h : decodeCharset(bytesToBin(hb), cs?cs[1]:cpLabel(cpid)); }
+  else if(m.S('1013')) mail.html=m.S('1013');
+  const rb=m.B('1009'); let rtf='';
+  if(!mail.html&&rb){ try{ rtf=bytesToBin(lzfu(rb)); }catch(e){} if(/\\fromhtml/.test(rtf.slice(0,3000))) mail.html=rtfExtract(rtf); }
+  mail.text=m.S('1000') || (rtf&&!mail.html ? rtfExtract(rtf) : null);
+  // pièces jointes
+  for(const [name,e] of Object.entries(m.k)){
+    if(!name.startsWith('__attach_version1.0_')) continue;
+    const a=msgStore(c,e,8);
+    const fname=a.S('3707')||a.S('3704')||a.S('3001')||('piece-jointe-'+(mail.att.length+1));
+    const cid=(a.S('3712')||'').replace(/[<>]/g,'').trim();
+    const emb=a.k['__substg1.0_3701000d'];
+    if(emb){ let sub=null; try{ sub=msgToMail(c,emb,24); }catch(x){}
+      if(sub) mail.att.push({name:(sub.subject||fname), size:0, mail:sub}); continue; }
+    const d=a.B('3701'); if(!d) continue;
+    const mime=a.S('370e')||guessMime(fname);
+    if(cid&&mime.startsWith('image/')) mail.cid[cid]='data:'+mime+';base64,'+btoa(bytesToBin(d));
+    mail.att.push({name:fname, cid, size:d.length, url:URL.createObjectURL(new Blob([d],{type:mime}))});
+  }
+  return mail;
 }
 
 // ---------- affichage ----------
 const $=id=>document.getElementById(id);
-const loaded=[]; let current=null, allowRemote=false;
+let current=null, allowRemote=false;
 function esc(s){ return s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function size(n){ return n<1024? n+' o' : n<1048576? (n/1024).toFixed(0)+' Ko' : (n/1048576).toFixed(1)+' Mo'; }
 
@@ -167,7 +343,12 @@ function render(mail){
   $('rows').innerHTML = rows.map(r=>`<div class="row"><span>${r[0]}</span><span>${esc(r[1])}</span></div>`).join('');
   const atts = mail.att.filter(a=>!(a.cid && mail.html && mail.html.includes('cid:'+a.cid)));
   $('atts').style.display = atts.length? 'flex':'none';
-  $('atts').innerHTML = atts.map(a=>`<a href="${a.url}" download="${esc(a.name)}">📎 ${esc(a.name)} <em>${size(a.size)}</em></a>`).join('');
+  $('atts').innerHTML='';
+  for(const a of atts){ const el=document.createElement('a');
+    el.innerHTML = a.mail ? `✉️ ${esc(a.name)} <em>ouvrir</em>` : `📎 ${esc(a.name)} <em>${size(a.size)}</em>`;
+    if(a.mail){ el.href='#'; el.onclick=e=>{ e.preventDefault(); addMail(a.mail, a.name); }; }
+    else { el.href=a.url; el.download=a.name; }
+    $('atts').appendChild(el); }
   [...document.querySelectorAll('#files button')].forEach(b=>b.classList.toggle('on', b._mail===mail));
   drawBody();
 }
@@ -192,20 +373,20 @@ function drawBody(){
 }
 $('showImg').onclick=()=>{ allowRemote=true; drawBody(); };
 
+function addMail(mail, label){
+  const b=document.createElement('button'); b.textContent=mail.subject||label; b.title=label; b._mail=mail;
+  b.onclick=()=>render(mail); $('files').appendChild(b);
+  render(mail);
+}
 function openFile(file){
   const r=new FileReader();
   r.onload=()=>{
-    const root=parsePart(bytesToBin(new Uint8Array(r.result)));
-    const H=k=>decodeWords(decodeCharset(root.h[k]||'','utf-8'));
-    const out={html:null,text:null,att:[],cid:{}};
-    walk(root,out);
-    let date=H('date'); const d=new Date(date);
-    if (date && !isNaN(d)) date=d.toLocaleString('fr-BE',{dateStyle:'full',timeStyle:'short'});
-    const mail={ subject:H('subject'), from:H('from'), to:H('to'), cc:H('cc'), date, ...out };
-    loaded.push(mail);
-    const b=document.createElement('button'); b.textContent=mail.subject||file.name; b.title=file.name; b._mail=mail;
-    b.onclick=()=>render(mail); $('files').appendChild(b);
-    render(mail);
+    const u8=new Uint8Array(r.result); let mail;
+    try {
+      if(u8[0]===0xD0&&u8[1]===0xCF&&u8[2]===0x11&&u8[3]===0xE0){ const c=cfb(u8); mail=msgToMail(c,c.root,32); }
+      else mail=emlToMail(bytesToBin(u8));
+    } catch(e){ mail={subject:file.name, text:'Impossible de lire ce fichier ('+e.message+').', att:[], cid:{}}; }
+    addMail(mail, file.name);
   };
   r.readAsArrayBuffer(file);
 }
