@@ -79,7 +79,7 @@
     <div class="bar" id="bar">Images externes bloquées pour ta vie privée. <button id="showImg">Les afficher</button></div>
     <div id="body"></div>
   </section>
-  <p style="margin-top:28px;color:var(--muted);font-size:12px;text-align:center">Lecteur EML / MSG · version 3</p>
+  <p style="margin-top:28px;color:var(--muted);font-size:12px;text-align:center">Lecteur EML / MSG · version 4</p>
 </main>
 
 <script>
@@ -439,7 +439,7 @@ if ('launchQueue' in window) {
     status('');
     for (const h of list) {
       try { const f=await h.getFile(); openFile(f); }
-      catch(e){ status('Le fichier a bien été transmis, mais Windows ou Edge en a refusé la lecture ('+(e.name||'')+' '+(e.message||'')+'). As-tu cliqué sur « Autoriser » ?'); }
+      catch(e){ status('Ce PC ne permet pas d\'ouvrir « '+(h.name||'ce fichier')+' » directement dans l\'appli (règle de sécurité). Glisse plutôt le fichier dans cette fenêtre, ou clique sur « Choisis un fichier ».'); }
     }
   });
 } else if (matchMedia('(display-mode: standalone)').matches) {
