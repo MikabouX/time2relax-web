@@ -1661,7 +1661,7 @@ async function followsTests(browser) {
   const share = {
     updated: '2026-10-29T08:00:00Z',
     payload: { v: 1, weeks: [{ monday: '2026-10-26', days: [
-      { d: '2026-10-26', k: 'site', s: '08:00', e: '16:30', items: [{ t: '10:00', m: 15, y: 'break' }, { t: '12:00', m: 30, y: 'lunch' }] },
+      { d: '2026-10-26', k: 'site', s: '08:00', e: '16:30', u: 1, items: [{ t: '10:00', m: 15, y: 'break' }, { t: '12:00', m: 30, y: 'lunch' }] },
       { d: '2026-10-27', k: 'remote', s: '09:00', e: '17:00', items: [{ t: '09:00', m: 60, y: 'other', l: 'Phone' }, { t: '10:00', m: 60, y: 'other', l: 'Meeting' }, { t: '11:00', m: 300, y: 'other', l: 'Phone' }] },
       { d: '2026-10-28', k: 'off', off: 'holiday', h: 'Toussaint' },
       { d: '2026-10-29', k: 'off', off: 'absent' },
@@ -1713,6 +1713,8 @@ async function followsTests(browser) {
   eq(await page.locator('.fw-blk.lun').count(), 1, 'lunch du lundi affiché');
   eq(await page.locator('.fw-blk.main').count(), 3, 'journée du lundi en fond + Phone du mardi (2 blocs)');
   eq(await page.locator('.fw-blk.oth').count(), 1, 'meeting du mardi');
+  check((await text(page, '.fw-grid')).includes('Travail (habituel)'), 'horaire habituel signalé');
+  eq((await page.locator('.fw-end').allInnerTexts()).join(' | '), '16:30 | 16:00', 'heure de fin en bas de la journée');
   const offs = await page.locator('.fw-off').allInnerTexts();
   eq(offs.join(' | '), 'Toussaint | Absent', 'férié et absence');
   eq(await page.locator('.fw-place.site svg').count(), 1, 'sur site : voiture');

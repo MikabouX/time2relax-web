@@ -109,7 +109,7 @@ function followDays(data) {
         let e = hmToMin(d.e);
         if (s !== null && e !== null) {
           if (e <= s) e = 24 * 60; // travail de nuit : jusqu'à minuit ce jour-là
-          blocks.unshift({ from: s, to: e, type: 'other', label: t('fw_work'), min: e - s, base: true });
+          blocks.unshift({ from: s, to: e, type: 'other', label: d.u === 1 ? t('fw_work_usual') : t('fw_work'), min: e - s, base: true });
         }
       }
       days[d.d] = { off: false, place: d.k === 'site' || d.k === 'remote' ? d.k : null, blocks };
@@ -215,7 +215,9 @@ function followWeek(f) {
           const end = `${two(Math.floor(b.to / 60) % 24)}:${two(b.to % 60)}`;
           col.append(h('div', {
             class: `fw-blk ${cls}`, style: `top:${top + 0.5}px;height:${hgt}px`, title: `${name} · ${start} – ${end}`,
-          }, hgt < 16 ? '' : hgt < 30 ? name : [h('span', {}, start), h('br', {}), name]));
+          }, hgt < 16 ? '' : hgt < 30 ? name : [h('span', {}, start), h('br', {}), name,
+            // Journée en fond, assez haute : l'heure de fin en bas.
+            isMain(b) && hgt >= 60 ? h('span', { class: 'fw-end' }, end) : null]));
         });
       }
       if (k === today && nowMin >= h0 * 60 && nowMin <= h1 * 60) col.append(h('div', { class: 'fw-now', style: `top:${y(nowMin) - 1}px` }));

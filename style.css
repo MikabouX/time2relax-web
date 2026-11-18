@@ -505,6 +505,7 @@ button.tile { border: 0; font: inherit; cursor: pointer; }
 .fw-blk.lun, .fw-sw.lun { background: var(--tertiary); color: #fff; }
 .fw-blk.main, .fw-sw.main { background: var(--highest); color: var(--muted); }
 .fw-blk.oth, .fw-sw.oth { background: var(--secondary-c); color: var(--on-secondary-c); }
+.fw-end { position: absolute; left: 3px; bottom: 1px; }
 .fw-now { position: absolute; left: -3px; right: 0; height: 2px; background: var(--error); pointer-events: none; }
 .fw-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 10px; }
 .fw-legend span { display: inline-flex; align-items: center; gap: 6px; }
