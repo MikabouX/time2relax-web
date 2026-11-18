@@ -1,0 +1,27 @@
+{
+  "id": "/outils-eml-k7q4/",
+  "name": "Lecteur EML / MSG",
+  "short_name": "Lecteur mail",
+  "description": "Ouvre les fichiers .eml et .msg sans Outlook. Tout reste sur l'ordinateur.",
+  "lang": "fr",
+  "start_url": "/outils-eml-k7q4/",
+  "scope": "/outils-eml-k7q4/",
+  "display": "standalone",
+  "background_color": "#f5f5f4",
+  "theme_color": "#2563eb",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ],
+  "file_handlers": [
+    {
+      "action": "/outils-eml-k7q4/",
+      "accept": {
+        "message/rfc822": [".eml"],
+        "application/vnd.ms-outlook": [".msg"]
+      },
+      "launch_type": "multiple-clients"
+    }
+  ],
+  "launch_handler": { "client_mode": "focus-existing" }
+}

@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow, noarchive">
 <title>Lecteur EML / MSG</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="theme-color" content="#2563eb">
 <style>
   :root { --bg:#f5f5f4; --card:#fff; --ink:#1c1917; --muted:#78716c; --line:#e7e5e4; --accent:#2563eb; }
   @media (prefers-color-scheme: dark) {
@@ -34,12 +38,16 @@
   .bar { padding: 8px 18px; font-size: 13px; color: var(--muted); border-bottom:1px solid var(--line); display:none; }
   .bar button { font:inherit; color:var(--accent); background:none; border:none; cursor:pointer; padding:0; text-decoration: underline; }
   iframe { width:100%; height: 72vh; border:0; background:#fff; display:block; }
+  #install { display:none; margin: 0 0 16px; padding: 12px 14px; border-radius: 10px; background: var(--card); border:1px solid var(--line); font-size: 14px; align-items:center; gap:12px; flex-wrap:wrap; }
+  #install button { font:inherit; font-weight:600; color:#fff; background:var(--accent); border:none; border-radius:8px; padding:7px 14px; cursor:pointer; }
+  #install span { color: var(--muted); }
   pre { margin:0; padding: 18px; white-space: pre-wrap; word-break: break-word; font: 14px/1.55 ui-monospace, Menlo, Consolas, monospace; }
 </style>
 </head>
 <body>
 <main>
   <h1>📧 Lecteur EML / MSG</h1>
+  <div id="install"><button id="installBtn">Installer l'application</button><span>Ensuite, les fichiers .eml et .msg pourront s'ouvrir directement avec elle.</span></div>
   <label id="drop">
     <input type="file" id="pick" accept=".eml,.msg,message/rfc822" multiple hidden>
     <div><b>Choisis un fichier .eml ou .msg</b> ou glisse-le ici</div>
@@ -395,6 +403,17 @@ const drop=$('drop');
 ['dragenter','dragover'].forEach(ev=>document.addEventListener(ev,e=>{e.preventDefault(); drop.classList.add('over');}));
 ['dragleave','drop'].forEach(ev=>document.addEventListener(ev,e=>{e.preventDefault(); drop.classList.remove('over');}));
 document.addEventListener('drop',e=>[...e.dataTransfer.files].forEach(openFile));
+
+// ---------- application installable ----------
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
+let installEvt=null;
+window.addEventListener('beforeinstallprompt', e=>{ e.preventDefault(); installEvt=e; $('install').style.display='flex'; });
+$('installBtn').onclick=async()=>{ if(!installEvt) return; installEvt.prompt(); try{ await installEvt.userChoice; }catch(e){} installEvt=null; $('install').style.display='none'; };
+window.addEventListener('appinstalled', ()=>{ $('install').style.display='none'; });
+// Fichier ouvert depuis Windows (double-clic, « Ouvrir avec », UDA…)
+if ('launchQueue' in window) launchQueue.setConsumer(async params=>{
+  for (const h of (params.files||[])) { try { openFile(await h.getFile()); } catch(e){} }
+});
 </script>
 </body>
 </html>
