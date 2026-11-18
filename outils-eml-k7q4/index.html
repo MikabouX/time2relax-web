@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow, noarchive">
+<title>Lecteur EML</title>
+<style>
+  :root { --bg:#f5f5f4; --card:#fff; --ink:#1c1917; --muted:#78716c; --line:#e7e5e4; --accent:#2563eb; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#1c1917; --card:#292524; --ink:#f5f5f4; --muted:#a8a29e; --line:#44403c; --accent:#60a5fa; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; font:15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; background:var(--bg); color:var(--ink); }
+  main { max-width: 960px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { font-size: 20px; margin: 0 0 16px; }
+  #drop { border: 2px dashed var(--line); border-radius: 12px; padding: 28px; text-align:center; background:var(--card); cursor:pointer; transition:.15s; }
+  #drop.over { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--card)); }
+  #drop b { color: var(--accent); }
+  #drop small { color: var(--muted); display:block; margin-top:6px; }
+  #files { display:flex; flex-wrap:wrap; gap:6px; margin:14px 0 0; }
+  #files button { border:1px solid var(--line); background:var(--card); color:var(--ink); border-radius:999px; padding:4px 12px; font:inherit; font-size:13px; cursor:pointer; max-width:280px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #files button.on { border-color: var(--accent); color: var(--accent); }
+  #mail { margin-top: 18px; background: var(--card); border:1px solid var(--line); border-radius: 12px; overflow:hidden; display:none; }
+  .head { padding: 16px 18px; border-bottom: 1px solid var(--line); }
+  .subject { font-size: 19px; font-weight: 600; margin: 0 0 10px; word-break: break-word; }
+  .row { display:flex; gap:8px; font-size:14px; }
+  .row span:first-child { color: var(--muted); min-width: 48px; }
+  .row span:last-child { word-break: break-word; }
+  .atts { padding: 10px 18px; border-bottom:1px solid var(--line); display:flex; flex-wrap:wrap; gap:8px; }
+  .atts a { display:inline-flex; gap:6px; align-items:center; text-decoration:none; color:var(--ink); border:1px solid var(--line); border-radius:8px; padding:5px 10px; font-size:13px; }
+  .atts a:hover { border-color: var(--accent); }
+  .atts a em { color: var(--muted); font-style: normal; }
+  .bar { padding: 8px 18px; font-size: 13px; color: var(--muted); border-bottom:1px solid var(--line); display:none; }
+  .bar button { font:inherit; color:var(--accent); background:none; border:none; cursor:pointer; padding:0; text-decoration: underline; }
+  iframe { width:100%; height: 72vh; border:0; background:#fff; display:block; }
+  pre { margin:0; padding: 18px; white-space: pre-wrap; word-break: break-word; font: 14px/1.55 ui-monospace, Menlo, Consolas, monospace; }
+</style>
+</head>
+<body>
+<main>
+  <h1>📧 Lecteur EML</h1>
+  <label id="drop">
+    <input type="file" id="pick" accept=".eml,message/rfc822" multiple hidden>
+    <div><b>Choisis un fichier .eml</b> ou glisse-le ici</div>
+    <small>Tout reste sur ton ordinateur : rien n'est envoyé sur internet.</small>
+  </label>
+  <div id="files"></div>
+  <section id="mail">
+    <div class="head">
+      <p class="subject" id="subject"></p>
+      <div id="rows"></div>
+    </div>
+    <div class="atts" id="atts"></div>
+    <div class="bar" id="bar">Images externes bloquées pour ta vie privée. <button id="showImg">Les afficher</button></div>
+    <div id="body"></div>
+  </section>
+</main>
+
+<script>
+// ---------- outils de décodage ----------
+function bytesToBin(u8){ let s=''; for(let i=0;i<u8.length;i+=8192) s+=String.fromCharCode.apply(null,u8.subarray(i,i+8192)); return s; }
+function binToBytes(s){ const u=new Uint8Array(s.length); for(let i=0;i<s.length;i++) u[i]=s.charCodeAt(i)&255; return u; }
+function decodeCharset(bin, cs){
+  cs = (cs||'utf-8').toLowerCase().trim();
+  if (cs==='us-ascii' || cs==='ascii') cs='windows-1252';
+  try { return new TextDecoder(cs).decode(binToBytes(bin)); }
+  catch(e){ return new TextDecoder('utf-8').decode(binToBytes(bin)); }
+}
+function qp(s){ return s.replace(/=\r?\n/g,'').replace(/=([0-9A-Fa-f]{2})/g,(x,h)=>String.fromCharCode(parseInt(h,16))); }
+function b64(s){
+  s = s.replace(/[^A-Za-z0-9+/=]/g,'').replace(/=+$/,'');
+  s = s.slice(0, s.length - (s.length % 4 === 1 ? 1 : 0));
+  while (s.length % 4) s += '=';
+  try { return atob(s); } catch(e){ return ''; }
+}
+function decodeWords(s){
+  if(!s) return '';
+  s = s.replace(/(=\?[^?]+\?[bBqQ]\?[^?]*\?=)\s+(?==\?)/g,'$1');
+  return s.replace(/=\?([^?*]+)(?:\*[^?]*)?\?([bBqQ])\?([^?]*)\?=/g,(m,cs,enc,t)=>{
+    const bin = enc.toUpperCase()==='B' ? b64(t) : qp(t.replace(/_/g,' '));
+    return decodeCharset(bin, cs);
+  });
+}
+function parseHeaders(txt){
+  const h={};
+  for (const l of txt.replace(/\r?\n(?=[ \t])/g,'').split(/\r?\n/)){
+    const i=l.indexOf(':'); if(i<=0) continue;
+    const k=l.slice(0,i).trim().toLowerCase();
+    if(!(k in h)) h[k]=l.slice(i+1).trim();
+  }
+  return h;
+}
+function param(v, name){
+  if(!v) return '';
+  const re = new RegExp(';\\s*'+name+'(\\*\\d+)?(\\*)?\\s*=\\s*("(?:[^"\\\\]|\\\\.)*"|[^;]*)','gi');
+  const s=';'+v.replace(/^[^;]*/,''); const parts=[]; let m, ext=false;
+  while((m=re.exec(s))){
+    let val=m[3].trim();
+    if(val[0]==='"') val=val.slice(1,-1).replace(/\\(.)/g,'$1');
+    if(m[2]) ext=true;
+    parts[m[1]?parseInt(m[1].slice(1)):0]={val, enc:!!m[2]};
+  }
+  if(!parts.length) return '';
+  let out='', cs='utf-8';
+  parts.forEach((p,i)=>{ if(!p) return; let val=p.val;
+    if(p.enc){ if(i===0){ const mm=/^([^']*)'[^']*'(.*)$/.exec(val); if(mm){ cs=mm[1]||cs; val=mm[2]; } }
+      out += val.replace(/%([0-9A-Fa-f]{2})/g,(x,h)=>String.fromCharCode(parseInt(h,16))); }
+    else out += val; });
+  return ext ? decodeCharset(out, cs) : decodeWords(decodeCharset(out,'utf-8'));
+}
+
+// ---------- analyse MIME ----------
+function parsePart(bin){
+  let hRaw, body;
+  if (/^\r?\n/.test(bin)) { hRaw=''; body=bin.replace(/^\r?\n/,''); }
+  else { const m=/\r?\n\r?\n/.exec(bin); hRaw=m?bin.slice(0,m.index):bin; body=m?bin.slice(m.index+m[0].length):''; }
+  const h=parseHeaders(hRaw);
+  const ct=h['content-type']||'text/plain';
+  const type=ct.split(';')[0].trim().toLowerCase();
+  const part={h, ct, type};
+  if (type.startsWith('multipart/')){
+    const b=param(ct,'boundary'); part.parts=[];
+    if (b){
+      const segs=body.split('--'+b);
+      for (let i=1;i<segs.length;i++){
+        let seg=segs[i]; if (seg.startsWith('--')) break;
+        seg=seg.replace(/^[ \t]*\r?\n/,'').replace(/\r?\n$/,'');
+        part.parts.push(parsePart(seg));
+      }
+    }
+  } else {
+    const te=(h['content-transfer-encoding']||'').toLowerCase().trim();
+    part.data = te==='base64' ? b64(body) : te==='quoted-printable' ? qp(body) : body;
+  }
+  return part;
+}
+function walk(p, out){
+  if (p.parts){ p.parts.forEach(c=>walk(c,out)); return; }
+  const disp=(p.h['content-disposition']||'').toLowerCase();
+  const isAtt = disp.startsWith('attachment');
+  const fname = param(p.h['content-disposition'],'filename') || param(p.ct,'name');
+  const cs = param(p.ct,'charset');
+  if (!isAtt && !fname && p.type==='text/html' && out.html==null) out.html=decodeCharset(p.data,cs);
+  else if (!isAtt && !fname && p.type==='text/plain' && out.text==null) out.text=decodeCharset(p.data,cs);
+  else {
+    const cid=(p.h['content-id']||'').replace(/[<>]/g,'').trim();
+    const data=p.data||'';
+    if (cid && p.type.startsWith('image/')) out.cid[cid]='data:'+p.type+';base64,'+btoa(data);
+    const ext = p.type==='message/rfc822' ? '.eml' : '';
+    out.att.push({ name: fname || ('piece-jointe-'+(out.att.length+1)+ext), cid, size:data.length,
+      url: URL.createObjectURL(new Blob([binToBytes(data)],{type:p.type})) });
+  }
+}
+
+// ---------- affichage ----------
+const $=id=>document.getElementById(id);
+const loaded=[]; let current=null, allowRemote=false;
+function esc(s){ return s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function size(n){ return n<1024? n+' o' : n<1048576? (n/1024).toFixed(0)+' Ko' : (n/1048576).toFixed(1)+' Mo'; }
+
+function render(mail){
+  current=mail; allowRemote=false;
+  $('mail').style.display='block';
+  $('subject').textContent = mail.subject || '(sans objet)';
+  const rows=[['De',mail.from],['À',mail.to],['Cc',mail.cc],['Date',mail.date]].filter(r=>r[1]);
+  $('rows').innerHTML = rows.map(r=>`<div class="row"><span>${r[0]}</span><span>${esc(r[1])}</span></div>`).join('');
+  const atts = mail.att.filter(a=>!(a.cid && mail.html && mail.html.includes('cid:'+a.cid)));
+  $('atts').style.display = atts.length? 'flex':'none';
+  $('atts').innerHTML = atts.map(a=>`<a href="${a.url}" download="${esc(a.name)}">📎 ${esc(a.name)} <em>${size(a.size)}</em></a>`).join('');
+  [...document.querySelectorAll('#files button')].forEach(b=>b.classList.toggle('on', b._mail===mail));
+  drawBody();
+}
+function drawBody(){
+  const mail=current, box=$('body');
+  box.innerHTML='';
+  if (mail.html){
+    let html = mail.html.replace(/cid:([^"'\s)>]+)/gi,(m,id)=>mail.cid[id]||m);
+    const csp = allowRemote ? '' : `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; font-src data:">`;
+    const hasRemote = /<img[^>]+src=["']?https?:/i.test(html) || /url\(["']?https?:/i.test(html);
+    $('bar').style.display = (!allowRemote && hasRemote) ? 'block':'none';
+    const f=document.createElement('iframe');
+    f.setAttribute('sandbox','allow-popups allow-popups-to-escape-sandbox');
+    f.srcdoc = `<!DOCTYPE html><html><head><meta charset="utf-8">${csp}<base target="_blank"><style>body{font-family:system-ui,sans-serif;margin:16px;color:#1c1917}img{max-width:100%;height:auto}</style></head><body>${html}</body></html>`;
+    box.appendChild(f);
+  } else {
+    $('bar').style.display='none';
+    const pre=document.createElement('pre');
+    pre.textContent = mail.text || '(aucun contenu)';
+    box.appendChild(pre);
+  }
+}
+$('showImg').onclick=()=>{ allowRemote=true; drawBody(); };
+
+function openFile(file){
+  const r=new FileReader();
+  r.onload=()=>{
+    const root=parsePart(bytesToBin(new Uint8Array(r.result)));
+    const H=k=>decodeWords(decodeCharset(root.h[k]||'','utf-8'));
+    const out={html:null,text:null,att:[],cid:{}};
+    walk(root,out);
+    let date=H('date'); const d=new Date(date);
+    if (date && !isNaN(d)) date=d.toLocaleString('fr-BE',{dateStyle:'full',timeStyle:'short'});
+    const mail={ subject:H('subject'), from:H('from'), to:H('to'), cc:H('cc'), date, ...out };
+    loaded.push(mail);
+    const b=document.createElement('button'); b.textContent=mail.subject||file.name; b.title=file.name; b._mail=mail;
+    b.onclick=()=>render(mail); $('files').appendChild(b);
+    render(mail);
+  };
+  r.readAsArrayBuffer(file);
+}
+$('pick').onchange=e=>{ [...e.target.files].forEach(openFile); e.target.value=''; };
+const drop=$('drop');
+['dragenter','dragover'].forEach(ev=>document.addEventListener(ev,e=>{e.preventDefault(); drop.classList.add('over');}));
+['dragleave','drop'].forEach(ev=>document.addEventListener(ev,e=>{e.preventDefault(); drop.classList.remove('over');}));
+document.addEventListener('drop',e=>[...e.dataTransfer.files].forEach(openFile));
+</script>
+</body>
+</html>
