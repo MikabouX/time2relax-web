@@ -52,6 +52,9 @@
   .actions{display:flex;gap:8px;margin-top:10px}
   button{font:inherit;font-size:13.5px;border:1px solid var(--line);background:#fff;border-radius:8px;padding:6px 12px;cursor:pointer}
   button:hover{border-color:var(--accent)}
+  .avis{grid-column:1/-1;justify-self:center;display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;text-decoration:none;color:var(--ink);font-size:13.5px;padding:8px 14px;border-radius:10px}
+  .avis:hover{background:#fff;box-shadow:0 0 0 1px var(--line)}
+  .avis strong{color:var(--accent)}
   footer{grid-column:1/-1;color:var(--muted);font-size:12px;text-align:center;margin-top:6px}
 </style>
 </head>
@@ -174,6 +177,11 @@
       </ul>
     </details>
   </section>
+
+  <a class="avis" href="avis/">
+    <svg width="34" height="31" viewBox="0 0 34 31" aria-hidden="true"><path d="M17 1.5 L32.5 29.5 H1.5 Z" fill="#ffd400" stroke="#111" stroke-width="2.4" stroke-linejoin="round"/><rect x="15.4" y="10" width="3.2" height="11" rx="1.6" fill="#111"/><circle cx="17" cy="25" r="1.9" fill="#111"/></svg>
+    <span><strong>Enquête de satisfaction</strong><br>Donnez votre avis</span>
+  </a>
 
   <footer>Outil interne non officiel – aucune donnée n'est enregistrée ni envoyée, tout est calculé dans votre navigateur.</footer>
 </main>
