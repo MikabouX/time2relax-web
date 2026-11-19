@@ -302,8 +302,25 @@
     } else { s.hidden = true; }
 
     var typeLbl = ['appartement', '2 façades', '3 façades', '4 façades'][inp.type];
-    lastText = 'Estimation indicative – ' + inp.persons + (inp.persons >= 5 ? '+' : '') + ' pers., ' + typeLbl +
-      '\nÉlectricité : ' + fmt(r.e) + ' kWh/an' + '\nGaz : ' + fmt(r.g) + ' kWh/an' + (solarTxt ? '\n' + solarTxt : '');
+    var heatLbl = {gaz: 'gaz', elec: 'électrique', pac: 'pompe à chaleur'}[inp.heating];
+    var waterLbl = inp.water === 'elec' ? 'boiler électrique' : 'gaz';
+    var evLbl = inp.ev ? 'oui, ' + fmt(inp.km) + ' km/an rechargés à domicile' : 'non';
+    var pvLbl = inp.pv ? 'oui, ' + String(inp.kwc).replace('.', ',') + ' kWc, ' + (inp.bat ? 'avec' : 'sans') + ' batterie, ' + (inp.comp ? 'avec compensation' : 'sans compensation (injection)') : 'non';
+    var detailTxt = r.lines.map(function(l, k){
+      if (k === 0) return '- ' + l.label + ' : élec ' + fmt(l.e) + ' / gaz ' + fmt(l.g) + ' kWh';
+      var parts = [];
+      if (l.e) parts.push('élec ' + (l.e > 0 ? '+' : '−') + fmt(Math.abs(l.e)));
+      if (l.g) parts.push('gaz ' + (l.g > 0 ? '+' : '−') + fmt(Math.abs(l.g)));
+      return '- ' + l.label + ' : ' + parts.join(' / ') + ' kWh';
+    }).join('\n');
+    lastText = 'Estimation indicative de consommation annuelle' +
+      '\nMénage : ' + inp.persons + (inp.persons >= 5 ? '+' : '') + ' pers., ' + typeLbl +
+      '\nChauffage : ' + heatLbl +
+      '\nEau chaude : ' + waterLbl +
+      '\nVoiture électrique : ' + evLbl +
+      '\nPanneaux solaires : ' + pvLbl +
+      '\n\nDétail :\n' + detailTxt +
+      '\n\nÉlectricité : ' + fmt(r.e) + ' kWh/an' + '\nGaz : ' + fmt(r.g) + ' kWh/an' + (solarTxt ? '\n' + solarTxt : '');
   }
 
   document.getElementById('f').addEventListener('input', render);
