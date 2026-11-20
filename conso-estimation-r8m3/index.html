@@ -253,8 +253,8 @@
       <fieldset id="knSet">
         <legend>Consommations connues <span class="hint">(facultatif)</span></legend>
         <div class="hint" style="margin:-2px 0 6px">D'après la facture ou les relevés du compteur : remplace l'estimation dans le calcul du prix.</div>
-        <div class="row" id="knERow"><span class="clbl">Électricité</span><input type="text" inputmode="numeric" class="px" id="knE" maxlength="7"> <span>kWh/an prélevés</span></div>
-        <div class="row" id="knENRow"><span class="clbl"></span><input type="text" inputmode="numeric" class="px" id="knEN" maxlength="7"> <span>dont nuit / heures creuses (bi-horaire)</span></div>
+        <div class="row" id="knERow"><span class="clbl">Électricité</span><input type="text" inputmode="numeric" class="px" id="knE" maxlength="7"> <span>kWh/an prélevés (compteur simple) ou heures pleines</span></div>
+        <div class="row" id="knENRow"><span class="clbl"></span><input type="text" inputmode="numeric" class="px" id="knEN" maxlength="7"> <span>heures creuses (bi-horaire : les deux index séparés)</span></div>
         <div class="row" id="knPRow"><span class="clbl">Panneaux</span><input type="text" inputmode="numeric" class="px" id="knP" maxlength="7"> <span>kWh/an produits</span> <input type="text" inputmode="numeric" class="px" id="knI" maxlength="7"> <span>kWh/an injectés</span></div>
         <div class="row" id="knGRow"><span class="clbl">Gaz</span><input type="text" inputmode="numeric" class="px" id="knG" maxlength="7"> <span>kWh/an</span></div>
       </fieldset>
@@ -915,7 +915,9 @@
     document.getElementById('boxG').hidden = !showG;
     document.querySelector('.totals').classList.toggle('one', !(showE && showG));
     // Consommations connues (facture / compteur) : elles remplacent l'estimation pour le prix.
-    var knE = showE ? pnum($('knE').value) : null, knEN = showE ? pnum($('knEN').value) : null, knG = showG ? pnum($('knG').value) : null;
+    var knEP = showE ? pnum($('knE').value) : null, knEN = showE ? pnum($('knEN').value) : null, knG = showG ? pnum($('knG').value) : null;
+    // Bi-horaire : le compteur donne deux index séparés (pleines, creuses) ; leur somme = prélèvement total.
+    var knE = knEP !== null ? knEP + (knEN || 0) : null;
     $('knERow').hidden = $('knENRow').hidden = !showE; $('knGRow').hidden = !showG;
     if (knE !== null) knE = Math.round(knE); if (knG !== null) knG = Math.round(knG);
     var pctEl = $('pct'), autoPct = knE && knEN !== null && knEN <= knE;
@@ -1048,7 +1050,7 @@
       '\nÉnergies : ' + enLbl + P.txt +
       '\nMénage : ' + inp.persons + (inp.persons >= 5 ? '+' : '') + ' pers., ' + typeLbl + ' ; chauffage ' + heatLbl + ' ; eau chaude ' + waterLbl +
       (showE ? '\nCompteur communicant : ' + (val('pcpt') === 'comm' ? 'oui' : 'non') + '\nPanneaux solaires : ' + pvTxt + (knP !== null || knI !== null ? ' ; relevés : ' + [knP !== null ? 'production ' + fmt(knP) + ' kWh/an' : '', knI !== null ? 'injection ' + fmt(knI) + ' kWh/an' : ''].filter(Boolean).join(', ') : '') + '\nVéhicule électrique : ' + evLbl + '\nClimatisation : ' + (inp.clim ? 'oui, ' + inp.climN + ' appareil' + (inp.climN > 1 ? 's' : '') : 'non') + (inp.pv ? '\nBatterie domestique : ' + (inp.bat ? 'oui' : 'non') : '') : '') +
-      '\nConsommation ' + ((showE && knE !== null) || (showG && knG !== null) ? 'utilisée' : 'estimée') + ' : ' + [showE ? 'électricité ' + fmt(knE !== null ? knE : kE0) + ' kWh/an' + (knE !== null ? ' (connue)' : '') : '', showG ? 'gaz ' + fmt(knG !== null ? knG : r.g) + ' kWh/an' + (knG !== null ? ' (connue)' : '') : ''].filter(Boolean).join(', ') +
+      '\nConsommation ' + ((showE && knE !== null) || (showG && knG !== null) ? 'utilisée' : 'estimée') + ' : ' + [showE ? 'électricité ' + fmt(knE !== null ? knE : kE0) + ' kWh/an' + (knE !== null ? (knEN !== null ? ' (connue : heures pleines ' + fmt(knEP) + ' + creuses ' + fmt(knEN) + ')' : ' (connue)') : '') : '', showG ? 'gaz ' + fmt(knG !== null ? knG : r.g) + ' kWh/an' + (knG !== null ? ' (connue)' : '') : ''].filter(Boolean).join(', ') +
       (acTxt ? '\nAcompte estimé : ' + acTxt : '') +
       (acS !== null ? '\nAcompte souhaité : ' + fmt(acS) + ' €/mois' : '');
   }
