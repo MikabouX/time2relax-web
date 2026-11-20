@@ -184,3 +184,9 @@ create table if not exists public.conso_cp_nom (
 alter table public.conso_cp_nom enable row level security;
 revoke all on public.conso_cp_nom from anon, authenticated;
 create extension if not exists unaccent schema extensions;
+
+-- ===== Précision (migration conso_prix_precision, 20 novembre 2026) =====
+-- Le simulateur affiche les prix comme les cartes ENGIE (particulier TVAC, pro HTVA) : plus de décimales pour retrouver
+-- exactement les montants TVAC après ÷ 1,06 puis × 1,06.
+alter table public.conso_prix alter column prix_kwh type numeric(10,5), alter column prix_jour type numeric(10,5), alter column prix_nuit type numeric(10,5), alter column fixe_an type numeric(10,4);
+alter table public.conso_prix_propositions alter column prix_kwh type numeric(10,5), alter column prix_jour type numeric(10,5), alter column prix_nuit type numeric(10,5), alter column fixe_an type numeric(10,4);
