@@ -32,6 +32,12 @@
   .sub{margin:8px 0 0 2px;padding:10px 12px;border-left:3px solid var(--accent-soft);display:grid;gap:8px}
   .sub[hidden]{display:none}
   .row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  input[type=text]{flex:1;min-width:180px;padding:6px 8px;border:1px solid var(--line);border-radius:7px;font-size:14px}
+  .contracts{display:grid;gap:8px}
+  .contracts [hidden]{display:none}
+  .clbl{min-width:110px;font-size:14px}
+  .check{display:inline-flex;align-items:center;gap:6px;font-size:14px;cursor:pointer}
+  .check input{accent-color:var(--accent);margin:0}
   input[type=number]{width:110px;padding:6px 8px;border:1px solid var(--line);border-radius:7px;font-size:14px}
   .hint{color:var(--muted);font-size:12.5px}
   .totals{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
@@ -80,6 +86,15 @@
           <label><input type="radio" name="en" value="both" checked>Électricité + gaz</label>
           <label><input type="radio" name="en" value="e">Électricité seule</label>
           <label><input type="radio" name="en" value="g">Gaz seul</label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Contrat choisi</legend>
+        <div class="contracts">
+          <label class="check" id="sameRow"><input type="checkbox" id="same" checked> Même contrat pour l'électricité et le gaz</label>
+          <div class="row" id="rowE"><span class="clbl" id="lblE">Électricité</span><input type="text" id="cE" maxlength="80" placeholder="Nom du contrat"></div>
+          <div class="row" id="rowG"><span class="clbl">Gaz</span><input type="text" id="cG" maxlength="80" placeholder="Nom du contrat"></div>
         </div>
       </fieldset>
 
@@ -326,6 +341,18 @@
     document.getElementById('boxE').hidden = !showE;
     document.getElementById('boxG').hidden = !showG;
     document.querySelector('.totals').classList.toggle('one', !(showE && showG));
+    var both = showE && showG, sameBox = document.getElementById('same').checked;
+    var elE = document.getElementById('cE'), elG = document.getElementById('cG');
+    if (!showE && sameBox && !elG.value.trim() && elE.value.trim()) elG.value = elE.value;  // gaz seul : reprend le contrat commun
+    if (!showG && sameBox && !elE.value.trim() && elG.value.trim()) elE.value = elG.value;
+    var shared = both && sameBox;
+    document.getElementById('sameRow').hidden = !both;
+    document.getElementById('rowE').hidden = !showE;
+    document.getElementById('rowG').hidden = !showG || shared;
+    document.getElementById('lblE').textContent = shared ? 'Élec. et gaz' : 'Électricité';
+    var cE = elE.value.trim(), cG = elG.value.trim();
+    var contratTxt = shared ? '\nContrat (électricité et gaz) : ' + (cE || 'non renseigné')
+      : (showE ? '\nContrat électricité : ' + (cE || 'non renseigné') : '') + (showG ? '\nContrat gaz : ' + (cG || 'non renseigné') : '');
     var r = compute(inp);
 
     document.getElementById('totE').textContent = fmt(r.e);
@@ -367,7 +394,7 @@
       return '- ' + l.label + ' : ' + parts.join(' / ') + ' kWh';
     }).join('\n');
     lastText = 'Estimation indicative de consommation annuelle' +
-      '\nÉnergies : ' + enLbl +
+      '\nÉnergies : ' + enLbl + contratTxt +
       '\nMénage : ' + inp.persons + (inp.persons >= 5 ? '+' : '') + ' pers., ' + typeLbl +
       '\nChauffage : ' + heatLbl +
       '\nEau chaude : ' + waterLbl +
