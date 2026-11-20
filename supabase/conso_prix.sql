@@ -190,3 +190,9 @@ create extension if not exists unaccent schema extensions;
 -- exactement les montants TVAC après ÷ 1,06 puis × 1,06.
 alter table public.conso_prix alter column prix_kwh type numeric(10,5), alter column prix_jour type numeric(10,5), alter column prix_nuit type numeric(10,5), alter column fixe_an type numeric(10,4);
 alter table public.conso_prix_propositions alter column prix_kwh type numeric(10,5), alter column prix_jour type numeric(10,5), alter column prix_nuit type numeric(10,5), alter column fixe_an type numeric(10,4);
+
+-- ===== Tri-horaire (migration conso_prix_trihoraire, 20 novembre 2026) =====
+-- prix_t1 / prix_t2 / prix_t3 (c€/kWh HTVA) : énergie Flextime (heures pleines / creuses / super-creuses, Empower variable)
+-- et réseau wallon Impact (PIC / MEDIUM / ECO, transport compris). Sans valeur : pleines = jour, creuses et super-creuses = nuit.
+-- Renvoyés par conso_prix_get, gardés par conso_prix_save si la clé est absente, recopiés par conso_prix_copy.
+alter table public.conso_prix add column if not exists prix_t1 numeric(10,5), add column if not exists prix_t2 numeric(10,5), add column if not exists prix_t3 numeric(10,5);

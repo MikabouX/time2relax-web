@@ -298,8 +298,9 @@
           <div class="row lst"><span class="clbl">Gestionnaire</span><select id="grdE"></select><span class="hint" id="regE"></span></div>
           <div class="row"><span class="clbl">Contrat</span><select id="selE" class="lst"></select><input type="text" id="cE" maxlength="80" placeholder="Nom du contrat"><a id="docE" class="doclink" target="_blank" rel="noopener" hidden>Carte ENGIE électricité (PDF)</a></div>
           <div class="row"><span class="clbl">Compteur</span>
-            <div class="opts"><label><input type="radio" name="cpt" value="simple" checked>Simple</label><label><input type="radio" name="cpt" value="bi">Bi-horaire</label></div>
+            <div class="opts"><label><input type="radio" name="cpt" value="simple" checked>Simple</label><label><input type="radio" name="cpt" value="bi">Bi-horaire</label><label><input type="radio" name="cpt" value="tri">Tri-horaire / Flextime</label></div>
           </div>
+          <div class="row" id="rowTri" hidden><span class="clbl">Répartition</span><input type="text" inputmode="decimal" class="px" id="t1p" value="40" style="width:44px"> % pleines <input type="text" inputmode="decimal" class="px" id="t2p" value="40" style="width:44px"> % creuses <input type="text" inputmode="decimal" class="px" id="t3p" value="20" style="width:44px"> % super-creuses <span class="hint">(compteur communicant ; réseau wallon : tarif Impact PIC / MEDIUM / ECO)</span></div>
           <div class="row" id="rowPct" hidden><span class="clbl">Part de nuit</span><input type="text" inputmode="decimal" class="px" id="pct" value="50"> % de la consommation</div>
           <div id="tabE"></div>
           <div class="prop" id="propE" hidden>
@@ -483,15 +484,22 @@
   function grdOf(code){ return (T && T.grd.filter(function(x){ return x.code === code; })[0]) || null; }
   function regionOf(en){ var g = grdOf($(en === 'e' ? 'grdE' : 'grdG').value); return g ? g.region : ''; }
   function bi(){ return document.querySelector('input[name="cpt"]:checked').value === 'bi'; }
+  function tri(){ return document.querySelector('input[name="cpt"]:checked').value === 'tri'; }
+  // Répartition tri-horaire (pleines / creuses / super-creuses), ramenée à 100 %.
+  function triShares(){ var a = pnum($('t1p').value), b = pnum($('t2p').value), c = pnum($('t3p').value); a = a === null ? 40 : a; b = b === null ? 40 : b; c = c === null ? 20 : c; var t = a + b + c || 1; return [a / t, b / t, c / t]; }
   function SEG(){ return document.querySelector('input[name="seg"]:checked').value; }
   function tvaRate(){ return SEG() === 'P' ? 0.21 : 0.06; }
   function segOf(type){ return type === 'reseau' ? '*' : SEG(); }
-  function fields(en){ return en === 'e' && bi() ? ['j', 'n', 'f'] : ['k', 'f']; }
-  var FIELD_DB = {k: 'prix_kwh', j: 'prix_jour', n: 'prix_nuit', f: 'fixe_an'};
+  function fields(en){ return en === 'e' && tri() ? ['a', 'b', 'c', 'f'] : en === 'e' && bi() ? ['j', 'n', 'f'] : ['k', 'f']; }
+  var FIELD_DB = {k: 'prix_kwh', j: 'prix_jour', n: 'prix_nuit', a: 'prix_t1', b: 'prix_t2', c: 'prix_t3', f: 'fixe_an'};
+  // Sans prix tri-horaire : pleines = jour, creuses et super-creuses = nuit, sinon prix unique.
+  var TRI_FB = {a: ['prix_t1', 'prix_jour', 'prix_kwh'], b: ['prix_t2', 'prix_nuit', 'prix_kwh'], c: ['prix_t3', 'prix_nuit', 'prix_kwh']};
   // Énergie verte : même ligne de la liste que l'énergie, colonne vert_kwh (identique jour/nuit, pas de fixe).
   function fdb(c, f){ return c === 'vt' ? (f === 'f' ? null : 'vert_kwh') : FIELD_DB[f]; }
-  function rv(r, c, f){ var k = fdb(c, f); return r && k && r[k] !== null && r[k] !== undefined ? +r[k] : null; }
-  var FIELD_LBL = {k: 'c€/kWh', j: 'Jour c€/kWh', n: 'Nuit c€/kWh', f: '€/an'};
+  function rv(r, c, f){
+    if (r && c !== 'vt' && TRI_FB[f]){ for (var i = 0; i < 3; i++){ var x = r[TRI_FB[f][i]]; if (x !== null && x !== undefined) return +x; } return null; }
+    var k = fdb(c, f); return r && k && r[k] !== null && r[k] !== undefined ? +r[k] : null; }
+  var FIELD_LBL = {k: 'c€/kWh', j: 'Jour c€/kWh', n: 'Nuit c€/kWh', a: 'Pleines c€/kWh', b: 'Creuses c€/kWh', c: 'Super-creuses c€/kWh', f: '€/an'};
 
   function names(en){
     var reg = regionOf(en), seen = {}, out = [];
@@ -545,7 +553,7 @@
     if (SOCIAL[en]){ rows.re = {prix_kwh: 0, prix_jour: 0, prix_nuit: 0, fixe_an: 0, prosumer_kwe: null}; rows.tx = reg ? findRow('taxes', en, 'Tarif social', reg) : null; }
     COMPS.forEach(function(c){
       var old = SRC[en][c.k], v = VAL[en][c.k], r = rows[c.k];
-      ['k', 'j', 'n', 'f'].forEach(function(f){
+      ['k', 'j', 'n', 'a', 'b', 'c', 'f'].forEach(function(f){
         if (c.k === 'vt' && f === 'f'){ v[f] = null; return; }
         var was = rv(old, c.k, f), cur = v[f];
         var userEdited = cur !== null && cur !== undefined && (was === null ? true : +cur !== +was);
@@ -585,6 +593,7 @@
       COMPS.forEach(function(c){
         var v = VAL[en][c.k][f];
         if ((f === 'j' || f === 'n') && (v === null || v === undefined)) v = VAL[en][c.k].k;  // même prix jour et nuit si non séparé
+        if ((f === 'a' || f === 'b' || f === 'c') && (v === null || v === undefined)){ var w = VAL[en][c.k][f === 'a' ? 'j' : 'n']; v = w !== null && w !== undefined ? w : VAL[en][c.k].k; }
         if (v !== null && v !== undefined){ any = true; t += +v; }
       });
       out[f] = any ? t : null;
@@ -629,7 +638,7 @@
   }
   function refreshSums(en){
     var s = sums(en), box = $(en === 'e' ? 'tabE' : 'tabG'), t = 1 + tvaRate();
-    function g(c, f){ var v = VAL[en][c][f]; if ((f === 'j' || f === 'n') && (v === null || v === undefined)) v = VAL[en][c].k; return v === null || v === undefined ? null : +v; }
+    function g(c, f){ var v = VAL[en][c][f]; if ((f === 'a' || f === 'b' || f === 'c') && (v === null || v === undefined)) v = VAL[en][c][f === 'a' ? 'j' : 'n']; if ((f === 'j' || f === 'n' || f === 'a' || f === 'b' || f === 'c') && (v === null || v === undefined)) v = VAL[en][c].k; return v === null || v === undefined ? null : +v; }
     var df = DF();
     box.querySelectorAll('[data-sum]').forEach(function(td){ var f = td.getAttribute('data-sum'); td.textContent = s[f] === null ? '–' : num2(s[f] * df); });
     box.querySelectorAll('[data-tvac]').forEach(function(td){ var f = td.getAttribute('data-tvac'); td.textContent = s[f] === null ? '–' : num2(s[f] * t); });
@@ -655,14 +664,15 @@
     $('rowCG').hidden = shared;
     var lists = !!(T && T.grd.length);
     ['E', 'G'].forEach(function(k){ $('c' + k).hidden = lists && $('sel' + k).value !== AUTRE; });
-    $('rowPct').hidden = !bi();
+    $('rowPct').hidden = !bi(); $('rowTri').hidden = !tri();
     $('regE').textContent = regionOf('e'); $('regG').textContent = regionOf('g');
     var pct = pnum($('pct').value); if (pct === null || pct > 100) pct = 50;
     var mois = T && T.mois ? T.mois : null, out = {txt: ''};
 
     ['e', 'g'].forEach(function(en){
       var s = sums(en), o = {};
-      if (en === 'e' && bi()) o.prixMoyen = s.j !== null && s.n !== null ? s.j * (1 - pct / 100) + s.n * pct / 100 : null;
+      if (en === 'e' && tri()){ var sh = triShares(); o.prixMoyen = s.a !== null && s.b !== null && s.c !== null ? s.a * sh[0] + s.b * sh[1] + s.c * sh[2] : null; }
+      else if (en === 'e' && bi()) o.prixMoyen = s.j !== null && s.n !== null ? s.j * (1 - pct / 100) + s.n * pct / 100 : null;
       else o.prixMoyen = s.k;
       o.fixe = s.f || 0;
       var anyEdit = false, anyList = false, parts = [];
@@ -673,6 +683,9 @@
         if (en === 'e' && bi()){
           var j = v.j !== null && v.j !== undefined ? v.j : v.k, n = v.n !== null && v.n !== undefined ? v.n : v.k;
           if (j !== null && j !== undefined) bits.push(showv(j, c.k, 'j') + ' / ' + showv(n, c.k, 'n') + ' c€/kWh');
+        } else if (en === 'e' && tri()){
+          var g3 = ['a', 'b', 'c'].map(function(f){ var x = v[f]; if (x === null || x === undefined){ x = v[f === 'a' ? 'j' : 'n']; if (x === null || x === undefined) x = v.k; } return x; });
+          if (g3[0] !== null && g3[0] !== undefined) bits.push(g3.map(function(x, i){ return showv(x, c.k, 'abc'[i]); }).join(' / ') + ' c€/kWh');
         } else if (v.k !== null && v.k !== undefined) bits.push(showv(v.k, c.k, 'k') + ' c€/kWh');
         if (v.f) bits.push(showv(v.f, c.k, 'f') + ' €/an');
         var edited = fs.some(function(f){ return isEdited(en, c.k, f); });
@@ -684,7 +697,7 @@
       var grd = grdOf($(en === 'e' ? 'grdE' : 'grdG').value), name = contractName(en);
       var head = [];
       if (grd) head.push(grd.nom + ', ' + grd.region);
-      if (en === 'e') head.push(bi() ? 'compteur bi-horaire, ' + fmt(pct) + ' % la nuit' : 'compteur simple');
+      if (en === 'e') head.push(tri() ? 'compteur tri-horaire, ' + triShares().map(function(x){ return Math.round(x * 100); }).join(' / ') + ' % pleines / creuses / super-creuses' : bi() ? 'compteur bi-horaire, ' + fmt(pct) + ' % la nuit' : 'compteur simple');
       if (anyList) head.push('prix ' + deMois(mois) + (anyEdit ? ', en partie corrigés à la main' : ''));
       else if (parts.some(function(p){ return p.txt !== 'non renseigné'; })) head.push('prix saisis à la main');
       o.source = head.join(' · ');
@@ -913,7 +926,8 @@
       var kwe = pnum($('kwe').value); if (kwe === null) kwe = inp.kwc;
       var rate = pnum($('prosRate').value), comm = val('pcpt') === 'comm';
       var reS = sums('e'), reK = (VAL.e.re.k !== null && VAL.e.re.k !== undefined) ? +VAL.e.re.k : null;
-      if (bi()){ var rj = VAL.e.re.j !== undefined && VAL.e.re.j !== null ? +VAL.e.re.j : reK, rn = VAL.e.re.n !== undefined && VAL.e.re.n !== null ? +VAL.e.re.n : reK, pc = pnum($('pct').value); if (pc === null || pc > 100) pc = 50; reK = rj !== null && rn !== null ? rj * (1 - pc / 100) + rn * pc / 100 : null; }
+      if (tri()){ var sh3 = triShares(), r3 = ['a', 'b', 'c'].map(function(f){ var x = VAL.e.re[f]; if (x === null || x === undefined){ x = VAL.e.re[f === 'a' ? 'j' : 'n']; if (x === null || x === undefined) x = VAL.e.re.k; } return x === null || x === undefined ? null : +x; }); reK = r3.indexOf(null) < 0 ? r3[0] * sh3[0] + r3[1] * sh3[1] + r3[2] * sh3[2] : null; }
+      else if (bi()){ var rj = VAL.e.re.j !== undefined && VAL.e.re.j !== null ? +VAL.e.re.j : reK, rn = VAL.e.re.n !== undefined && VAL.e.re.n !== null ? +VAL.e.re.n : reK, pc = pnum($('pct').value); if (pc === null || pc > 100) pc = 50; reK = rj !== null && rn !== null ? rj * (1 - pc / 100) + rn * pc / 100 : null; }
       var forfait = rate !== null ? kwe * rate : null, prop = comm && reK !== null ? kRes * reK / 100 : null, pros = null, how = '';
       if (comm){ pros = prop !== null && forfait !== null ? Math.min(prop, forfait) : (prop !== null ? prop : forfait);
         how = fmt(kRes) + ' kWh prélevés × ' + (reK !== null ? num2(reK) : '?') + ' c€ (réseau)' + (forfait !== null ? ' (plafond : ' + num2(kwe) + ' kWe × ' + num2(rate) + ' € = ' + fmt(forfait) + ' €)' : ''); }
