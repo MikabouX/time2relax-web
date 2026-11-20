@@ -47,7 +47,7 @@
   input[type=text]{flex:1;min-width:180px;padding:6px 8px;border:1px solid var(--line);border-radius:7px;font-size:14px}
   .clbl{min-width:100px;font-size:14px}
   #prixSet{display:grid;gap:10px}
-  #prixSet [hidden], #knSet [hidden], .veh[hidden]{display:none}
+  #prixSet [hidden], #knSet [hidden], .veh[hidden], #knPRow[hidden]{display:none}
   .pblock{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:grid;gap:8px}
   .ptitle{font-weight:650;font-size:14px;padding-left:8px}
   .ptitle.e{border-left:4px solid var(--elec)} .ptitle.g{border-left:4px solid var(--gas)}
@@ -141,6 +141,7 @@
         <div class="hint" style="margin:-2px 0 6px">D'après la facture ou les relevés du compteur : remplace l'estimation dans le calcul du prix.</div>
         <div class="row" id="knERow"><span class="clbl">Électricité</span><input type="text" inputmode="numeric" class="px" id="knE" maxlength="7"> <span>kWh/an prélevés</span></div>
         <div class="row" id="knENRow"><span class="clbl"></span><input type="text" inputmode="numeric" class="px" id="knEN" maxlength="7"> <span>dont nuit / heures creuses (bi-horaire)</span></div>
+        <div class="row" id="knPRow"><span class="clbl">Panneaux</span><input type="text" inputmode="numeric" class="px" id="knP" maxlength="7"> <span>kWh/an produits</span> <input type="text" inputmode="numeric" class="px" id="knI" maxlength="7"> <span>kWh/an injectés</span></div>
         <div class="row" id="knGRow"><span class="clbl">Gaz</span><input type="text" inputmode="numeric" class="px" id="knG" maxlength="7"> <span>kWh/an</span></div>
       </fieldset>
 
@@ -441,13 +442,15 @@
     g = Math.max(0, g);
 
     var solar = null;
-    if (input.pv && input.kwc > 0){
-      var prod = r100(input.kwc * K.pvKwhKwc);
+    if (input.pv && (input.kwc > 0 || input.prodKnown > 0)){
+      // Production et injection connues (relevés) : elles remplacent l'estimation (kWc × 900, 30 % / 65 % autoconsommés).
+      var prod = input.prodKnown > 0 ? Math.round(input.prodKnown) : r100(input.kwc * K.pvKwhKwc);
+      var autoEst = input.injKnown !== null && input.injKnown !== undefined && input.injKnown <= prod ? prod - Math.round(input.injKnown) : r100(prod * (input.bat ? K.autoBat : K.autoSans));
       if (input.comp){
-        var autoC = Math.min(e, r100(prod * (input.bat ? K.autoBat : K.autoSans)));
-        solar = {mode: 'comp', prod: prod, net: Math.max(0, e - prod), auto: autoC, reseau: e - autoC};
+        var autoC = Math.min(e, autoEst);
+        solar = {mode: 'comp', prod: prod, net: Math.max(0, e - prod), auto: autoC, reseau: e - autoC, injecte: prod - autoC};
       } else {
-        var auto = Math.min(e, r100(prod * (input.bat ? K.autoBat : K.autoSans)));
+        var auto = Math.min(e, autoEst);
         solar = {mode: 'inj', prod: prod, auto: auto, reseau: e - auto, injecte: prod - auto};
       }
     }
@@ -887,6 +890,9 @@
     var pctEl = $('pct'), autoPct = knE && knEN !== null && knEN <= knE;
     if (autoPct){ pctEl.value = String(Math.round(knEN / knE * 1000) / 10).replace('.', ','); pctEl.readOnly = true; pctEl.title = 'Calculé à partir des consommations connues'; }
     else if (pctEl.readOnly){ pctEl.readOnly = false; pctEl.title = ''; pctEl.value = '50'; }
+    var knP = showE && inp.pv ? pnum($('knP').value) : null, knI = showE && inp.pv ? pnum($('knI').value) : null;
+    $('knPRow').hidden = !(showE && inp.pv);
+    inp.prodKnown = knP; inp.injKnown = knI;
     var P = prixUI(showE, showG);
     var r = compute(inp);
 
@@ -908,8 +914,10 @@
     var s = document.getElementById('solar'), solarTxt = '';
     if (r.solar){
       if (r.solar.mode === 'comp'){
-        s.innerHTML = 'Production solaire estimée : <b>' + fmt(r.solar.prod) + ' kWh</b>.<br>Avec compensation, consommation nette facturée : <b>' + fmt(r.solar.net) + ' kWh / an</b>.';
-        solarTxt = 'Production solaire : ' + fmt(r.solar.prod) + ' kWh. Avec compensation, consommation nette : ' + fmt(r.solar.net) + ' kWh/an.';
+        var injS = knI !== null ? knI : r.solar.injecte, netS = knE !== null ? (val('pcpt') === 'comm' ? Math.max(0, knE - injS) : knE) : r.solar.net;
+        s.innerHTML = 'Production solaire ' + (knP !== null ? 'relevée' : 'estimée') + ' : <b>' + fmt(r.solar.prod) + ' kWh</b>.<br>' +
+          (knE !== null && val('pcpt') === 'comm' ? 'Prélevé ' + fmt(knE) + ' − injecté ' + fmt(injS) + ' kWh' + (knI !== null ? '' : ' (estimé)') + ' : ' : 'Avec compensation, ') + 'consommation nette facturée : <b>' + fmt(netS) + ' kWh / an</b>.';
+        solarTxt = 'Production solaire : ' + fmt(r.solar.prod) + ' kWh. Avec compensation, consommation nette : ' + fmt(netS) + ' kWh/an.';
       } else {
         s.innerHTML = 'Production solaire estimée : <b>' + fmt(r.solar.prod) + ' kWh</b>, dont environ <b>' + fmt(r.solar.auto) + ' kWh</b> consommés directement.<br>Électricité prélevée sur le réseau : <b>' + fmt(r.solar.reseau) + ' kWh / an</b>. Injectée : environ ' + fmt(r.solar.injecte) + ' kWh / an.';
         solarTxt = 'Production solaire : ' + fmt(r.solar.prod) + ' kWh, autoconsommée ~' + fmt(r.solar.auto) + ' kWh. Prélevée sur le réseau : ' + fmt(r.solar.reseau) + ' kWh/an, injectée ~' + fmt(r.solar.injecte) + ' kWh/an.';
@@ -918,7 +926,9 @@
     } else { s.hidden = true; }
 
     // ---- coût et acompte
-    var kE = knE !== null ? knE : (r.solar ? (r.solar.mode === 'comp' ? r.solar.net : r.solar.reseau) : r.e), kE0 = r.e, acTxt = '';
+    // Compensation + compteur communicant : prélèvement connu − injection (connue ou estimée) = consommation nette facturée.
+    var commPv = r.solar && r.solar.mode === 'comp' && val('pcpt') === 'comm', injU = knI !== null ? knI : (r.solar ? r.solar.injecte : 0);
+    var kE = knE !== null ? (commPv ? Math.max(0, knE - injU) : knE) : (r.solar ? (r.solar.mode === 'comp' ? r.solar.net : r.solar.reseau) : r.e), kE0 = r.e, acTxt = '';
     var kRes = knE !== null ? knE : (r.solar ? r.solar.reseau : r.e);   // kWh prélevés (tarif prosumer proportionnel)
     var cst = document.getElementById('cost'), costTxt = '', html = '', tot = 0, nOk = 0, nMiss = 0, totEn = {e: 0, g: 0}, okEn = {e: false, g: false};
     function costLine(lbl, kwh, pr, fixe){
@@ -945,7 +955,7 @@
       // Compteur communicant : les kWh compensés ne paient pas l'énergie mais bien le réseau (prélèvement × coûts de réseau),
       // plafonné au tarif prosumer (ristourne de la différence). Les kWh au-delà de la production (consommation nette) paient
       // énergie + réseau + taxes, déjà comptés dans la ligne électricité.
-      var kComp = knE !== null ? Math.max(0, r.solar.reseau - r.solar.net) : Math.max(0, kRes - kE);
+      var kComp = knE !== null ? Math.min(knE, injU) : Math.max(0, kRes - kE);
       var forfait = rate !== null ? kwe * rate : null, prop = comm && reK !== null ? kComp * reK / 100 : null, pros = null, how = '', rist = 0;
       if (comm){ pros = prop !== null && forfait !== null ? Math.min(prop, forfait) : (prop !== null ? prop : forfait);
         if (prop !== null && forfait !== null && prop < forfait) rist = forfait - prop;
@@ -1006,7 +1016,7 @@
       '\nClient : ' + (SEG() === 'P' ? 'professionnel' : 'particulier') +
       '\nÉnergies : ' + enLbl + P.txt +
       '\nMénage : ' + inp.persons + (inp.persons >= 5 ? '+' : '') + ' pers., ' + typeLbl + ' ; chauffage ' + heatLbl + ' ; eau chaude ' + waterLbl +
-      (showE ? '\nVéhicule électrique : ' + evLbl + '\nPanneaux solaires : ' + pvTxt + (inp.pv ? '\nBatterie domestique : ' + (inp.bat ? 'oui' : 'non') : '') : '') +
+      (showE ? '\nVéhicule électrique : ' + evLbl + '\nPanneaux solaires : ' + pvTxt + (knP !== null || knI !== null ? ' ; relevés : ' + [knP !== null ? 'production ' + fmt(knP) + ' kWh/an' : '', knI !== null ? 'injection ' + fmt(knI) + ' kWh/an' : ''].filter(Boolean).join(', ') : '') + (inp.pv ? '\nBatterie domestique : ' + (inp.bat ? 'oui' : 'non') : '') : '') +
       '\nConsommation ' + ((showE && knE !== null) || (showG && knG !== null) ? 'utilisée' : 'estimée') + ' : ' + [showE ? 'électricité ' + fmt(knE !== null ? knE : kE0) + ' kWh/an' + (knE !== null ? ' (connue)' : '') : '', showG ? 'gaz ' + fmt(knG !== null ? knG : r.g) + ' kWh/an' + (knG !== null ? ' (connue)' : '') : ''].filter(Boolean).join(', ') +
       (acTxt ? '\nAcompte estimé : ' + acTxt : '') +
       (acS !== null ? '\nAcompte souhaité : ' + fmt(acS) + ' €/mois' : '');
