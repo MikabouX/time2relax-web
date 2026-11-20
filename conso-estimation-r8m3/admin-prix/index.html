@@ -95,6 +95,11 @@
 
     <details class="sec" id="cards">
       <summary><strong>Cartes tarifaires ENGIE du mois</strong> <span class="hint">(liens directs, à ouvrir ou télécharger puis à m'envoyer)</span></summary>
+      <div class="row" style="margin-top:8px">
+        <button type="button" id="dlAll">Tout télécharger (<span id="dlCount">0</span> cartes)</button>
+        <span class="msg" id="dlMsg"></span>
+      </div>
+      <p class="hint" style="margin:6px 0 0">Les cartes arrivent dans votre dossier Téléchargements (Chrome demande la première fois d'autoriser les téléchargements multiples). Rangez-les ensuite dans <code>~/Claude/Tarifs/AAAA-MM</code> sur le Mac et demandez à Claude de les lire.</p>
       <div id="cardLinks" class="hint" style="margin-top:6px"></div>
     </details>
     <div class="sec">
@@ -315,6 +320,18 @@
     $('cardLinks').innerHTML = html + '<p>Ces liens donnent les cartes du mois en cours sur le site d\'ENGIE. Si un lien ne s\'ouvre plus, ENGIE a changé la référence du document : utilisez les pages « Prix et conditions » d\'ENGIE.</p>';
   }
   drawCards();
+  $('dlCount').textContent = $('cardLinks').querySelectorAll('a').length;
+  $('dlAll').addEventListener('click', function(){
+    var urls = Array.prototype.map.call($('cardLinks').querySelectorAll('a'), function(a){ return a.href; }), i = 0, btn = this;
+    btn.disabled = true;
+    (function next(){
+      if (i >= urls.length){ msg('dlMsg', urls.length + ' téléchargements lancés. Vérifiez le dossier Téléchargements.', 'ok'); btn.disabled = false; return; }
+      var a = document.createElement('a'); a.href = urls[i]; a.rel = 'noopener'; a.style.display = 'none';
+      document.body.appendChild(a); a.click(); a.remove();
+      i++; msg('dlMsg', 'Téléchargement ' + i + ' / ' + urls.length + '…');
+      setTimeout(next, 900);
+    })();
+  });
 
   window.addEventListener('beforeunload', function(e){ if (dirty){ e.preventDefault(); e.returnValue = ''; } });
 
