@@ -96,7 +96,7 @@
     <details class="sec" id="cards">
       <summary><strong>Cartes tarifaires ENGIE du mois</strong> <span class="hint">(liens directs, à ouvrir ou télécharger puis à m'envoyer)</span></summary>
       <div class="row" style="margin-top:8px">
-        <button type="button" id="dlAll">Tout télécharger (<span id="dlCount">0</span> cartes)</button>
+        <button type="button" id="dlAll">Tout télécharger (<span id="dlCount">0</span> cartes)</button> <button type="button" id="dlAutres" class="sec">Autres tarifs seulement</button>
         <span class="msg" id="dlMsg"></span>
       </div>
       <p class="hint" style="margin:6px 0 0">Les cartes arrivent dans votre dossier Téléchargements (Chrome demande la première fois d'autoriser les téléchargements multiples). Rangez-les ensuite dans <code>~/Claude/Tarifs/AAAA-MM</code> sur le Mac et demandez à Claude de les lire.</p>
@@ -303,18 +303,25 @@
   var PRODUITS = [
     ['Easy variable', 'EASY_{S}_GREEN_C_I_{D}', true], ['Easy fixe', 'EASY_{S}_GREEN_C_F_{D}', true], ['Flow variable', 'FLOW_{S}_GREEN_C_I_{F}', true],
     ['Direct Online variable', 'DIRECT_ONLINE_{S}_{DG}_C_I_{D}', true], ['Dynamic', 'DYNAMIC_{S}_GREY_C_I_{D}', false],
-    ['Empower variable/Flextime', 'EMPOWER_{S}_GREEN_C_I_00', true], ['Empower fixe', 'EMPOWER_{S}_GREEN_C_F_00', true]];
+    ['Empower variable/Flextime', 'EMPOWER_{S}_GREEN_C_I_00', true], ['Empower fixe', 'EMPOWER_{S}_GREEN_C_F_00', true],
+    // « Nos autres tarifs » : [nom, code, gaz, segments, régions, nom pro]
+    ['Basic Online variable', 'BASIC_ONLINE_{S}_GREY_C_I_24', true, 'R', 'VW'],
+    ['Maison vide', 'EMPTYHOUSE_{S}_GREY_C_I_36', true, 'RP', 'VBW', 'Bâtiment vide'],
+    ['Tarif social', 'SOCIAL_{S}_GREY_C_F_00', true, 'R', 'VBW']];
   function cardUrl(doc, s){ return 'https://www.engie.be/api/engie/be/ms/pricing/v1/public/pricesAndConditionsPDF?document=' + doc + '&monthOffset=0&segment=' + s + '&language=F'; }
   function drawCards(){
     var html = '', regs = [['V', 'Flandre'], ['B', 'Bruxelles'], ['W', 'Wallonie']];
     [['R', 'Particuliers'], ['P', 'Professionnels']].forEach(function(sg){
       html += '<p style="margin:8px 0 2px"><strong>' + sg[1] + '</strong></p><table><tr><th>Contrat</th>' + regs.map(function(r){ return '<th>' + r[1] + '</th>'; }).join('') + '</tr>';
       PRODUITS.forEach(function(pr){
-        html += '<tr><td>' + pr[0] + (sg[0] === 'P' ? ' Pro' : '') + '</td>' + regs.map(function(r){
+        if (pr[3] && pr[3].indexOf(sg[0]) < 0) return;
+        var autre = pr.length > 3 ? ' class="autre"' : '';
+        html += '<tr><td>' + (sg[0] === 'P' && pr[5] ? pr[5] : pr[0] + (sg[0] === 'P' ? ' Pro' : '')) + '</td>' + regs.map(function(r){
+          if (pr[4] && pr[4].indexOf(r[0]) < 0) return '<td class="hint">–</td>';
           var d = sg[0] === 'R' && r[0] === 'B' ? '36' : '12', f = sg[0] === 'R' && r[0] === 'B' ? '48' : '24';
           var base = pr[1].replace('{S}', sg[0]).replace('{D}', d).replace('{F}', f).replace('{DG}', sg[0] === 'R' ? 'GREEN' : 'GREY') + '_' + r[0] + '_F';
           var e = 'E_' + base, g = 'G_' + base.replace('_GREEN_', '_GREY_');
-          return '<td><a href="' + cardUrl(e, sg[0]) + '" target="_blank" rel="noopener">Élec</a>' + (pr[2] ? ' · <a href="' + cardUrl(g, sg[0]) + '" target="_blank" rel="noopener">Gaz</a>' : '') + '</td>';
+          return '<td><a' + autre + ' href="' + cardUrl(e, sg[0]) + '" target="_blank" rel="noopener">Élec</a>' + (pr[2] ? ' · <a' + autre + ' href="' + cardUrl(g, sg[0]) + '" target="_blank" rel="noopener">Gaz</a>' : '') + '</td>';
         }).join('') + '</tr>';
       });
       html += '</table>';
@@ -323,8 +330,11 @@
   }
   drawCards();
   $('dlCount').textContent = $('cardLinks').querySelectorAll('a').length;
-  $('dlAll').addEventListener('click', function(){
-    var urls = Array.prototype.map.call($('cardLinks').querySelectorAll('a'), function(a){ return a.href; }), i = 0, btn = this;
+  $('dlAutres').textContent = 'Autres tarifs seulement (' + $('cardLinks').querySelectorAll('a.autre').length + ')';
+  $('dlAutres').addEventListener('click', function(){ dlRun(this, 'a.autre'); });
+  $('dlAll').addEventListener('click', function(){ dlRun(this, 'a'); });
+  function dlRun(btn, sel){
+    var urls = Array.prototype.map.call($('cardLinks').querySelectorAll(sel), function(a){ return a.href; }), i = 0;
     btn.disabled = true;
     (function next(){
       if (i >= urls.length){ msg('dlMsg', urls.length + ' téléchargements lancés. Vérifiez le dossier Téléchargements.', 'ok'); btn.disabled = false; return; }
@@ -333,7 +343,7 @@
       i++; msg('dlMsg', 'Téléchargement ' + i + ' / ' + urls.length + '…');
       setTimeout(next, 900);
     })();
-  });
+  }
 
   window.addEventListener('beforeunload', function(e){ if (dirty){ e.preventDefault(); e.returnValue = ''; } });
 
