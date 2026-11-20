@@ -144,3 +144,19 @@ revoke all on public.conso_prix_propositions from anon, authenticated;
 -- clé primaire : (mois, segment, type, energie, cle, region) ; même colonne dans conso_prix_propositions.
 -- conso_seg(type, segment) : renvoie '*' pour le réseau, sinon 'R' ou 'P'.
 -- conso_prix_save(p_mois, p_segment, p_type, p_energie, p_rows) remplace l'ancienne version à 4 paramètres.
+
+-- ===== Code postal -> gestionnaire (migration conso_cp, 20 novembre 2026) =====
+-- Sources : données ouvertes Fluvius (netbeheerder per gemeente, 8 zones actuelles), ORES (points d'accès par localité 2024,
+-- électricité et gaz, portail ODWB), RESA gaz par commune (2025), codes postaux belges (ODWB), désignations CWaPE
+-- (AIEG : Andenne, Gesves, Ohey, Viroinval, Rumes ; AIESH : Beaumont, Froidchapelle, Couvin, Chimay, Momignies, Sivry-Rance ;
+-- REW : Wavre). Bruxelles : Sibelga. 1145 codes, 2040 lignes ; plusieurs lignes = le simulateur propose le choix.
+-- Zones Fluvius ajoutées : fl-antwerpen, fl-halle-vilvoorde, fl-imewo, fl-kempen, fl-limburg, fl-midden-vlaanderen, fl-west,
+-- fl-zenne-dijle ; désactivées : fl-gaselwest, fl-intergem, fl-iveka, fl-iverlek, fl-sibelgas, fl-pbe.
+create table if not exists public.conso_cp (
+  code int not null check (code between 1000 and 9999),
+  energie text not null check (energie in ('e','g')),
+  grd text not null references public.conso_grd(code) on update cascade,
+  primary key (code, energie, grd));
+alter table public.conso_cp enable row level security;
+revoke all on public.conso_cp from anon, authenticated;
+-- conso_cp_get(p_code int) -> {connu, e:[grd], g:[grd]} ; public (anon).

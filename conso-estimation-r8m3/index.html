@@ -261,6 +261,7 @@
         <div class="row"><span class="clbl">Contrat</span>
           <div class="opts"><label><input type="radio" name="etat" value="cours" checked>En cours</label><label><input type="radio" name="etat" value="nouveau">Pas encore établi</label></div>
         </div>
+        <div class="row"><span class="clbl">Code postal</span><input type="text" id="cp" inputmode="numeric" maxlength="4" placeholder="ex. 5000" style="width:90px"><span class="hint" id="cpHint">remplit le gestionnaire de réseau</span></div>
         <div class="row" id="debutRow" hidden><span class="clbl">Début prévu</span><input type="month" id="debut"><span class="hint" id="debutHint"></span></div>
         <div class="row" id="moisRow" hidden><span class="clbl">Prix de</span><select id="mois"></select></div>
         <label class="check" id="sameRow"><input type="checkbox" id="same" checked> Même contrat pour l'électricité et le gaz</label>
@@ -690,6 +691,33 @@
       .catch(function(){ T = null; fillLists(); buildTable('e'); buildTable('g'); render(); });
   }
   $('mois').addEventListener('change', function(e){ e.stopPropagation(); loadMonth(this.value); });
+  // ---------- Code postal -> gestionnaire(s) de réseau ----------
+  var cpSeq = 0;
+  $('cp').addEventListener('input', function(e){
+    e.stopPropagation();
+    var v = this.value.replace(/\D/g, '').slice(0, 4), h = $('cpHint');
+    if (v !== this.value) this.value = v;
+    if (v.length < 4){ h.textContent = 'remplit le gestionnaire de réseau'; return; }
+    var my = ++cpSeq; h.textContent = 'Recherche…';
+    fetch(SB_URL + '/rest/v1/rpc/conso_cp_get', {method: 'POST', headers: {'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY, 'Content-Type': 'application/json'}, body: JSON.stringify({p_code: +v})})
+      .then(function(r){ if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(function(d){
+        if (my !== cpSeq) return;
+        if (!d.connu){ h.textContent = 'Code postal inconnu : choisissez le gestionnaire à la main.'; return; }
+        var msgs = [];
+        function apply(en, list){
+          var sel = $(en === 'e' ? 'grdE' : 'grdG'), lbl = en === 'e' ? 'Électricité' : 'Gaz';
+          if (!list.length){ sel.value = ''; if (en === 'g') msgs.push('pas de réseau de gaz connu'); return; }
+          var names = list.map(function(c){ var g = grdOf(c); return g ? g.nom : c; });
+          if (list.length === 1){ sel.value = list[0]; if (sel.value !== list[0]) sel.value = ''; msgs.push(lbl + ' : ' + names[0]); }
+          else { if (list.indexOf(sel.value) < 0) sel.value = ''; msgs.push(lbl + ' : ' + names.join(' ou ') + ' (selon l\'adresse, à choisir)'); }
+        }
+        apply('e', d.e); apply('g', d.g);
+        h.textContent = msgs.join(' · ');
+        fillContracts('e'); fillContracts('g'); applyPrices('e'); applyPrices('g'); render();
+      })
+      .catch(function(){ if (my === cpSeq) h.textContent = 'Recherche impossible : choisissez le gestionnaire à la main.'; });
+  });
   document.querySelectorAll('input[name="seg"]').forEach(function(r){ r.addEventListener('change', function(e){ e.stopPropagation(); fillContracts('e'); fillContracts('g'); applyPrices('e'); applyPrices('g'); render(); }); });
   function debutIso(){ return document.querySelector('input[name="etat"]:checked').value === 'nouveau' && $('debut').value ? $('debut').value + '-01' : null; }
   function onDebut(){
@@ -809,6 +837,7 @@
     lastText = 'Estimation indicative de consommation annuelle' +
       '\nClient : ' + (SEG() === 'P' ? 'professionnel' : 'particulier') +
       '\nContrat : ' + (document.querySelector('input[name="etat"]:checked').value === 'nouveau' ? 'pas encore établi' + ($('debut').value ? ', début prévu ' + moisLbl($('debut').value + '-01') : '') : 'en cours') +
+      ($('cp').value.length === 4 ? '\nCode postal : ' + $('cp').value : '') +
       '\nÉnergies : ' + enLbl + P.txt +
       '\nMénage : ' + inp.persons + (inp.persons >= 5 ? '+' : '') + ' pers., ' + typeLbl +
       '\nChauffage : ' + heatLbl +
@@ -820,7 +849,7 @@
 
   document.getElementById('f').addEventListener('input', render);
   document.getElementById('f').addEventListener('change', render);
-  document.getElementById('reset').addEventListener('click', function(){ document.getElementById('f').reset(); resetPrices(); onDebut(); render(); });
+  document.getElementById('reset').addEventListener('click', function(){ document.getElementById('f').reset(); $('cpHint').textContent = 'remplit le gestionnaire de réseau'; resetPrices(); onDebut(); render(); });
   document.getElementById('copy').addEventListener('click', function(){
     var btn = this;
     function done(ok){ btn.textContent = ok ? 'Copié ✓' : 'Copie impossible'; setTimeout(function(){ btn.textContent = 'Copier le résultat'; }, 1500); }
