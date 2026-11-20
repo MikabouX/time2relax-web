@@ -47,7 +47,7 @@
   input[type=text]{flex:1;min-width:180px;padding:6px 8px;border:1px solid var(--line);border-radius:7px;font-size:14px}
   .clbl{min-width:100px;font-size:14px}
   #prixSet{display:grid;gap:10px}
-  #prixSet [hidden], #knSet [hidden]{display:none}
+  #prixSet [hidden], #knSet [hidden], .veh[hidden]{display:none}
   .pblock{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:grid;gap:8px}
   .ptitle{font-weight:650;font-size:14px;padding-left:8px}
   .ptitle.e{border-left:4px solid var(--elec)} .ptitle.g{border-left:4px solid var(--gas)}
@@ -186,14 +186,17 @@
       </fieldset>
 
       <fieldset id="evSet">
-        <legend>Voiture électrique rechargée à domicile</legend>
+        <legend>Voiture électrique ou hybride rechargeable, rechargée à domicile</legend>
         <div class="opts">
           <label><input type="radio" name="ev" value="0" checked>Non</label>
           <label><input type="radio" name="ev" value="1">Oui</label>
         </div>
         <div class="sub" id="evBox" hidden>
-          <div class="row"><input type="number" id="km" min="0" step="1000" value="15000"> <span>km par an rechargés à la maison</span></div>
-          <span class="hint">Moyenne belge : environ 15 000 km par an.</span>
+          <div class="row"><span class="clbl">Nombre</span><select id="evN"><option value="1">1 véhicule</option><option value="2">2 véhicules</option><option value="3">3 véhicules</option></select></div>
+          <div class="row veh" id="veh1"><span class="clbl">Véhicule 1</span><select id="ev1t"><option value="e">Électrique</option><option value="h">Hybride rechargeable</option></select> <input type="number" id="km" min="0" step="1000" value="15000" style="width:90px"> <span>km/an à domicile</span> <input type="text" inputmode="decimal" class="px" id="ev1c" value="18" style="width:50px"> <span>kWh/100 km</span></div>
+          <div class="row veh" id="veh2" hidden><span class="clbl">Véhicule 2</span><select id="ev2t"><option value="e">Électrique</option><option value="h">Hybride rechargeable</option></select> <input type="number" id="km2" min="0" step="1000" value="15000" style="width:90px"> <span>km/an à domicile</span> <input type="text" inputmode="decimal" class="px" id="ev2c" value="18" style="width:50px"> <span>kWh/100 km</span></div>
+          <div class="row veh" id="veh3" hidden><span class="clbl">Véhicule 3</span><select id="ev3t"><option value="e">Électrique</option><option value="h">Hybride rechargeable</option></select> <input type="number" id="km3" min="0" step="1000" value="15000" style="width:90px"> <span>km/an à domicile</span> <input type="text" inputmode="decimal" class="px" id="ev3c" value="18" style="width:50px"> <span>kWh/100 km</span></div>
+          <span class="hint">Consommation selon le modèle : citadine 14–16, berline 16–19, SUV ou grande voiture 20–25 kWh/100 km (recharge comprise). Hybride rechargeable : seulement les km roulés en électrique (souvent 6 000 à 10 000 par an), environ 20 kWh/100 km. Moyenne belge : environ 15 000 km par an.</span>
         </div>
       </fieldset>
 
@@ -254,7 +257,7 @@
         <li>Boiler électrique : 850 kWh par personne et par an (Homegrade).</li>
         <li>Chauffage électrique : 0,9 kWh d'électricité par kWh de gaz remplacé (rendement de la chaudière). Pompe à chaleur : 3 fois moins (COP saisonnier de 3, ecoconso).</li>
         <li>Chaudière mazout : environ 300 kWh d'électricité par an (brûleur et circulateur ; un circulateur seul consomme de 50 à 450 kWh selon son âge, Test-Achats). Poêle à pellets : environ 100 kWh par an (ENGIE). Le combustible (mazout, pellets) n'est pas compté. Poêle au gaz : 70 % du gaz de chauffage d'une chaudière (il chauffe surtout les pièces de vie et n'a pas les pertes du circuit de chauffage) – estimation.</li>
-        <li>Voiture électrique : 18 kWh pour 100 km, pertes de recharge comprises.</li>
+        <li>Voiture électrique : 18 kWh pour 100 km par défaut (modifiable par véhicule), pertes de recharge comprises. Hybride rechargeable : km roulés en électrique × 20 kWh pour 100 km par défaut.</li>
         <li>Panneaux solaires : 900 kWh produits par kWc et par an en Belgique. Part consommée directement : 30 % sans batterie, 65 % avec batterie.</li>
         <li>Prix encodés HTVA ; TVA de 6 % pour les particuliers et de 21 % pour les professionnels. Coût : kWh facturés × prix du kWh + frais fixes annuels ; acompte = coût annuel TVAC ÷ 12, arrondi à l'euro. Avec panneaux solaires, on facture la consommation nette (compensation) ou l'électricité prélevée (injection), sans compter le revenu de l'injection. Compteur bi-horaire : prix moyen selon la part de nuit indiquée.</li>
         <li>Tarif prosumer (Wallonie, compensation) : compteur classique = puissance de l'onduleur (kWe) × tarif du gestionnaire en €/kWe ; compteur double flux ou communicant = électricité prélevée × coûts de réseau (distribution + transport), sans dépasser le forfait. Électricité prélevée estimée avec la même part d'autoconsommation (30 % sans batterie, 65 % avec).</li>
@@ -422,10 +425,13 @@
       lines.push({label: "Eau chaude sans gaz ni électricité", e: 0, g: -ecsGas});
       g -= ecsGas;
     }
-    if (input.ev && input.km > 0){
-      var ev = r100(input.km * K.evKwh100 / 100);
-      lines.push({label: "Voiture électrique (" + fmt(input.km) + " km)", e: ev, g: 0});
+    if (input.ev) (input.vehicles || [{t: 'e', km: input.km, c: K.evKwh100}]).forEach(function(v, i, all){
+      if (!(v.km > 0)) return;
+      var ev = r100(v.km * (v.c || K.evKwh100) / 100);
+      lines.push({label: (v.t === 'h' ? 'Hybride rechargeable' : 'Voiture électrique') + (all.length > 1 ? ' ' + (i + 1) : '') + ' (' + fmt(v.km) + ' km × ' + String(v.c || K.evKwh100).replace('.', ',') + ' kWh/100 km)', e: ev, g: 0});
       e += ev;
+    });
+    if (false){
     }
     g = Math.max(0, g);
 
@@ -452,6 +458,7 @@
       water: val('w'),
       ev: val('ev') === '1',
       km: num('km'),
+      vehicles: (function(){ var n = +($('evN') ? $('evN').value : 1), out = []; for (var i = 1; i <= n; i++) out.push({t: $('ev' + i + 't').value, km: num(i === 1 ? 'km' : 'km' + i), c: num('ev' + i + 'c') || (($('ev' + i + 't').value === 'h') ? 20 : 18)}); return out; })(),
       pv: val('pv') === '1',
       kwc: num('kwc'),
       bat: val('bat') === '1',
@@ -839,6 +846,7 @@
     document.getElementById('evSet').hidden = !showE;
     document.getElementById('pvSet').hidden = !showE;
     document.getElementById('evBox').hidden = !inp.ev;
+    for (var vi = 2; vi <= 3; vi++) $('veh' + vi).hidden = +$('evN').value < vi;
     document.getElementById('pvBox').hidden = !inp.pv;
     $('prosBox').hidden = !(inp.pv && inp.comp);
     if (!$('kwe').value && inp.kwc) $('kwe').placeholder = String(inp.kwc).replace('.', ',');
@@ -947,7 +955,8 @@
     var heatLbl = {gaz: 'gaz', elec: 'électrique', pac: 'pompe à chaleur', mazout: 'chaudière mazout', poelegaz: 'poêle au gaz', pellets: 'poêle à pellets'}[inp.heating];
     var waterLbl = {gaz: 'gaz', elec: 'boiler électrique', autre: 'chaudière mazout / autre'}[inp.water];
     var enLbl = {both: 'électricité + gaz', e: 'électricité seule', g: 'gaz seul'}[inp.energies];
-    var evLbl = inp.ev ? 'oui, ' + fmt(inp.km) + ' km/an rechargés à domicile' : 'non';
+    var evV = (inp.vehicles || []).filter(function(v){ return v.km > 0; });
+    var evLbl = inp.ev && evV.length ? 'oui, ' + (evV.length > 1 ? evV.length + ' véhicules : ' : '') + evV.map(function(v){ return (v.t === 'h' ? 'hybride rechargeable ' : 'électrique ') + fmt(v.km) + ' km/an (' + String(v.c).replace('.', ',') + ' kWh/100 km)'; }).join(' ; ') + ', recharge à domicile' : 'non';
     var pvLbl = inp.pv ? 'oui, ' + String(inp.kwc).replace('.', ',') + ' kWc, ' + (inp.comp ? 'compensation' : 'injection') : 'non';
     var detailTxt = lines.map(function(l, k){
       if (k === 0) return '- ' + l.label + ' : ' + [showE ? 'élec ' + fmt(l.e) : '', showG ? 'gaz ' + fmt(l.g) : ''].filter(Boolean).join(' / ') + ' kWh';
@@ -961,19 +970,19 @@
     lastText = 'Infos de la demande client :' +
       '\nClient : ' + (SEG() === 'P' ? 'professionnel' : 'particulier') +
       '\nDemande : ' + ($('dem').value || 'non précisée') + (etatTxt ? ' (' + etatTxt + ')' : '') +
-      (cpCode() ? '\nCode postal : ' + $('cp').value.trim() : '') +
       '\nÉnergies : ' + enLbl + P.txt +
       '\n\nDétail en bref :' +
       '\nMénage : ' + inp.persons + (inp.persons >= 5 ? '+' : '') + ' pers., ' + typeLbl +
       '\nChauffage : ' + heatLbl +
       '\nEau chaude : ' + waterLbl +
-      (showE ? '\nVoiture électrique : ' + evLbl + '\nPanneaux solaires : ' + pvLbl + '\nBatterie domestique : ' + (inp.pv && inp.bat ? 'oui' : 'non') : '') +
+      (showE ? '\nVéhicule électrique : ' + evLbl + '\nPanneaux solaires : ' + pvLbl + '\nBatterie domestique : ' + (inp.pv && inp.bat ? 'oui' : 'non') : '') +
       '\n\nDétail :\n' + detailTxt +
       (showE ? '\nÉlectricité : ' + (knE !== null ? fmt(knE) + ' kWh/an prélevés (connue' + (knEN !== null ? ', dont ' + fmt(knEN) + ' de nuit' : '') + ' ; estimation ' + fmt(r.e) + ')' : fmt(r.e) + ' kWh/an') : '') +
       (showG ? '\nGaz : ' + (knG !== null ? fmt(knG) + ' kWh/an (connue ; estimation ' + fmt(r.g) + ')' : fmt(r.g) + ' kWh/an') : '') + (solarTxt ? '\n' + solarTxt : '') + costTxt +
       '\n\nAcompte souhaité : ' + (acS !== null ? fmt(acS) + ' €/mois' : 'non précisé');
   }
 
+  [1, 2, 3].forEach(function(i){ $('ev' + i + 't').addEventListener('change', function(){ var c = $('ev' + i + 'c'); if (c.value === '18' || c.value === '20' || !c.value) c.value = this.value === 'h' ? '20' : '18'; if (i > 1 || true){ var k = $(i === 1 ? 'km' : 'km' + i); if (this.value === 'h' && k.value === '15000') k.value = '8000'; else if (this.value === 'e' && k.value === '8000') k.value = '15000'; } }); });
   document.getElementById('f').addEventListener('input', render);
   document.getElementById('f').addEventListener('change', render);
   document.getElementById('reset').addEventListener('click', function(){ document.getElementById('f').reset(); $('cpHint').textContent = CP_HINT; hideSug(); resetPrices(); onDebut(); render(); });
