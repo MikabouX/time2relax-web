@@ -519,3 +519,5 @@ button.tile { border: 0; font: inherit; cursor: pointer; }
 .me-row:last-child { border-bottom: 0; }
 .pair-qr { display: flex; justify-content: center; margin: 12px 0; }
 .pair-qr svg { border-radius: 8px; }
+
+.clock-line { display: flex; align-items: center; gap: 4px; margin: 2px 0 6px 4px; }

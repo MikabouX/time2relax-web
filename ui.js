@@ -616,6 +616,11 @@ function historyView() {
     if (!byDay.has(k)) byDay.set(k, []);
     byDay.get(k).push(e);
   });
+  // Journées pointées sans break (ex. télétravail) : elles apparaissent aussi.
+  const shiftDays = typeof meShifts === 'function' ? meShifts().map((x) => dayKey(parseLocal(x.s))) : [];
+  const oldest = oldestKeptDay();
+  shiftDays.forEach((k) => { if (k >= oldest && !byDay.has(k)) byDay.set(k, []); });
+  const sorted = new Map([...byDay.entries()].sort((a, b) => (a[0] < b[0] ? 1 : -1)));
 
   const menu = h('div', { class: 'menu', id: 'histMenu', hidden: true },
     menuItem('download', t('menu_export'), doExport),
@@ -624,10 +629,10 @@ function historyView() {
     menuItem('delete_sweep', t('menu_clear_old'), () => clearHistory(true)),
     menuItem('delete_forever', t('menu_clear_all'), () => clearHistory(false)));
 
-  const body = entries.length === 0
+  const body = sorted.size === 0
     ? h('div', { class: 'empty' }, icon('history', 56), h('p', {}, t('history_empty')),
       h('button', { type: 'button', class: 'btn tonal', on: { click: () => editEntry(null) } }, icon('add', 18), t('entry_add')))
-    : [...byDay.entries()].map(([key, list]) => dayBlock(key, list)).concat(h('p', { class: 'small muted note center' }, t('keep_note')));
+    : [...sorted.entries()].map(([key, list]) => dayBlock(key, list)).concat(h('p', { class: 'small muted note center' }, t('keep_note')));
 
   return h('div', { class: 'page' },
     h('header', { class: 'top' },
@@ -672,7 +677,20 @@ function dayBlock(key, list) {
       h('span', { class: 'grow day-name' }, dayLabel(key)),
       tot.b.n ? totalChip('coffee', humanDuration(tot.b.s), 'brk') : null,
       tot.l.n ? totalChip('restaurant', humanDuration(tot.l.s), 'lun') : null),
+    clockLine(key),
     list.map(entryRow));
+}
+
+/** Pointage du jour (pointeuse du téléphone ou du site) : lieu et heures. */
+function clockLine(key) {
+  if (typeof meShifts !== 'function') return null;
+  const day = meShifts().filter((x) => dayKey(parseLocal(x.s)) === key);
+  if (!day.length) return null;
+  const hm = (d) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  const remote = day.every((x) => x.r), mixed = !remote && day.some((x) => x.r);
+  const place = remote ? t('fw_remote') : mixed ? `${t('fw_site')} + ${t('fw_remote')}` : t('fw_site');
+  const spans = day.map((x) => `${hm(parseLocal(x.s))}–${x.e ? hm(parseLocal(x.e)) : '…'}`).join(', ');
+  return h('div', { class: 'small muted clock-line' }, icon(remote ? 'home' : 'directions_car', 16), ` ${place} · ${spans}`);
 }
 
 function entryRow(e) {
