@@ -136,3 +136,11 @@ revoke all on public.conso_prix_propositions from anon, authenticated;
 -- conso_prix_proposition_decider(p_id bigint, p_accept boolean) : admin ; accepter = upsert dans conso_prix
 --   (coalesce : un champ vide garde la valeur actuelle), puis suppression de la proposition.
 -- Texte complet des fonctions : voir la migration « conso_prix_propositions » dans Supabase.
+
+-- ===== Segment particulier / professionnel (migration conso_prix_segment, 20 novembre 2026) =====
+-- Les montants sont désormais HTVA (TVA appliquée par le simulateur : 6 % particulier, 21 % professionnel).
+-- segment : 'R' particulier, 'P' professionnel, '*' commun (toujours utilisé pour type = 'reseau').
+-- alter table conso_prix add column segment text not null default '*' check (segment in ('R','P','*'));
+-- clé primaire : (mois, segment, type, energie, cle, region) ; même colonne dans conso_prix_propositions.
+-- conso_seg(type, segment) : renvoie '*' pour le réseau, sinon 'R' ou 'P'.
+-- conso_prix_save(p_mois, p_segment, p_type, p_energie, p_rows) remplace l'ancienne version à 4 paramètres.

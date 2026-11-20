@@ -85,23 +85,30 @@
         <button id="copyPrev">Copier le mois précédent ici</button>
         <button id="delMonth" class="danger">Supprimer ce mois</button>
       </div>
-      <div class="tabs"><button id="tabE" class="on">Électricité</button><button id="tabG">Gaz</button></div>
+      <div class="row">
+        <div class="tabs"><button id="segR" class="on">Particulier</button><button id="segP">Professionnel</button></div>
+        <div class="tabs"><button id="tabE" class="on">Électricité</button><button id="tabG">Gaz</button></div>
+      </div>
     </div>
     <div class="row" style="margin-top:8px"><span class="hint">Mois en ligne (6 mois conservés, les plus anciens sont effacés automatiquement) :</span><div class="chips" id="chips"></div></div>
-    <p class="hint" style="margin:8px 0 0">Tous les montants sont <strong>TVAC</strong> : prix en c€/kWh, frais fixes en €/an. Laissez vide ce qui ne s'applique pas. Pour un compteur bi-horaire, remplissez Jour et Nuit ; si une ligne n'a qu'un prix, il sert pour le jour et la nuit.</p>
+    <p class="hint" style="margin:8px 0 0">Tous les montants sont <strong>HTVA</strong> : prix en c€/kWh, frais fixes en €/an (le simulateur ajoute 6 % de TVA pour les particuliers, 21 % pour les professionnels). Les contrats et les taxes sont propres à chaque type de client ; les coûts de réseau sont communs aux deux. Laissez vide ce qui ne s'applique pas. Pour un compteur bi-horaire, remplissez Jour et Nuit ; si une ligne n'a qu'un prix, il sert pour le jour et la nuit.</p>
 
+    <details class="sec" id="cards">
+      <summary><strong>Cartes tarifaires ENGIE du mois</strong> <span class="hint">(liens directs, à ouvrir ou télécharger puis à m'envoyer)</span></summary>
+      <div id="cardLinks" class="hint" style="margin-top:6px"></div>
+    </details>
     <div class="sec">
-      <h3>1. Énergie – prix des contrats (par région)</h3>
+      <h3>1. Énergie – prix des contrats <span id="segLbl1">particuliers</span> (par région)</h3>
       <div class="tw"><table id="tEn"></table></div>
       <div><button id="addEn">+ Ajouter un contrat</button></div>
     </div>
     <div class="sec">
-      <h3>2. Coûts de réseau (par gestionnaire)</h3>
+      <h3>2. Coûts de réseau (par gestionnaire) – communs particuliers et professionnels</h3>
       <p class="hint" style="margin:0">Distribution + transport. Prosumer (électricité, Wallonie) : tarif capacitaire en €/kWe par an, pour les panneaux avec compensation (installés avant 2024).</p>
       <div class="tw"><table id="tRe"></table></div>
     </div>
     <div class="sec">
-      <h3>3. Taxes et surcharges (par région)</h3>
+      <h3>3. Taxes et surcharges <span id="segLbl3">particuliers</span> (par région)</h3>
       <div class="tw"><table id="tTx"></table></div>
     </div>
     <div class="row" style="margin-top:14px">
@@ -115,7 +122,7 @@
   "use strict";
   var URL = 'https://gxftbzbvbveocwpdavtt.supabase.co', KEY = 'sb_publishable_9fKWGXevueh6hHJpGQvmhg_EFOd_-dR';
   var REGIONS = ['Wallonie', 'Bruxelles', 'Flandre'];
-  var S = {access: null, refresh: null, email: ''}, en = 'e', DATA = null, dirty = false;
+  var S = {access: null, refresh: null, email: ''}, en = 'e', seg = 'R', DATA = null, dirty = false;
   function $(id){ return document.getElementById(id); }
   function esc(t){ return String(t === null || t === undefined ? '' : t).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
   function shown(x){ return x === null || x === undefined ? '' : String(+x).replace('.', ','); }
@@ -168,9 +175,9 @@
     return rpc('conso_prix_propositions_list', {}).then(function(list){
       $('propCard').hidden = !list.length;
       $('propCount').textContent = list.length ? list.length : '';
-      $('tProp').innerHTML = '<tr><th>Reçu le</th><th>Mois</th><th>Énergie</th><th>Quoi</th><th>Proposé</th><th>Actuel</th><th>Source</th><th></th></tr>' + list.map(function(p){
+      $('tProp').innerHTML = '<tr><th>Reçu le</th><th>Mois</th><th>Client</th><th>Énergie</th><th>Quoi</th><th>Proposé</th><th>Actuel</th><th>Source</th><th></th></tr>' + list.map(function(p){
         var d = new Date(p.created_at), quoi = TYPE_LBL[p.type] + ' – ' + (p.type === 'reseau' ? grdNom(p.cle) : p.cle) + (p.type !== 'taxes' ? ' (' + p.region + ')' : '');
-        return '<tr><td>' + d.toLocaleDateString('fr-BE') + ' ' + d.toLocaleTimeString('fr-BE', {hour: '2-digit', minute: '2-digit'}) + '</td><td>' + moisLbl(p.mois) + '</td><td>' + (p.energie === 'e' ? 'Électricité' : 'Gaz') + '</td><td>' + esc(quoi) + '</td><td class="new">' + esc(val2(p)) + '</td><td class="old">' + (p.actuel ? esc(val2(p.actuel)) : 'nouveau') + '</td><td>' + esc(p.note || '') + '</td><td style="white-space:nowrap"><button class="main" data-ok="' + p.id + '">Accepter</button> <button class="danger" data-no="' + p.id + '">Refuser</button></td></tr>';
+        return '<tr><td>' + d.toLocaleDateString('fr-BE') + ' ' + d.toLocaleTimeString('fr-BE', {hour: '2-digit', minute: '2-digit'}) + '</td><td>' + moisLbl(p.mois) + '</td><td>' + ({R: 'Particulier', P: 'Pro', '*': 'Tous'}[p.segment] || '') + '</td><td>' + (p.energie === 'e' ? 'Électricité' : 'Gaz') + '</td><td>' + esc(quoi) + '</td><td class="new">' + esc(val2(p)) + '</td><td class="old">' + (p.actuel ? esc(val2(p.actuel)) : 'nouveau') + '</td><td>' + esc(p.note || '') + '</td><td style="white-space:nowrap"><button class="main" data-ok="' + p.id + '">Accepter</button> <button class="danger" data-no="' + p.id + '">Refuser</button></td></tr>';
       }).join('');
     }).catch(function(e){ msg('propMsg', e.message, 'err'); $('propCard').hidden = false; });
   }
@@ -205,10 +212,14 @@
   $('mois').addEventListener('change', function(){ if (confirmLeave()) load(); });
   function confirmLeave(){ return !dirty || confirm('Des modifications ne sont pas enregistrées. Continuer sans enregistrer ?'); }
   function setTab(x){ if (x === en || !confirmLeave()) return; en = x; $('tabE').classList.toggle('on', en === 'e'); $('tabG').classList.toggle('on', en === 'g'); dirty = false; draw(); msg('msg', ''); }
+  function setSeg(x){ if (x === seg || !confirmLeave()) return; seg = x; $('segR').classList.toggle('on', seg === 'R'); $('segP').classList.toggle('on', seg === 'P');
+    $('segLbl1').textContent = $('segLbl3').textContent = seg === 'P' ? 'professionnels' : 'particuliers'; dirty = false; draw(); msg('msg', ''); }
+  $('segR').addEventListener('click', function(){ setSeg('R'); });
+  $('segP').addEventListener('click', function(){ setSeg('P'); });
   $('tabE').addEventListener('click', function(){ setTab('e'); });
   $('tabG').addEventListener('click', function(){ setTab('g'); });
 
-  function rows(type){ return (DATA && DATA.prix || []).filter(function(p){ return p.type === type && p.energie === en; }); }
+  function rows(type){ var sg = type === 'reseau' ? '*' : seg; return (DATA && DATA.prix || []).filter(function(p){ return p.segment === sg && p.type === type && p.energie === en; }); }
   function priceCells(p, prosumer){
     var c = '<td><input class="px" data-f="prix_kwh" value="' + esc(shown(p.prix_kwh)) + '"></td>';
     if (en === 'e') c += '<td><input class="px" data-f="prix_jour" value="' + esc(shown(p.prix_jour)) + '"></td><td><input class="px" data-f="prix_nuit" value="' + esc(shown(p.prix_nuit)) + '"></td>';
@@ -261,11 +272,11 @@
     var seen = {}, dup = a.rows.filter(function(r){ var k = r.cle + '|' + r.region; if (seen[k]) return true; seen[k] = 1; return false; });
     if (dup.length){ msg('msg', 'Le contrat « ' + dup[0].cle + ' » apparaît deux fois pour la région ' + dup[0].region + '.', 'err'); return; }
     $('save').disabled = true; msg('msg', 'Enregistrement…');
-    rpc('conso_prix_save', {p_mois: m, p_type: 'energie', p_energie: en, p_rows: a.rows})
-      .then(function(){ return rpc('conso_prix_save', {p_mois: m, p_type: 'reseau', p_energie: en, p_rows: b.rows}); })
-      .then(function(){ return rpc('conso_prix_save', {p_mois: m, p_type: 'taxes', p_energie: en, p_rows: c.rows}); })
+    rpc('conso_prix_save', {p_mois: m, p_segment: seg, p_type: 'energie', p_energie: en, p_rows: a.rows})
+      .then(function(){ return rpc('conso_prix_save', {p_mois: m, p_segment: '*', p_type: 'reseau', p_energie: en, p_rows: b.rows}); })
+      .then(function(){ return rpc('conso_prix_save', {p_mois: m, p_segment: seg, p_type: 'taxes', p_energie: en, p_rows: c.rows}); })
       .then(function(){ return load(); })
-      .then(function(){ msg('msg', 'Enregistré (' + (en === 'e' ? 'électricité' : 'gaz') + ', ' + moisLbl(m) + ').', 'ok'); })
+      .then(function(){ msg('msg', 'Enregistré (' + (seg === 'P' ? 'professionnels' : 'particuliers') + ', ' + (en === 'e' ? 'électricité' : 'gaz') + ', ' + moisLbl(m) + ').', 'ok'); })
       .catch(function(e){ msg('msg', e.message, 'err'); })
       .then(function(){ $('save').disabled = false; });
   });
@@ -281,6 +292,30 @@
     if (!confirm('Supprimer TOUS les prix de ' + moisLbl(m) + ' (électricité et gaz) ?')) return;
     rpc('conso_prix_delete_month', {p_mois: m}).then(function(n){ return load().then(function(){ msg('msg', n + ' ligne(s) supprimée(s).', 'ok'); }); }).catch(function(e){ msg('msg', e.message, 'err'); });
   });
+  // Liens vers les cartes tarifaires ENGIE (même schéma que les pages prix-conditions d'ENGIE)
+  var PRODUITS = [
+    ['Easy variable', 'EASY_{S}_GREEN_C_I_{D}', true], ['Easy fixe', 'EASY_{S}_GREEN_C_F_{D}', true], ['Flow variable', 'FLOW_{S}_GREEN_C_I_{F}', true],
+    ['Direct Online variable', 'DIRECT_ONLINE_{S}_{DG}_C_I_{D}', true], ['Dynamic', 'DYNAMIC_{S}_GREY_C_I_{D}', false],
+    ['Empower variable/Flextime', 'EMPOWER_{S}_GREEN_C_I_00', true], ['Empower fixe', 'EMPOWER_{S}_GREEN_C_F_00', true]];
+  function cardUrl(doc, s){ return 'https://www.engie.be/api/engie/be/ms/pricing/v1/public/pricesAndConditionsPDF?document=' + doc + '&monthOffset=0&segment=' + s + '&language=F'; }
+  function drawCards(){
+    var html = '', regs = [['V', 'Flandre'], ['B', 'Bruxelles'], ['W', 'Wallonie']];
+    [['R', 'Particuliers'], ['P', 'Professionnels']].forEach(function(sg){
+      html += '<p style="margin:8px 0 2px"><strong>' + sg[1] + '</strong></p><table><tr><th>Contrat</th>' + regs.map(function(r){ return '<th>' + r[1] + '</th>'; }).join('') + '</tr>';
+      PRODUITS.forEach(function(pr){
+        html += '<tr><td>' + pr[0] + (sg[0] === 'P' ? ' Pro' : '') + '</td>' + regs.map(function(r){
+          var d = sg[0] === 'R' && r[0] === 'B' ? '36' : '12', f = sg[0] === 'R' && r[0] === 'B' ? '48' : '24';
+          var base = pr[1].replace('{S}', sg[0]).replace('{D}', d).replace('{F}', f).replace('{DG}', sg[0] === 'R' ? 'GREEN' : 'GREY') + '_' + r[0] + '_F';
+          var e = 'E_' + base, g = 'G_' + base.replace('_GREEN_', '_GREY_');
+          return '<td><a href="' + cardUrl(e, sg[0]) + '" target="_blank" rel="noopener">Élec</a>' + (pr[2] ? ' · <a href="' + cardUrl(g, sg[0]) + '" target="_blank" rel="noopener">Gaz</a>' : '') + '</td>';
+        }).join('') + '</tr>';
+      });
+      html += '</table>';
+    });
+    $('cardLinks').innerHTML = html + '<p>Ces liens donnent les cartes du mois en cours sur le site d\'ENGIE. Si un lien ne s\'ouvre plus, ENGIE a changé la référence du document : utilisez les pages « Prix et conditions » d\'ENGIE.</p>';
+  }
+  drawCards();
+
   window.addEventListener('beforeunload', function(e){ if (dirty){ e.preventDefault(); e.returnValue = ''; } });
 
   restore();

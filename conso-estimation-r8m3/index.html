@@ -197,7 +197,7 @@
               <label><input type="radio" name="pcpt" value="comm">Double flux ou communicant</label>
             </div>
             <div class="row" style="margin-top:6px"><input type="text" inputmode="decimal" class="px" id="kwe"> <span>kWe (puissance de l'onduleur ; par défaut = kWc)</span></div>
-            <div class="row" style="margin-top:6px"><input type="text" inputmode="decimal" class="px" id="prosRate"> <span>€/kWe/an – tarif prosumer du gestionnaire</span></div>
+            <div class="row" style="margin-top:6px"><input type="text" inputmode="decimal" class="px" id="prosRate"> <span>€/kWe/an HTVA – tarif prosumer du gestionnaire</span></div>
             <div class="hint" id="prosSrc"></div>
           </div>
         </div>
@@ -205,6 +205,13 @@
 
       <fieldset id="prixSet">
         <legend>Contrat et prix</legend>
+        <div class="row"><span class="clbl">Client</span>
+          <div class="opts"><label><input type="radio" name="seg" value="R" checked>Particulier</label><label><input type="radio" name="seg" value="P">Professionnel</label></div>
+        </div>
+        <div class="row"><span class="clbl">Contrat</span>
+          <div class="opts"><label><input type="radio" name="etat" value="cours" checked>En cours</label><label><input type="radio" name="etat" value="nouveau">Pas encore établi</label></div>
+        </div>
+        <div class="row" id="debutRow" hidden><span class="clbl">Début prévu</span><input type="month" id="debut"><span class="hint" id="debutHint"></span></div>
         <div class="row" id="moisRow" hidden><span class="clbl">Prix de</span><select id="mois"></select></div>
         <label class="check" id="sameRow"><input type="checkbox" id="same" checked> Même contrat pour l'électricité et le gaz</label>
 
@@ -235,7 +242,7 @@
             <div class="hint" id="pmsgG"></div>
           </div>
         </div>
-        <div class="hint">Montants TVAC, comme sur la carte tarifaire : prix par kWh et frais fixes par an pour l'énergie, le réseau et les taxes. Tout reste modifiable ; une valeur corrigée apparaît en orange.</div>
+        <div class="hint">Montants <strong>HTVA</strong>, comme sur la carte tarifaire : prix par kWh et frais fixes par an pour l'énergie, le réseau et les taxes. La TVA est ajoutée dans le résultat (6 % particulier, 21 % professionnel). Tout reste modifiable ; une valeur corrigée apparaît en orange.</div>
       </fieldset>
     </form>
     <div class="actions">
@@ -267,7 +274,7 @@
         <li>Chaudière mazout : environ 300 kWh d'électricité par an (brûleur et circulateur ; un circulateur seul consomme de 50 à 450 kWh selon son âge, Test-Achats). Poêle à pellets : environ 100 kWh par an (ENGIE). Le combustible (mazout, pellets) n'est pas compté. Poêle au gaz : 70 % du gaz de chauffage d'une chaudière (il chauffe surtout les pièces de vie et n'a pas les pertes du circuit de chauffage) – estimation.</li>
         <li>Voiture électrique : 18 kWh pour 100 km, pertes de recharge comprises.</li>
         <li>Panneaux solaires : 900 kWh produits par kWc et par an en Belgique. Part consommée directement : 30 % sans batterie, 65 % avec batterie.</li>
-        <li>Coût : kWh facturés × prix du kWh + frais fixes annuels ; acompte = coût annuel ÷ 12, arrondi à l'euro. Avec panneaux solaires, on facture la consommation nette (compensation) ou l'électricité prélevée (injection), sans compter le revenu de l'injection. Compteur bi-horaire : prix moyen selon la part de nuit indiquée.</li>
+        <li>Prix encodés HTVA ; TVA de 6 % pour les particuliers et de 21 % pour les professionnels. Coût : kWh facturés × prix du kWh + frais fixes annuels ; acompte = coût annuel TVAC ÷ 12, arrondi à l'euro. Avec panneaux solaires, on facture la consommation nette (compensation) ou l'électricité prélevée (injection), sans compter le revenu de l'injection. Compteur bi-horaire : prix moyen selon la part de nuit indiquée.</li>
         <li>Tarif prosumer (Wallonie, compensation) : compteur classique = puissance de l'onduleur (kWe) × tarif du gestionnaire en €/kWe ; compteur double flux ou communicant = électricité prélevée × coûts de réseau (distribution + transport), sans dépasser le forfait. Électricité prélevée estimée avec la même part d'autoconsommation (30 % sans batterie, 65 % avec).</li>
         <li>Les cinq personnes et plus utilisent la ligne « 5 personnes ». La cuisson n'est pas comptée à part.</li>
       </ul>
@@ -415,13 +422,16 @@
   function grdOf(code){ return (T && T.grd.filter(function(x){ return x.code === code; })[0]) || null; }
   function regionOf(en){ var g = grdOf($(en === 'e' ? 'grdE' : 'grdG').value); return g ? g.region : ''; }
   function bi(){ return document.querySelector('input[name="cpt"]:checked').value === 'bi'; }
+  function SEG(){ return document.querySelector('input[name="seg"]:checked').value; }
+  function tvaRate(){ return SEG() === 'P' ? 0.21 : 0.06; }
+  function segOf(type){ return type === 'reseau' ? '*' : SEG(); }
   function fields(en){ return en === 'e' && bi() ? ['j', 'n', 'f'] : ['k', 'f']; }
   var FIELD_DB = {k: 'prix_kwh', j: 'prix_jour', n: 'prix_nuit', f: 'fixe_an'};
   var FIELD_LBL = {k: 'c€/kWh', j: 'Jour c€/kWh', n: 'Nuit c€/kWh', f: '€/an'};
 
   function names(en){
     var reg = regionOf(en), seen = {}, out = [];
-    (T ? T.prix : []).forEach(function(p){ if (p.type === 'energie' && p.energie === en && (!reg || p.region === reg) && !seen[p.cle]){ seen[p.cle] = 1; out.push(p.cle); } });
+    (T ? T.prix : []).forEach(function(p){ if (p.type === 'energie' && p.energie === en && p.segment === SEG() && (!reg || p.region === reg) && !seen[p.cle]){ seen[p.cle] = 1; out.push(p.cle); } });
     return out.sort(function(a, b){ return a.localeCompare(b, 'fr'); });
   }
   function fillGrd(sel, en){
@@ -458,7 +468,7 @@
     if (!sel.hidden && sel.value && sel.value !== AUTRE) return sel.value;
     return txt.value.trim();
   }
-  function findRow(type, en, cle, reg){ return (T ? T.prix : []).filter(function(p){ return p.type === type && p.energie === en && p.cle === cle && p.region === reg; })[0] || null; }
+  function findRow(type, en, cle, reg){ var sg = segOf(type); return (T ? T.prix : []).filter(function(p){ return p.segment === sg && p.type === type && p.energie === en && p.cle === cle && p.region === reg; })[0] || null; }
 
   // Prend les valeurs de la liste pour une énergie ; garde ce que l'utilisateur a corrigé à la main.
   function applyPrices(en){
@@ -520,7 +530,7 @@
       }).join('') + '</tr>';
     });
     var s = sums(en);
-    html += '<tr class="sum"><td>Total TVAC</td>' + fs.map(function(f){ return '<td class="n" data-sum="' + f + '">' + (s[f] === null ? '–' : num2(s[f])) + '</td>'; }).join('') + '</tr></table>';
+    html += '<tr class="sum"><td>Total HTVA</td>' + fs.map(function(f){ return '<td class="n" data-sum="' + f + '">' + (s[f] === null ? '–' : num2(s[f])) + '</td>'; }).join('') + '</tr></table>';
     box.innerHTML = html;
   }
   function refreshSums(en){
@@ -595,7 +605,7 @@
     var keys = {en: name ? {type: 'energie', cle: name} : null, re: grd ? {type: 'reseau', cle: grd} : null, tx: {type: 'taxes', cle: reg}};
     COMPS.forEach(function(c){
       var k = keys[c.k]; if (!k) return;
-      var v = VAL[en][c.k], src = SRC[en][c.k], row = {type: k.type, energie: en, cle: k.cle, region: reg}, changed = false, any = false;
+      var v = VAL[en][c.k], src = SRC[en][c.k], row = {segment: segOf(k.type), type: k.type, energie: en, cle: k.cle, region: reg}, changed = false, any = false;
       ['k', 'j', 'n', 'f'].forEach(function(f){
         var x = v[f]; if (x === undefined) x = null;
         row[FIELD_DB[f]] = x;
@@ -653,6 +663,18 @@
       .catch(function(){ T = null; fillLists(); buildTable('e'); buildTable('g'); render(); });
   }
   $('mois').addEventListener('change', function(e){ e.stopPropagation(); loadMonth(this.value); });
+  document.querySelectorAll('input[name="seg"]').forEach(function(r){ r.addEventListener('change', function(e){ e.stopPropagation(); fillContracts('e'); fillContracts('g'); applyPrices('e'); applyPrices('g'); render(); }); });
+  function debutIso(){ return document.querySelector('input[name="etat"]:checked').value === 'nouveau' && $('debut').value ? $('debut').value + '-01' : null; }
+  function onDebut(){
+    var d = debutIso(), h = $('debutHint');
+    $('debutRow').hidden = document.querySelector('input[name="etat"]:checked').value !== 'nouveau';
+    h.textContent = '';
+    if (!d || !T) return;
+    if ((T.mois_dispo || []).indexOf(d) >= 0){ if (T.mois !== d) loadMonth(d); }
+    else h.textContent = 'Pas encore de prix pour ce mois : prix ' + deMois(T.mois) + ' utilisés.';
+  }
+  document.querySelectorAll('input[name="etat"]').forEach(function(r){ r.addEventListener('change', function(e){ e.stopPropagation(); onDebut(); render(); }); });
+  $('debut').addEventListener('change', function(e){ e.stopPropagation(); onDebut(); render(); });
   function resetPrices(){
     COMPS.forEach(function(c){ VAL.e[c.k] = {}; VAL.g[c.k] = {}; SRC.e[c.k] = null; SRC.g[c.k] = null; });
     fillLists(); applyPrices('e'); applyPrices('g');
@@ -708,12 +730,12 @@
     function costLine(lbl, kwh, pr, fixe){
       if (pr === null){ nMiss++; html += '<div class="line"><span>' + lbl + '</span><span class="hint">prix à compléter</span></div>'; costTxt += '\n' + lbl + ' : prix non renseigné'; return; }
       var c = kwh * pr / 100 + (fixe || 0); tot += c; nOk++;
-      html += '<div class="line"><span>' + lbl + ' : ' + fmt(kwh) + ' kWh × ' + num2(pr) + ' c€' + (fixe ? ' + ' + fmt(fixe) + ' €' : '') + '</span><span>' + fmt(c) + ' €/an</span></div>';
+      html += '<div class="line"><span>' + lbl + ' : ' + fmt(kwh) + ' kWh × ' + num2(pr) + ' c€' + (fixe ? ' + ' + fmt(fixe) + ' €' : '') + '</span><span>' + fmt(c) + ' € HTVA</span></div>';
       var o = lbl === 'Gaz' ? P.g : P.e;
       html += '<div class="hint used">' + (o.source ? esc(o.source) + '<br>' : '') + o.parts.map(function(p){ return esc(p.lbl) + ' : ' + esc(p.txt) + (p.edited ? ' <b style="color:#9a5b00">(corrigé)</b>' : p.manual && o.anyList ? ' <i>(saisi à la main)</i>' : ''); }).join('<br>') + '</div>';
       var miss = o.parts.filter(function(p){ return p.txt === 'non renseigné'; }).map(function(p){ return p.lbl.toLowerCase(); });
       if (miss.length){ html += '<div class="hint" style="color:#9a3b2b;margin-top:-4px">Incomplet : ' + miss.join(', ') + ' non renseigné' + (miss.length > 1 ? 's' : '') + '.</div>'; costTxt += ' – incomplet : ' + miss.join(', ') + ' manquant' + (miss.length > 1 ? 's' : ''); }
-      costTxt += '\n' + lbl + ' : ' + fmt(kwh) + ' kWh × ' + num2(pr) + ' c€/kWh' + (fixe ? ' + ' + fmt(fixe) + ' €/an' : '') + ' = ' + fmt(c) + ' €/an (' + fmt(Math.round(c / 12)) + ' €/mois)';
+      costTxt += '\n' + lbl + ' : ' + fmt(kwh) + ' kWh × ' + num2(pr) + ' c€/kWh' + (fixe ? ' + ' + fmt(fixe) + ' €/an' : '') + ' = ' + fmt(c) + ' €/an HTVA';
     }
     if (showE) costLine('Électricité', kE, P.e.prixMoyen, P.e.fixe);
     if (showE && r.solar && r.solar.mode === 'comp'){
@@ -726,15 +748,21 @@
         how = fmt(r.solar.reseau) + ' kWh prélevés × ' + (reK !== null ? num2(reK) : '?') + ' c€ (réseau)' + (forfait !== null ? ' (plafond : ' + num2(kwe) + ' kWe × ' + num2(rate) + ' € = ' + fmt(forfait) + ' €)' : ''); }
       else { pros = forfait; how = num2(kwe) + ' kWe × ' + (rate !== null ? num2(rate) : '?') + ' €/kWe'; }
       if (pros === null){ nMiss++; html += '<div class="line"><span>Tarif prosumer</span><span class="hint">tarif €/kWe à compléter</span></div>'; costTxt += '\nTarif prosumer : tarif non renseigné'; }
-      else { tot += pros; html += '<div class="line"><span>Tarif prosumer : ' + esc(how) + '</span><span>' + fmt(pros) + ' €/an</span></div>'; costTxt += '\nTarif prosumer (' + (comm ? 'compteur communicant/double flux' : 'compteur classique') + ') : ' + how + ' = ' + fmt(pros) + ' €/an'; }
+      else { tot += pros; html += '<div class="line"><span>Tarif prosumer : ' + esc(how) + '</span><span>' + fmt(pros) + ' € HTVA</span></div>'; costTxt += '\nTarif prosumer (' + (comm ? 'compteur communicant/double flux' : 'compteur classique') + ') : ' + how + ' = ' + fmt(pros) + ' €/an HTVA'; }
       var ps = $('prosSrc'); ps.textContent = rate === null ? 'Tarif non encodé pour ce gestionnaire : à compléter.' : ($('prosRate').value === ($('prosRate').dataset.src || '') ? 'Tarif de la liste' + (T && T.mois ? ' – ' + moisLbl(T.mois) : '') + '.' : 'Tarif corrigé à la main.');
     }
     if (showG) costLine('Gaz', r.g, P.g.prixMoyen, P.g.fixe);
     if (nOk){
-      var acompte = Math.round(tot / 12);
-      html += '<div class="line acompte"><span>Acompte mensuel estimé' + (nMiss ? ' (partiel)' : '') + '</span><span>' + fmt(acompte) + ' €</span></div>';
-      html += '<div class="hint">Coût annuel estimé : ' + fmt(tot) + ' €' + (r.solar && r.solar.mode === 'inj' ? ' · revenu de l\'injection non déduit' : '') + '</div>';
-      costTxt = '\n\nCoût estimé :' + costTxt + '\nTotal : ' + fmt(tot) + ' €/an\nACOMPTE MENSUEL ESTIMÉ : ' + fmt(acompte) + ' €' + (nMiss ? ' (partiel : un prix manque)' : '');
+      var rate = tvaRate(), tva = tot * rate, ttc = tot + tva, pro = SEG() === 'P';
+      var acompte = Math.round(ttc / 12), acompteH = Math.round(tot / 12);
+      html += '<div class="line"><span>Total HTVA</span><span>' + fmt(tot) + ' €/an</span></div>';
+      html += '<div class="line"><span>TVA ' + Math.round(rate * 100) + ' %' + (pro ? ' (professionnel)' : ' (particulier)') + '</span><span>' + fmt(tva) + ' €/an</span></div>';
+      html += '<div class="line"><span>Total TVAC</span><span>' + fmt(ttc) + ' €/an</span></div>';
+      html += '<div class="line acompte"><span>Acompte mensuel estimé' + (nMiss ? ' (partiel)' : '') + '</span><span>' + fmt(acompte) + ' € TVAC</span></div>';
+      if (pro) html += '<div class="line"><span>soit hors TVA</span><span>' + fmt(acompteH) + ' € HTVA</span></div>';
+      if (r.solar && r.solar.mode === 'inj') html += '<div class="hint">Revenu de l\'injection non déduit.</div>';
+      costTxt = '\n\nCoût estimé :' + costTxt + '\nTotal : ' + fmt(tot) + ' €/an HTVA + TVA ' + Math.round(rate * 100) + ' % ' + fmt(tva) + ' € = ' + fmt(ttc) + ' €/an TVAC' +
+        '\nACOMPTE MENSUEL ESTIMÉ : ' + fmt(acompte) + ' € TVAC' + (pro ? ' (' + fmt(acompteH) + ' € HTVA)' : '') + (nMiss ? ' (partiel : un prix manque)' : '');
     } else costTxt = '';
     cst.innerHTML = html; cst.hidden = !nOk;
 
@@ -752,6 +780,8 @@
       return '- ' + l.label + ' : ' + parts.join(' / ') + ' kWh';
     }).join('\n');
     lastText = 'Estimation indicative de consommation annuelle' +
+      '\nClient : ' + (SEG() === 'P' ? 'professionnel' : 'particulier') +
+      '\nContrat : ' + (document.querySelector('input[name="etat"]:checked').value === 'nouveau' ? 'pas encore établi' + ($('debut').value ? ', début prévu ' + moisLbl($('debut').value + '-01') : '') : 'en cours') +
       '\nÉnergies : ' + enLbl + P.txt +
       '\nMénage : ' + inp.persons + (inp.persons >= 5 ? '+' : '') + ' pers., ' + typeLbl +
       '\nChauffage : ' + heatLbl +
@@ -763,7 +793,7 @@
 
   document.getElementById('f').addEventListener('input', render);
   document.getElementById('f').addEventListener('change', render);
-  document.getElementById('reset').addEventListener('click', function(){ document.getElementById('f').reset(); resetPrices(); render(); });
+  document.getElementById('reset').addEventListener('click', function(){ document.getElementById('f').reset(); resetPrices(); onDebut(); render(); });
   document.getElementById('copy').addEventListener('click', function(){
     var btn = this;
     function done(ok){ btn.textContent = ok ? 'Copié ✓' : 'Copie impossible'; setTimeout(function(){ btn.textContent = 'Copier le résultat'; }, 1500); }
