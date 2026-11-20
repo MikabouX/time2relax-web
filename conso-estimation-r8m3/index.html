@@ -515,6 +515,7 @@
     if (!sel.hidden && sel.value && sel.value !== AUTRE) return sel.value;
     return txt.value.trim();
   }
+  var SOCIAL = {e: false, g: false};
   function findRow(type, en, cle, reg){ var sg = segOf(type); return (T ? T.prix : []).filter(function(p){ return p.segment === sg && p.type === type && p.energie === en && p.cle === cle && p.region === reg; })[0] || null; }
 
   // Prend les valeurs de la liste pour une énergie ; garde ce que l'utilisateur a corrigé à la main.
@@ -522,6 +523,9 @@
     var reg = regionOf(en), grd = $(en === 'e' ? 'grdE' : 'grdG').value, name = contractName(en);
     var enRow = name && reg ? findRow('energie', en, name, reg) : null;
     var rows = {en: enRow, vt: enRow && enRow.vert_kwh !== null && enRow.vert_kwh !== undefined ? enRow : null, re: grd ? findRow('reseau', en, grd, reg) : null, tx: reg ? findRow('taxes', en, reg, reg) : null};
+    // Tarif social (CREG) : réseau compris dans le prix, accise réduite (ligne taxes « Tarif social »), pas de prosumer.
+    SOCIAL[en] = !!(enRow && (enRow.cle === 'Tarif social' || /_SOCIAL_/.test(enRow.doc || '')));
+    if (SOCIAL[en]){ rows.re = {prix_kwh: 0, prix_jour: 0, prix_nuit: 0, fixe_an: 0, prosumer_kwe: null}; rows.tx = reg ? findRow('taxes', en, 'Tarif social', reg) : null; }
     COMPS.forEach(function(c){
       var old = SRC[en][c.k], v = VAL[en][c.k], r = rows[c.k];
       ['k', 'j', 'n', 'f'].forEach(function(f){
@@ -573,7 +577,7 @@
   function buildTable(en){
     var fs = fields(en), box = $(en === 'e' ? 'tabE' : 'tabG');
     var grd = grdOf($(en === 'e' ? 'grdE' : 'grdG').value);
-    var sig = fs.join(',') + '|' + (grd ? grd.code : '') + '|' + SEG();
+    var sig = fs.join(',') + '|' + (grd ? grd.code : '') + '|' + SEG() + '|' + SOCIAL[en];
     if (box.dataset.sig === sig && box.querySelector('table')){
       // même structure : mise à jour sur place (ne pas détruire le champ où l'utilisateur clique)
       box.querySelectorAll('input[data-f]').forEach(function(inp){
@@ -588,7 +592,7 @@
     var html = '<table class="comp"><tr><th></th>' + fs.map(function(f){ return '<th class="n">' + FIELD_LBL[f] + '</th>'; }).join('') + '</tr>';
     COMPS.forEach(function(c){
       if (c.k === 'vt' && en === 'g') return;
-      var lbl = c.lbl + (c.k === 're' && grd ? '<span class="tag">' + esc(grd.nom) + '</span>' : '') + (c.k === 'tx' && grd ? '<span class="tag">' + esc(grd.region) + '</span>' : '');
+      var lbl = c.lbl + (c.k === 're' && SOCIAL[en] ? '<span class="tag">compris dans le tarif social</span>' : c.k === 're' && grd ? '<span class="tag">' + esc(grd.nom) + '</span>' : '') + (c.k === 'tx' && grd ? '<span class="tag">' + esc(grd.region) + (SOCIAL[en] ? ', tarif social' : '') + '</span>' : '');
       html += '<tr><td>' + lbl + '</td>' + fs.map(function(f){
         if (c.k === 'vt' && f === 'f') return '<td class="n hint">–</td>';
         var v = VAL[en][c.k][f];
@@ -656,6 +660,7 @@
         if (v.f) bits.push(showv(v.f, c.k, 'f') + ' €/an');
         var edited = fs.some(function(f){ return isEdited(en, c.k, f); });
         if (c.k === 'vt' && (en === 'g' || !bits.length)) return;  // énergie verte : électricité seulement, facultative
+        if (c.k === 're' && SOCIAL[en]){ parts.push({lbl: c.lbl, txt: 'compris dans le tarif social', edited: edited, list: true, manual: false}); return; }
         parts.push({lbl: c.lbl.replace(' (contrat)', ''), txt: bits.length ? bits.join(' + ') : 'non renseigné', edited: edited, list: !!SRC[en][c.k], manual: bits.length > 0 && !SRC[en][c.k]});
       });
       o.parts = parts; o.anyList = anyList;

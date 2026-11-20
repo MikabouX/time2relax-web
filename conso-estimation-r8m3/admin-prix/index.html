@@ -247,7 +247,9 @@
       var p = re[g.code] || {}; return '<tr data-cle="' + esc(g.code) + '" data-region="' + esc(g.region) + '"><td>' + esc(g.nom) + ' <span class="hint">' + esc(g.region) + '</span></td>' + priceCells(p, en === 'e' ? g.region === 'Wallonie' : undefined) + '</tr>';
     }).join('');
     var tx = {}; rows('taxes').forEach(function(p){ tx[p.cle] = p; });
-    $('tTx').innerHTML = head('Région') + REGIONS.map(function(r){ var p = tx[r] || {}; return '<tr data-cle="' + r + '" data-region="' + r + '"><td>' + r + '</td>' + priceCells(p) + '</tr>'; }).join('');
+    var txs = {}; rows('taxes').forEach(function(p){ if (p.cle === 'Tarif social') txs[p.region] = p; });
+    $('tTx').innerHTML = head('Région') + REGIONS.map(function(r){ var p = tx[r] || {}; return '<tr data-cle="' + r + '" data-region="' + r + '"><td>' + r + '</td>' + priceCells(p) + '</tr>'; }).join('') +
+      (seg === 'R' ? REGIONS.map(function(r){ var p = txs[r] || {}; return '<tr data-cle="Tarif social" data-region="' + r + '"><td>' + r + ' <span class="hint">tarif social (accise réduite)</span></td>' + priceCells(p) + '</tr>'; }).join('') : '');
   }
   $('addEn').addEventListener('click', function(){
     var tb = $('tEn').tBodies[0] || $('tEn').appendChild(document.createElement('tbody'));
