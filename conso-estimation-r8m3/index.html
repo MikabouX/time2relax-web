@@ -274,6 +274,14 @@
         <div class="row"><span class="clbl">Client</span>
           <div class="opts"><label><input type="radio" name="seg" value="R" checked>Particulier</label><label><input type="radio" name="seg" value="P">Professionnel</label></div>
         </div>
+        <div class="row"><span class="clbl">Demande</span><select id="dem">
+          <option value="">– choisir –</option>
+          <option value="contract update">Changement de contrat (contract update)</option>
+          <option value="SSW">Changement de fournisseur (SSW)</option>
+          <option value="take over">Emménagement, reprise de compteur (take over)</option>
+          <option value="first opening">Première ouverture (first opening)</option>
+          <option value="open existing">Réouverture (open existing)</option>
+        </select></div>
         <div class="row"><span class="clbl">Contrat</span>
           <div class="opts"><label><input type="radio" name="etat" value="cours" checked>En cours</label><label><input type="radio" name="etat" value="nouveau">Pas encore établi</label></div>
         </div>
@@ -316,6 +324,7 @@
       <div class="card result" aria-live="polite">
         <h3>Coût et acompte</h3>
     <div class="cost" id="cost" hidden></div>
+        <div class="row" style="margin-top:8px"><span class="clbl">Acompte souhaité</span><input type="text" inputmode="decimal" class="px" id="acSouh" maxlength="8"> <span>€ / mois (demande du client)</span></div>
         <p class="hint" id="costEmpty">Choisissez le contrat et le gestionnaire, ou tapez les prix, pour obtenir l'acompte.</p>
       </div>
     </div>
@@ -675,7 +684,6 @@
       out[en] = o;
       if ((en === 'e' && showE) || (en === 'g' && showG)){
         out.txt += '\nContrat ' + (en === 'e' ? 'électricité' : 'gaz') + ' : ' + (name || 'non renseigné') + (head.length ? ' (' + head.join(', ') + ')' : '');
-        out.txt += '\n  ' + parts.map(function(p){ return p.lbl + ' ' + p.txt + (p.edited ? ' (corrigé)' : p.manual && anyList ? ' (saisi à la main)' : ''); }).join(' · ');
       }
     });
     refreshPropose();
@@ -885,8 +893,8 @@
       var o = lbl === 'Gaz' ? P.g : P.e;
       html += '<div class="hint used">' + (o.source ? esc(o.source) + '<br>' : '') + o.parts.map(function(p){ return esc(p.lbl) + ' : ' + esc(p.txt) + (p.edited ? ' <b style="color:#9a5b00">(corrigé)</b>' : p.manual && o.anyList ? ' <i>(saisi à la main)</i>' : ''); }).join('<br>') + '</div>';
       var miss = o.parts.filter(function(p){ return p.txt === 'non renseigné'; }).map(function(p){ return p.lbl.toLowerCase(); });
-      if (miss.length){ html += '<div class="hint" style="color:#9a3b2b;margin-top:-4px">Incomplet : ' + miss.join(', ') + ' non renseigné' + (miss.length > 1 ? 's' : '') + '.</div>'; costTxt += ' – incomplet : ' + miss.join(', ') + ' manquant' + (miss.length > 1 ? 's' : ''); }
       costTxt += '\n' + lbl + ' : ' + fmt(kwh) + ' kWh × ' + num2(pr * df) + ' c€/kWh' + (fixe ? ' + ' + fmt(fixe * df) + ' €/an' : '') + ' = ' + fmt(c * df) + ' €/an ' + u;
+      if (miss.length){ html += '<div class="hint" style="color:#9a3b2b;margin-top:-4px">Incomplet : ' + miss.join(', ') + ' non renseigné' + (miss.length > 1 ? 's' : '') + '.</div>'; costTxt += ' – incomplet : ' + miss.join(', ') + ' manquant' + (miss.length > 1 ? 's' : ''); }
     }
     if (showE) costLine('Électricité', kE, P.e.prixMoyen, P.e.fixe);
     if (showE && r.solar && r.solar.mode === 'comp' && SOCIAL.e){
@@ -940,7 +948,7 @@
     var waterLbl = {gaz: 'gaz', elec: 'boiler électrique', autre: 'chaudière mazout / autre'}[inp.water];
     var enLbl = {both: 'électricité + gaz', e: 'électricité seule', g: 'gaz seul'}[inp.energies];
     var evLbl = inp.ev ? 'oui, ' + fmt(inp.km) + ' km/an rechargés à domicile' : 'non';
-    var pvLbl = inp.pv ? 'oui, ' + String(inp.kwc).replace('.', ',') + ' kWc, ' + (inp.bat ? 'avec' : 'sans') + ' batterie, ' + (inp.comp ? 'avec compensation' : 'sans compensation (injection)') : 'non';
+    var pvLbl = inp.pv ? 'oui, ' + String(inp.kwc).replace('.', ',') + ' kWc, ' + (inp.comp ? 'compensation' : 'injection') : 'non';
     var detailTxt = lines.map(function(l, k){
       if (k === 0) return '- ' + l.label + ' : ' + [showE ? 'élec ' + fmt(l.e) : '', showG ? 'gaz ' + fmt(l.g) : ''].filter(Boolean).join(' / ') + ' kWh';
       var parts = [];
@@ -948,18 +956,22 @@
       if (showG && l.g) parts.push('gaz ' + (l.g > 0 ? '+' : '−') + fmt(Math.abs(l.g)));
       return '- ' + l.label + ' : ' + parts.join(' / ') + ' kWh';
     }).join('\n');
-    lastText = 'Estimation indicative de consommation annuelle' +
+    var etatTxt = document.querySelector('input[name="etat"]:checked').value === 'nouveau' ? 'contrat pas encore établi' + ($('debut').value ? ', début ' + moisLbl($('debut').value + '-01') : '') : '';
+    var acS = pnum($('acSouh').value);
+    lastText = 'Infos de la demande client :' +
       '\nClient : ' + (SEG() === 'P' ? 'professionnel' : 'particulier') +
-      '\nContrat : ' + (document.querySelector('input[name="etat"]:checked').value === 'nouveau' ? 'pas encore établi' + ($('debut').value ? ', début prévu ' + moisLbl($('debut').value + '-01') : '') : 'en cours') +
+      '\nDemande : ' + ($('dem').value || 'non précisée') + (etatTxt ? ' (' + etatTxt + ')' : '') +
       (cpCode() ? '\nCode postal : ' + $('cp').value.trim() : '') +
       '\nÉnergies : ' + enLbl + P.txt +
+      '\n\nDétail en bref :' +
       '\nMénage : ' + inp.persons + (inp.persons >= 5 ? '+' : '') + ' pers., ' + typeLbl +
       '\nChauffage : ' + heatLbl +
       '\nEau chaude : ' + waterLbl +
-      (showE ? '\nVoiture électrique : ' + evLbl + '\nPanneaux solaires : ' + pvLbl : '') +
+      (showE ? '\nVoiture électrique : ' + evLbl + '\nPanneaux solaires : ' + pvLbl + '\nBatterie domestique : ' + (inp.pv && inp.bat ? 'oui' : 'non') : '') +
       '\n\nDétail :\n' + detailTxt +
-      '\n' + (showE ? '\nÉlectricité : ' + (knE !== null ? fmt(knE) + ' kWh/an prélevés (consommation connue' + (knEN !== null ? ', dont ' + fmt(knEN) + ' kWh de nuit' : '') + ' ; estimation : ' + fmt(r.e) + ')' : fmt(r.e) + ' kWh/an') : '') +
-      (showG ? '\nGaz : ' + (knG !== null ? fmt(knG) + ' kWh/an (consommation connue ; estimation : ' + fmt(r.g) + ')' : fmt(r.g) + ' kWh/an') : '') + (solarTxt ? '\n' + solarTxt : '') + costTxt;
+      (showE ? '\nÉlectricité : ' + (knE !== null ? fmt(knE) + ' kWh/an prélevés (connue' + (knEN !== null ? ', dont ' + fmt(knEN) + ' de nuit' : '') + ' ; estimation ' + fmt(r.e) + ')' : fmt(r.e) + ' kWh/an') : '') +
+      (showG ? '\nGaz : ' + (knG !== null ? fmt(knG) + ' kWh/an (connue ; estimation ' + fmt(r.g) + ')' : fmt(r.g) + ' kWh/an') : '') + (solarTxt ? '\n' + solarTxt : '') + costTxt +
+      '\n\nAcompte souhaité : ' + (acS !== null ? fmt(acS) + ' €/mois' : 'non précisé');
   }
 
   document.getElementById('f').addEventListener('input', render);
