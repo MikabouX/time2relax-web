@@ -829,11 +829,22 @@
       })
       .catch(function(){ if (my === cpSeq) h.textContent = 'Recherche impossible : choisissez le gestionnaire à la main.'; });
   }
-  document.querySelectorAll('input[name="seg"]').forEach(function(r){ r.addEventListener('change', function(e){ e.stopPropagation(); fillContracts('e'); fillContracts('g'); applyPrices('e'); applyPrices('g'); render(); }); });
+  document.querySelectorAll('input[name="seg"]').forEach(function(r){ r.addEventListener('change', function(e){ e.stopPropagation(); onDebut(); fillContracts('e'); fillContracts('g'); applyPrices('e'); applyPrices('g'); render(); }); });
   function debutIso(){ return /^\d{4}-\d{2}/.test($('debut').value) ? $('debut').value.slice(0, 7) + '-01' : null; }
-  function debutLbl(){ var v = $('debut').value, m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v); return m ? (+m[3]) + ' ' + moisLbl(m[1] + '-' + m[2] + '-01') : ''; }
+  function debutLbl(x){ var v = x || $('debut').value, m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v); return m ? (+m[3]) + ' ' + moisLbl(m[1] + '-' + m[2] + '-01') : ''; }
   // Les prix sont ceux du mois où le contrat est conclu (cartes « contrats conclus en … »), pas ceux du mois de début.
-  function onDebut(){ $('debutHint').textContent = debutIso() ? 'prix du mois de signature' : 'facultatif'; }
+  // Changement de fournisseur (SSW) : préavis d'un mois pour un particulier (20 jours pour un petit professionnel).
+  function ssw(){ return $('dem').value === 'SSW'; }
+  function isoDay(d){ return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  function sswMin(){ var d = new Date(); if (SEG() === 'P') d.setDate(d.getDate() + 20); else d.setMonth(d.getMonth() + 1); return isoDay(d); }
+  function onDebut(){
+    var h = $('debutHint'), v = $('debut').value, min = sswMin();
+    $('debut').min = ssw() ? min : '';
+    if (ssw() && v && v < min){ h.textContent = 'Trop tôt pour un changement de fournisseur : au plus tôt le ' + debutLbl(min) + ' (préavis ' + (SEG() === 'P' ? '20 jours' : 'd\'un mois') + ').'; h.style.color = '#9a3b2b'; return; }
+    h.style.color = '';
+    h.textContent = debutIso() ? 'prix du mois de signature' : (ssw() ? 'au plus tôt le ' + debutLbl(min) : 'facultatif');
+  }
+  $('dem').addEventListener('change', function(){ if (ssw() && !$('debut').value) $('debut').value = sswMin(); onDebut(); });
   $('debut').addEventListener('change', function(e){ e.stopPropagation(); onDebut(); render(); });
   function resetPrices(){
     COMPS.forEach(function(c){ VAL.e[c.k] = {}; VAL.g[c.k] = {}; SRC.e[c.k] = null; SRC.g[c.k] = null; });
