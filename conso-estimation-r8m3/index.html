@@ -109,6 +109,7 @@
   .sug{position:absolute;left:0;top:100%;z-index:20;min-width:100%;max-width:340px;max-height:260px;overflow:auto;background:#fff;border:1px solid #ccd;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.12);margin-top:2px}
   .sug button{display:block;width:100%;text-align:left;border:0;background:none;padding:6px 10px;font:inherit;cursor:pointer;color:inherit}
   .sug button:hover,.sug button:focus{background:#eef3fb}
+  .cost .acpart span:last-child{font-weight:600}
 </style>
 </head>
 <body>
@@ -876,10 +877,10 @@
     // ---- coût et acompte
     var kE = knE !== null ? knE : (r.solar ? (r.solar.mode === 'comp' ? r.solar.net : r.solar.reseau) : r.e);
     var kRes = knE !== null ? knE : (r.solar ? r.solar.reseau : r.e);   // kWh prélevés (tarif prosumer proportionnel)
-    var cst = document.getElementById('cost'), costTxt = '', html = '', tot = 0, nOk = 0, nMiss = 0;
+    var cst = document.getElementById('cost'), costTxt = '', html = '', tot = 0, nOk = 0, nMiss = 0, totEn = {e: 0, g: 0}, okEn = {e: false, g: false};
     function costLine(lbl, kwh, pr, fixe){
       if (pr === null){ nMiss++; html += '<div class="line"><span>' + lbl + '</span><span class="hint">prix à compléter</span></div>'; costTxt += '\n' + lbl + ' : prix non renseigné'; return; }
-      var c = kwh * pr / 100 + (fixe || 0), df = DF(), u = SEG() === 'P' ? 'HTVA' : 'TVAC'; tot += c; nOk++;
+      var c = kwh * pr / 100 + (fixe || 0), df = DF(), u = SEG() === 'P' ? 'HTVA' : 'TVAC', k = lbl === 'Gaz' ? 'g' : 'e'; tot += c; nOk++; totEn[k] += c; okEn[k] = true;
       html += '<div class="line"><span>' + lbl + ' : ' + fmt(kwh) + ' kWh × ' + num2(pr * df) + ' c€' + (fixe ? ' + ' + fmt(fixe * df) + ' €' : '') + '</span><span>' + fmt(c * df) + ' € ' + u + '</span></div>';
       var o = lbl === 'Gaz' ? P.g : P.e;
       html += '<div class="hint used">' + (o.source ? esc(o.source) + '<br>' : '') + o.parts.map(function(p){ return esc(p.lbl) + ' : ' + esc(p.txt) + (p.edited ? ' <b style="color:#9a5b00">(corrigé)</b>' : p.manual && o.anyList ? ' <i>(saisi à la main)</i>' : ''); }).join('<br>') + '</div>';
@@ -902,13 +903,17 @@
         how = fmt(kRes) + ' kWh prélevés × ' + (reK !== null ? num2(reK) : '?') + ' c€ (réseau)' + (forfait !== null ? ' (plafond : ' + num2(kwe) + ' kWe × ' + num2(rate) + ' € = ' + fmt(forfait) + ' €)' : ''); }
       else { pros = forfait; how = num2(kwe) + ' kWe × ' + (rate !== null ? num2(rate) : '?') + ' €/kWe'; }
       if (pros === null){ nMiss++; html += '<div class="line"><span>Tarif prosumer</span><span class="hint">tarif €/kWe à compléter</span></div>'; costTxt += '\nTarif prosumer : tarif non renseigné'; }
-      else { var pu = SEG() === 'P' ? 'HTVA' : 'TVAC'; tot += pros; html += '<div class="line"><span>Tarif prosumer : ' + esc(how) + '</span><span>' + fmt(pros * DF()) + ' € ' + pu + '</span></div>'; costTxt += '\nTarif prosumer (' + (comm ? 'compteur communicant/double flux' : 'compteur classique') + ') : ' + how + ' HTVA = ' + fmt(pros * DF()) + ' €/an ' + pu; }
+      else { var pu = SEG() === 'P' ? 'HTVA' : 'TVAC'; tot += pros; totEn.e += pros; html += '<div class="line"><span>Tarif prosumer : ' + esc(how) + '</span><span>' + fmt(pros * DF()) + ' € ' + pu + '</span></div>'; costTxt += '\nTarif prosumer (' + (comm ? 'compteur communicant/double flux' : 'compteur classique') + ') : ' + how + ' HTVA = ' + fmt(pros * DF()) + ' €/an ' + pu; }
       var ps = $('prosSrc'); ps.textContent = rate === null ? 'Tarif non encodé pour ce gestionnaire : à compléter.' : ($('prosRate').value === ($('prosRate').dataset.src || '') ? 'Tarif de la liste' + (T && T.mois ? ' – ' + moisLbl(T.mois) : '') + '.' : 'Tarif corrigé à la main.');
     }
     if (showG) costLine('Gaz', knG !== null ? knG : r.g, P.g.prixMoyen, P.g.fixe);
     if (nOk){
       var rate = tvaRate(), tva = tot * rate, ttc = tot + tva, pro = SEG() === 'P';
-      var acompte = Math.round(ttc / 12), acompteH = Math.round(tot / 12);
+      // Acompte par énergie (arrondi à l'euro), puis total = somme des deux.
+      var acE = Math.round(totEn.e * (1 + rate) / 12), acG = Math.round(totEn.g * (1 + rate) / 12);
+      var acEH = Math.round(totEn.e / 12), acGH = Math.round(totEn.g / 12);
+      var acompte = (okEn.e ? acE : 0) + (okEn.g ? acG : 0), acompteH = (okEn.e ? acEH : 0) + (okEn.g ? acGH : 0);
+      var both = okEn.e && okEn.g;
       if (pro){
         html += '<div class="line"><span>Total HTVA</span><span>' + fmt(tot) + ' €/an</span></div>';
         html += '<div class="line"><span>TVA 21 % (professionnel)</span><span>' + fmt(tva) + ' €/an</span></div>';
@@ -917,11 +922,16 @@
         html += '<div class="line"><span>Total TVAC</span><span>' + fmt(ttc) + ' €/an</span></div>';
         html += '<div class="line"><span class="hint">dont TVA 6 % (particulier)</span><span class="hint">' + fmt(tva) + ' €/an</span></div>';
       }
-      html += '<div class="line acompte"><span>Acompte mensuel estimé' + (nMiss ? ' (partiel)' : '') + '</span><span>' + fmt(acompte) + ' € TVAC</span></div>';
+      if (both){
+        html += '<div class="line acpart"><span>Acompte électricité</span><span>' + fmt(acE) + ' € TVAC' + (pro ? ' <span class="hint">(' + fmt(acEH) + ' € HTVA)</span>' : '') + '</span></div>';
+        html += '<div class="line acpart"><span>Acompte gaz</span><span>' + fmt(acG) + ' € TVAC' + (pro ? ' <span class="hint">(' + fmt(acGH) + ' € HTVA)</span>' : '') + '</span></div>';
+      }
+      html += '<div class="line acompte"><span>' + (both ? 'Acompte total (électricité + gaz)' : 'Acompte mensuel ' + (okEn.g ? 'gaz' : 'électricité')) + (nMiss ? ' (partiel)' : '') + '</span><span>' + fmt(acompte) + ' € TVAC</span></div>';
       if (pro) html += '<div class="line"><span>soit hors TVA</span><span>' + fmt(acompteH) + ' € HTVA</span></div>';
       if (r.solar && r.solar.mode === 'inj') html += '<div class="hint">Revenu de l\'injection non déduit.</div>';
       costTxt = '\n\nCoût estimé (' + (pro ? 'HTVA' : 'TVAC') + ') :' + costTxt + (pro ? '\nTotal : ' + fmt(tot) + ' €/an HTVA + TVA 21 % ' + fmt(tva) + ' € = ' + fmt(ttc) + ' €/an TVAC' : '\nTotal : ' + fmt(ttc) + ' €/an TVAC (dont TVA 6 % : ' + fmt(tva) + ' €)') +
-        '\nACOMPTE MENSUEL ESTIMÉ : ' + fmt(acompte) + ' € TVAC' + (pro ? ' (' + fmt(acompteH) + ' € HTVA)' : '') + (nMiss ? ' (partiel : un prix manque)' : '');
+        (both ? '\nAcompte électricité : ' + fmt(acE) + ' € TVAC' + (pro ? ' (' + fmt(acEH) + ' € HTVA)' : '') + '\nAcompte gaz : ' + fmt(acG) + ' € TVAC' + (pro ? ' (' + fmt(acGH) + ' € HTVA)' : '') : '') +
+        '\nACOMPTE MENSUEL ESTIMÉ' + (both ? ' (TOTAL)' : okEn.g ? ' GAZ' : ' ÉLECTRICITÉ') + ' : ' + fmt(acompte) + ' € TVAC' + (pro ? ' (' + fmt(acompteH) + ' € HTVA)' : '') + (nMiss ? ' (partiel : un prix manque)' : '');
     } else costTxt = '';
     cst.innerHTML = html; cst.hidden = !nOk; $('costEmpty').hidden = !!nOk;
 
