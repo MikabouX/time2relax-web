@@ -18,9 +18,21 @@
   header{background:var(--accent);color:#fff;padding:18px 20px}
   header h1{margin:0;font-size:20px;font-weight:650}
   header p{margin:4px 0 0;opacity:.9;font-size:13px}
-  main{max-width:1060px;margin:0 auto;padding:18px 16px 40px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px}
-  @media (max-width:820px){main{grid-template-columns:1fr}}
-  .banner{grid-column:1/-1;background:var(--warn);border:1px solid var(--warn-line);border-radius:10px;padding:10px 14px;font-size:13.5px}
+  main{max-width:1100px;margin:0 auto;padding:18px 16px 40px;display:grid;gap:18px}
+  .steps{display:grid;gap:22px}
+  .step{border-radius:14px;padding:14px;background:#eaf3ee;border:1px solid #cfe3d7}
+  .step.prix{background:#eaf0f8;border-color:#cad8ea}
+  .stephead{display:flex;align-items:center;gap:12px;margin:0 2px 12px}
+  .stephead .num{flex:none;width:34px;height:34px;border-radius:50%;background:var(--accent);color:#fff;font-weight:700;display:grid;place-items:center;font-size:17px}
+  .step.prix .stephead .num{background:#2e5f9e}
+  .stephead h2{margin:0;font-size:18px}
+  .stephead p{margin:2px 0 0;color:var(--muted);font-size:13px}
+  .cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;align-items:start}
+  @media (max-width:820px){.cols{grid-template-columns:1fr}}
+  .card.result{position:sticky;top:12px}
+  .card h3{margin:0 0 12px;font-size:15.5px}
+  .actions.bar{justify-content:center}
+  .banner{background:var(--warn);border:1px solid var(--warn-line);border-radius:10px;padding:10px 14px;font-size:13.5px}
   .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
   .card h2{margin:0 0 12px;font-size:16px}
   fieldset{border:0;margin:0 0 14px;padding:0}
@@ -101,9 +113,11 @@
 <main>
   <div class="banner"><strong>Outil à titre indicatif.</strong> Les résultats sont des moyennes : la consommation réelle dépend de l'isolation, de la surface, des habitudes et des équipements, et seule la mesure du compteur fait foi.</div>
 
-  <section class="card" aria-label="Questions">
-    <h2>Le ménage</h2>
-    <form id="f" autocomplete="off">
+  <form id="f" class="steps" autocomplete="off">
+  <section class="step" aria-label="Estimation de la consommation">
+    <div class="stephead"><span class="num">1</span><div><h2>Estimation de la consommation</h2><p>Le ménage, le logement et les équipements → kWh par an</p></div></div>
+    <div class="cols">
+      <div class="card">
       <fieldset>
         <legend>Énergies à estimer</legend>
         <div class="opts">
@@ -203,6 +217,42 @@
         </div>
       </fieldset>
 
+      </div>
+      <div class="card result" aria-live="polite">
+        <h3>Consommation estimée</h3>
+    <div class="totals">
+      <div class="tot e" id="boxE"><div class="lbl">Électricité</div><div class="val" id="totE">–</div><div class="unit" id="totEsub">kWh / an</div></div>
+      <div class="tot g" id="boxG"><div class="lbl">Gaz naturel</div><div class="val" id="totG">–</div><div class="unit">kWh / an</div></div>
+    </div>
+    <div class="solar" id="solar" hidden></div>
+    <table>
+      <thead id="head"></thead>
+      <tbody id="detail"></tbody>
+    </table>
+
+    <details>
+      <summary>Hypothèses et sources</summary>
+      <ul>
+        <li>Base : grille de consommations moyennes par nombre de personnes et type de logement (grille de formation), deux valeurs lissées pour qu'un ménage plus grand ne consomme jamais moins. Valeurs cohérentes avec l'étude ULB pour la CREG (2026) et les moyennes du gouvernement flamand.</li>
+        <li>La base gaz comprend le chauffage et l'eau chaude au gaz. Eau chaude au gaz : 800 kWh par personne et par an (Homegrade).</li>
+        <li>Boiler électrique : 850 kWh par personne et par an (Homegrade).</li>
+        <li>Chauffage électrique : 0,9 kWh d'électricité par kWh de gaz remplacé (rendement de la chaudière). Pompe à chaleur : 3 fois moins (COP saisonnier de 3, ecoconso).</li>
+        <li>Chaudière mazout : environ 300 kWh d'électricité par an (brûleur et circulateur ; un circulateur seul consomme de 50 à 450 kWh selon son âge, Test-Achats). Poêle à pellets : environ 100 kWh par an (ENGIE). Le combustible (mazout, pellets) n'est pas compté. Poêle au gaz : 70 % du gaz de chauffage d'une chaudière (il chauffe surtout les pièces de vie et n'a pas les pertes du circuit de chauffage) – estimation.</li>
+        <li>Voiture électrique : 18 kWh pour 100 km, pertes de recharge comprises.</li>
+        <li>Panneaux solaires : 900 kWh produits par kWc et par an en Belgique. Part consommée directement : 30 % sans batterie, 65 % avec batterie.</li>
+        <li>Prix encodés HTVA ; TVA de 6 % pour les particuliers et de 21 % pour les professionnels. Coût : kWh facturés × prix du kWh + frais fixes annuels ; acompte = coût annuel TVAC ÷ 12, arrondi à l'euro. Avec panneaux solaires, on facture la consommation nette (compensation) ou l'électricité prélevée (injection), sans compter le revenu de l'injection. Compteur bi-horaire : prix moyen selon la part de nuit indiquée.</li>
+        <li>Tarif prosumer (Wallonie, compensation) : compteur classique = puissance de l'onduleur (kWe) × tarif du gestionnaire en €/kWe ; compteur double flux ou communicant = électricité prélevée × coûts de réseau (distribution + transport), sans dépasser le forfait. Électricité prélevée estimée avec la même part d'autoconsommation (30 % sans batterie, 65 % avec).</li>
+        <li>Les cinq personnes et plus utilisent la ligne « 5 personnes ». La cuisson n'est pas comptée à part.</li>
+      </ul>
+    </details>
+      </div>
+    </div>
+  </section>
+
+  <section class="step prix" aria-label="Prix et acompte">
+    <div class="stephead"><span class="num">2</span><div><h2>Prix et acompte</h2><p>Contrat, gestionnaire de réseau et prix → coût annuel et acompte mensuel</p></div></div>
+    <div class="cols">
+      <div class="card">
       <fieldset id="prixSet">
         <legend>Contrat et prix</legend>
         <div class="row"><span class="clbl">Client</span>
@@ -244,43 +294,20 @@
         </div>
         <div class="hint">Montants <strong>HTVA</strong>, comme sur la carte tarifaire : prix par kWh et frais fixes par an pour l'énergie, le réseau et les taxes. La TVA est ajoutée dans le résultat (6 % particulier, 21 % professionnel). Tout reste modifiable ; une valeur corrigée apparaît en orange.</div>
       </fieldset>
-    </form>
-    <div class="actions">
-      <button type="button" id="reset">Recommencer</button>
-      <button type="button" id="copy">Copier le résultat</button>
-    </div>
-  </section>
-
-  <section class="card" aria-label="Résultat" aria-live="polite">
-    <h2>Consommation estimée</h2>
-    <div class="totals">
-      <div class="tot e" id="boxE"><div class="lbl">Électricité</div><div class="val" id="totE">–</div><div class="unit" id="totEsub">kWh / an</div></div>
-      <div class="tot g" id="boxG"><div class="lbl">Gaz naturel</div><div class="val" id="totG">–</div><div class="unit">kWh / an</div></div>
-    </div>
-    <div class="solar" id="solar" hidden></div>
+      </div>
+      <div class="card result" aria-live="polite">
+        <h3>Coût et acompte</h3>
     <div class="cost" id="cost" hidden></div>
-    <table>
-      <thead id="head"></thead>
-      <tbody id="detail"></tbody>
-    </table>
-
-    <details>
-      <summary>Hypothèses et sources</summary>
-      <ul>
-        <li>Base : grille de consommations moyennes par nombre de personnes et type de logement (grille de formation), deux valeurs lissées pour qu'un ménage plus grand ne consomme jamais moins. Valeurs cohérentes avec l'étude ULB pour la CREG (2026) et les moyennes du gouvernement flamand.</li>
-        <li>La base gaz comprend le chauffage et l'eau chaude au gaz. Eau chaude au gaz : 800 kWh par personne et par an (Homegrade).</li>
-        <li>Boiler électrique : 850 kWh par personne et par an (Homegrade).</li>
-        <li>Chauffage électrique : 0,9 kWh d'électricité par kWh de gaz remplacé (rendement de la chaudière). Pompe à chaleur : 3 fois moins (COP saisonnier de 3, ecoconso).</li>
-        <li>Chaudière mazout : environ 300 kWh d'électricité par an (brûleur et circulateur ; un circulateur seul consomme de 50 à 450 kWh selon son âge, Test-Achats). Poêle à pellets : environ 100 kWh par an (ENGIE). Le combustible (mazout, pellets) n'est pas compté. Poêle au gaz : 70 % du gaz de chauffage d'une chaudière (il chauffe surtout les pièces de vie et n'a pas les pertes du circuit de chauffage) – estimation.</li>
-        <li>Voiture électrique : 18 kWh pour 100 km, pertes de recharge comprises.</li>
-        <li>Panneaux solaires : 900 kWh produits par kWc et par an en Belgique. Part consommée directement : 30 % sans batterie, 65 % avec batterie.</li>
-        <li>Prix encodés HTVA ; TVA de 6 % pour les particuliers et de 21 % pour les professionnels. Coût : kWh facturés × prix du kWh + frais fixes annuels ; acompte = coût annuel TVAC ÷ 12, arrondi à l'euro. Avec panneaux solaires, on facture la consommation nette (compensation) ou l'électricité prélevée (injection), sans compter le revenu de l'injection. Compteur bi-horaire : prix moyen selon la part de nuit indiquée.</li>
-        <li>Tarif prosumer (Wallonie, compensation) : compteur classique = puissance de l'onduleur (kWe) × tarif du gestionnaire en €/kWe ; compteur double flux ou communicant = électricité prélevée × coûts de réseau (distribution + transport), sans dépasser le forfait. Électricité prélevée estimée avec la même part d'autoconsommation (30 % sans batterie, 65 % avec).</li>
-        <li>Les cinq personnes et plus utilisent la ligne « 5 personnes ». La cuisson n'est pas comptée à part.</li>
-      </ul>
-    </details>
+        <p class="hint" id="costEmpty">Choisissez le contrat et le gestionnaire, ou tapez les prix, pour obtenir l'acompte.</p>
+      </div>
+    </div>
   </section>
+  </form>
 
+  <div class="actions bar">
+    <button type="button" id="reset">Recommencer</button>
+    <button type="button" id="copy">Copier le résultat</button>
+  </div>
   <a class="avis" href="avis/">
     <svg width="34" height="31" viewBox="0 0 34 31" aria-hidden="true"><path d="M17 1.5 L32.5 29.5 H1.5 Z" fill="#ffd400" stroke="#111" stroke-width="2.4" stroke-linejoin="round"/><rect x="15.4" y="10" width="3.2" height="11" rx="1.6" fill="#111"/><circle cx="17" cy="25" r="1.9" fill="#111"/></svg>
     <span><strong>Enquête de satisfaction</strong><br>Donnez votre avis</span>
@@ -764,7 +791,7 @@
       costTxt = '\n\nCoût estimé :' + costTxt + '\nTotal : ' + fmt(tot) + ' €/an HTVA + TVA ' + Math.round(rate * 100) + ' % ' + fmt(tva) + ' € = ' + fmt(ttc) + ' €/an TVAC' +
         '\nACOMPTE MENSUEL ESTIMÉ : ' + fmt(acompte) + ' € TVAC' + (pro ? ' (' + fmt(acompteH) + ' € HTVA)' : '') + (nMiss ? ' (partiel : un prix manque)' : '');
     } else costTxt = '';
-    cst.innerHTML = html; cst.hidden = !nOk;
+    cst.innerHTML = html; cst.hidden = !nOk; $('costEmpty').hidden = !!nOk;
 
     var typeLbl = ['appartement', '2 façades', '3 façades', '4 façades'][inp.type];
     var heatLbl = {gaz: 'gaz', elec: 'électrique', pac: 'pompe à chaleur', mazout: 'chaudière mazout', poelegaz: 'poêle au gaz', pellets: 'poêle à pellets'}[inp.heating];
