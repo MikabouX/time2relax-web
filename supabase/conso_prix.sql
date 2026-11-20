@@ -160,3 +160,8 @@ create table if not exists public.conso_cp (
 alter table public.conso_cp enable row level security;
 revoke all on public.conso_cp from anon, authenticated;
 -- conso_cp_get(p_code int) -> {connu, e:[grd], g:[grd]} ; public (anon).
+
+-- ===== Lien vers la carte ENGIE (migration conso_prix_doc, 20 novembre 2026) =====
+-- conso_prix.doc = code de la carte (ex. E_EASY_R_GREEN_C_I_12_W_F) ; renvoyé par conso_prix_get, gardé par conso_prix_save
+-- (coalesce si la page admin ne l'envoie pas) et recopié par conso_prix_copy. Le simulateur affiche « Carte ENGIE (PDF) ».
+alter table public.conso_prix add column if not exists doc text check (doc is null or doc ~ '^[EG]_[A-Z_]+_[RP]_(GREEN|GREY)_C_[IF]_[0-9]{2}_[VBW]_F$');
