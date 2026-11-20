@@ -318,7 +318,12 @@
     var sel = $('cardMonth'), d = new Date(), noms = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
     for (var i = 0; i < 6; i++){ var x = new Date(d.getFullYear(), d.getMonth() - i, 1), ym = x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0');
       sel.insertAdjacentHTML('beforeend', '<option value="' + (i ? ym : '') + '">' + noms[x.getMonth()] + ' ' + x.getFullYear() + (i ? ' (archives)' : ' (mois en cours)') + '</option>'); }
-    sel.addEventListener('change', function(){ drawCards(); $('dlCount').textContent = $('cardLinks').querySelectorAll('a').length; $('dlAutres').textContent = 'Autres tarifs seulement (' + $('cardLinks').querySelectorAll('a.autre').length + ')'; $('cardMonthHint').textContent = this.value ? 'Encodez-les ensuite sous ce mois.' : ''; });
+    sel.addEventListener('change', function(){
+      var past = !!this.value;
+      $('dlAll').hidden = $('dlAutres').hidden = past;
+      if (past){ $('cardLinks').innerHTML = '<p>Les cartes des mois passés sont dans les archives d\'ENGIE, protégées par une vérification anti-robot : pas de téléchargement groupé possible. Téléchargez-les une par une sur <a href="https://www.engie.be/fr/energie/electricite-gaz/prix-conditions/archive-fiches-de-prix/" target="_blank" rel="noopener">la page des anciennes fiches (particuliers)</a> ou <a href="https://www.engie.be/fr/professionals/energie/electricite-gaz/prix-conditions/archive-fiches-de-prix/" target="_blank" rel="noopener">professionnels</a>, en choisissant le mois du contrat.</p>'; $('cardMonthHint').textContent = ''; return; }
+      drawCards(); $('dlCount').textContent = $('cardLinks').querySelectorAll('a').length; $('dlAutres').textContent = 'Autres tarifs seulement (' + $('cardLinks').querySelectorAll('a.autre').length + ')'; $('cardMonthHint').textContent = '';
+    });
   })();
   function cardUrl(doc, s){ return 'https://www.engie.be/api/engie/be/ms/pricing/v1/public/pricesAndConditionsPDF?document=' + doc + '&monthOffset=0&segment=' + s + '&language=F'; }
   function drawCards(){
