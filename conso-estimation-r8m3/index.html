@@ -781,6 +781,10 @@
   }
   $('mois').addEventListener('change', function(e){ e.stopPropagation(); loadMonth(this.value); });
   // ---------- Code postal -> gestionnaire(s) de réseau ----------
+  // Mois du relevé annuel Sibelga par code postal (calendrier publié sur sibelga.be, relevé en novembre 2026).
+  var RELEVE_SIBELGA = {1000: 'février (Bruxelles centre) ou avril (quartier Ambiorix)', 1020: 'octobre', 1030: 'mai ou juillet selon la rue', 1040: 'août', 1050: 'septembre',
+    1060: 'décembre', 1070: 'janvier ou octobre selon la rue', 1080: 'mars, juillet ou août selon la rue', 1081: 'avril', 1082: 'mars', 1083: 'juin', 1090: 'avril',
+    1120: 'octobre', 1130: 'octobre', 1140: 'mars', 1150: 'juin', 1160: 'mars', 1170: 'mai', 1180: 'novembre', 1190: 'janvier', 1200: 'juin', 1210: 'février'};
   var cpSeq = 0, sugSeq = 0, sugT = null, CP_HINT = 'remplit le gestionnaire de réseau';
   function rpcPub(fn, body){ return fetch(SB_URL + '/rest/v1/rpc/' + fn, {method: 'POST', headers: {'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY, 'Content-Type': 'application/json'}, body: JSON.stringify(body)}).then(function(r){ if (!r.ok) throw new Error(r.status); return r.json(); }); }
   function cpCode(){ var m = /^\s*(\d{4})(?!\d)/.exec($('cp').value); return m ? m[1] : ''; }
@@ -831,6 +835,7 @@
           else { if (list.indexOf(sel.value) < 0) sel.value = ''; msgs.push(lbl + ' : ' + names.join(' ou ') + ' (selon l\'adresse, à choisir)'); }
         }
         apply('e', d.e); apply('g', d.g);
+        if (RELEVE_SIBELGA[+v]) msgs.push('Relevé Sibelga : ' + RELEVE_SIBELGA[+v]);
         h.textContent = msgs.join(' · ');
         fillContracts('e'); fillContracts('g'); applyPrices('e'); applyPrices('g'); render();
       })
