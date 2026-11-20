@@ -47,6 +47,10 @@
   .chip.cur{border-color:var(--accent);background:var(--accent-soft)}
   .tw{overflow-x:auto}
   [hidden]{display:none !important}
+  .badge{background:#c0392b;color:#fff;border-radius:10px;padding:1px 8px;font-size:12.5px;vertical-align:middle}
+  .badge:empty{display:none}
+  td.old{color:var(--muted);font-size:12px}
+  .new{font-weight:600}
 </style>
 </head>
 <body>
@@ -64,6 +68,13 @@
       <button class="main" type="submit">Se connecter</button>
       <div class="msg" id="loginMsg"></div>
     </form>
+  </section>
+
+  <section class="card" id="propCard" hidden>
+    <h2>Propositions des collègues <span class="badge" id="propCount"></span></h2>
+    <p class="hint" style="margin:0 0 8px">Prix proposés depuis le simulateur. « Accepter » les ajoute à la liste du mois indiqué (un champ vide garde la valeur actuelle) ; « Refuser » les supprime. Les propositions non traitées disparaissent après 60 jours.</p>
+    <div class="tw"><table id="tProp"></table></div>
+    <div class="msg" id="propMsg"></div>
   </section>
 
   <section class="card" id="app" hidden>
@@ -139,9 +150,39 @@
       if (ok !== true) throw new Error("Ce compte n'est pas administrateur.");
       $('loginCard').hidden = true; $('app').hidden = false; $('logout').hidden = false; $('who').textContent = S.email;
       var d = new Date(); $('mois').value = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
-      return load();
+      return load().then(loadProps);
     });
   }
+  var TYPE_LBL = {energie: 'Énergie (contrat)', reseau: 'Réseau', taxes: 'Taxes'};
+  function grdNom(code){ var g = DATA && (DATA.grd || []).filter(function(x){ return x.code === code; })[0]; return g ? g.nom : code; }
+  function val2(p){
+    var b = [];
+    if (p.prix_kwh !== null && p.prix_kwh !== undefined) b.push(shown(p.prix_kwh) + ' c€');
+    if (p.prix_jour !== null && p.prix_jour !== undefined) b.push('jour ' + shown(p.prix_jour));
+    if (p.prix_nuit !== null && p.prix_nuit !== undefined) b.push('nuit ' + shown(p.prix_nuit));
+    if (p.fixe_an !== null && p.fixe_an !== undefined) b.push(shown(p.fixe_an) + ' €/an');
+    if (p.prosumer_kwe !== null && p.prosumer_kwe !== undefined) b.push('prosumer ' + shown(p.prosumer_kwe) + ' €/kWe');
+    return b.join(' · ') || '–';
+  }
+  function loadProps(){
+    return rpc('conso_prix_propositions_list', {}).then(function(list){
+      $('propCard').hidden = !list.length;
+      $('propCount').textContent = list.length ? list.length : '';
+      $('tProp').innerHTML = '<tr><th>Reçu le</th><th>Mois</th><th>Énergie</th><th>Quoi</th><th>Proposé</th><th>Actuel</th><th>Source</th><th></th></tr>' + list.map(function(p){
+        var d = new Date(p.created_at), quoi = TYPE_LBL[p.type] + ' – ' + (p.type === 'reseau' ? grdNom(p.cle) : p.cle) + (p.type !== 'taxes' ? ' (' + p.region + ')' : '');
+        return '<tr><td>' + d.toLocaleDateString('fr-BE') + ' ' + d.toLocaleTimeString('fr-BE', {hour: '2-digit', minute: '2-digit'}) + '</td><td>' + moisLbl(p.mois) + '</td><td>' + (p.energie === 'e' ? 'Électricité' : 'Gaz') + '</td><td>' + esc(quoi) + '</td><td class="new">' + esc(val2(p)) + '</td><td class="old">' + (p.actuel ? esc(val2(p.actuel)) : 'nouveau') + '</td><td>' + esc(p.note || '') + '</td><td style="white-space:nowrap"><button class="main" data-ok="' + p.id + '">Accepter</button> <button class="danger" data-no="' + p.id + '">Refuser</button></td></tr>';
+      }).join('');
+    }).catch(function(e){ msg('propMsg', e.message, 'err'); $('propCard').hidden = false; });
+  }
+  $('tProp').addEventListener('click', function(e){
+    var ok = e.target.getAttribute('data-ok'), no = e.target.getAttribute('data-no'), id = ok || no;
+    if (!id) return;
+    e.target.disabled = true;
+    rpc('conso_prix_proposition_decider', {p_id: +id, p_accept: !!ok})
+      .then(function(){ msg('propMsg', ok ? 'Proposition acceptée et ajoutée à la liste.' : 'Proposition refusée.', 'ok'); return loadProps(); })
+      .then(function(){ if (ok) return load(); })
+      .catch(function(err){ msg('propMsg', err.message, 'err'); e.target.disabled = false; });
+  });
   $('loginForm').addEventListener('submit', function(e){
     e.preventDefault(); msg('loginMsg', 'Connexion…');
     S.email = $('email').value.trim();

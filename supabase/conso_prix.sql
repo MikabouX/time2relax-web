@@ -111,3 +111,28 @@ grant execute on function public.conso_prix_delete_month(date) to authenticated;
 
 -- Purge quotidienne (pg_cron) : job « conso-prix-purge », 03:17.
 -- select cron.schedule('conso-prix-purge', '17 3 * * *', 'select public.conso_prix_purge()');
+
+-- ===== Propositions de prix des collègues (migration conso_prix_propositions, 20 novembre 2026) =====
+-- Envoyées depuis le simulateur (anonyme, 6 lignes max par envoi, 100 par heure), validées dans admin-prix/.
+create table if not exists public.conso_prix_propositions (
+  id bigint generated always as identity primary key,
+  created_at timestamptz not null default now(),
+  mois date not null check (extract(day from mois) = 1),
+  type text not null check (type in ('energie','reseau','taxes')),
+  energie text not null check (energie in ('e','g')),
+  cle text not null check (char_length(cle) between 1 and 80),
+  region text not null check (region in ('Wallonie','Bruxelles','Flandre')),
+  prix_kwh numeric(8,3) check (prix_kwh >= 0 and prix_kwh < 1000),
+  prix_jour numeric(8,3) check (prix_jour >= 0 and prix_jour < 1000),
+  prix_nuit numeric(8,3) check (prix_nuit >= 0 and prix_nuit < 1000),
+  fixe_an numeric(8,2) check (fixe_an >= 0 and fixe_an < 100000),
+  prosumer_kwe numeric(8,2) check (prosumer_kwe >= 0 and prosumer_kwe < 10000),
+  note text check (char_length(note) <= 200));
+alter table public.conso_prix_propositions enable row level security;
+revoke all on public.conso_prix_propositions from anon, authenticated;
+
+-- conso_prix_proposer(p_mois date, p_rows jsonb, p_note text) : public ; mois entre -5 et +2 mois ; purge > 60 jours.
+-- conso_prix_propositions_list() : admin ; propositions + valeur actuelle de la liste.
+-- conso_prix_proposition_decider(p_id bigint, p_accept boolean) : admin ; accepter = upsert dans conso_prix
+--   (coalesce : un champ vide garde la valeur actuelle), puis suppression de la proposition.
+-- Texte complet des fonctions : voir la migration « conso_prix_propositions » dans Supabase.

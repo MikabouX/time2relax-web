@@ -49,6 +49,10 @@
   input.px.edit{border-color:#e0a000;background:#fff8e6}
   input.px.miss{border-color:#e7b7ad}
   .tag{font-size:11.5px;color:var(--muted);display:block}
+  .prop{display:grid;grid-template-columns:1fr auto;gap:6px;align-items:center;background:#fafbfa;border:1px dashed var(--line);border-radius:8px;padding:8px}
+  .prop input{min-width:0}
+  .prop .hint{grid-column:1/-1}
+  .prop .hint.ok{color:var(--accent)} .prop .hint.err{color:#9a3b2b}
   .cost{border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:14px;font-size:14px}
   .cost[hidden]{display:none}
   .cost .line{display:flex;justify-content:space-between;gap:10px;padding:3px 0}
@@ -213,6 +217,11 @@
           </div>
           <div class="row" id="rowPct" hidden><span class="clbl">Part de nuit</span><input type="text" inputmode="decimal" class="px" id="pct" value="50"> % de la consommation</div>
           <div id="tabE"></div>
+          <div class="prop" id="propE" hidden>
+            <input type="text" id="noteE" maxlength="200" placeholder="Source (ex. carte tarifaire de novembre)">
+            <button type="button" id="btnPropE">Proposer ces prix pour la liste</button>
+            <div class="hint" id="pmsgE"></div>
+          </div>
         </div>
 
         <div class="pblock" id="blkG">
@@ -220,6 +229,11 @@
           <div class="row lst"><span class="clbl">Gestionnaire</span><select id="grdG"></select><span class="hint" id="regG"></span></div>
           <div class="row" id="rowCG"><span class="clbl">Contrat</span><select id="selG" class="lst"></select><input type="text" id="cG" maxlength="80" placeholder="Nom du contrat"></div>
           <div id="tabG"></div>
+          <div class="prop" id="propG" hidden>
+            <input type="text" id="noteG" maxlength="200" placeholder="Source (ex. carte tarifaire de novembre)">
+            <button type="button" id="btnPropG">Proposer ces prix pour la liste</button>
+            <div class="hint" id="pmsgG"></div>
+          </div>
         </div>
         <div class="hint">Montants TVAC, comme sur la carte tarifaire : prix par kWh et frais fixes par an pour l'énergie, le réseau et les taxes. Tout reste modifiable ; une valeur corrigée apparaît en orange.</div>
       </fieldset>
@@ -265,7 +279,7 @@
     <span><strong>Enquête de satisfaction</strong><br>Donnez votre avis</span>
   </a>
 
-  <footer>Outil interne non officiel – les données saisies ne sont ni enregistrées ni envoyées, tout est calculé dans votre navigateur.</footer>
+  <footer>Outil interne non officiel – les données saisies ne sont ni enregistrées ni envoyées, tout est calculé dans votre navigateur – sauf les prix que vous choisissez de proposer pour la liste (n'y indiquez aucune donnée de client).</footer>
 </main>
 
 <script>
@@ -484,6 +498,18 @@
   function buildTable(en){
     var fs = fields(en), box = $(en === 'e' ? 'tabE' : 'tabG');
     var grd = grdOf($(en === 'e' ? 'grdE' : 'grdG').value);
+    var sig = fs.join(',') + '|' + (grd ? grd.code : '');
+    if (box.dataset.sig === fs.join(',') + '|' + (grd ? grd.code : '') && box.querySelector('table')){
+      // même structure : mise à jour sur place (ne pas détruire le champ où l'utilisateur clique)
+      box.querySelectorAll('input[data-f]').forEach(function(inp){
+        var v = VAL[en][inp.dataset.c][inp.dataset.f], want = shownum(v);
+        if (document.activeElement !== inp && pnum(inp.value) !== (v === null || v === undefined ? null : +v)) inp.value = want;
+        inp.classList.toggle('edit', isEdited(en, inp.dataset.c, inp.dataset.f));
+      });
+      refreshSums(en);
+      return;
+    }
+    box.dataset.sig = sig;
     var html = '<table class="comp"><tr><th></th>' + fs.map(function(f){ return '<th class="n">' + FIELD_LBL[f] + '</th>'; }).join('') + '</tr>';
     COMPS.forEach(function(c){
       var lbl = c.lbl + (c.k === 're' && grd ? '<span class="tag">' + esc(grd.nom) + '</span>' : '') + (c.k === 'tx' && grd ? '<span class="tag">' + esc(grd.region) + '</span>' : '');
@@ -557,8 +583,54 @@
         out.txt += '\n  ' + parts.map(function(p){ return p.lbl + ' ' + p.txt + (p.edited ? ' (corrigé)' : p.manual && anyList ? ' (saisi à la main)' : ''); }).join(' · ');
       }
     });
+    refreshPropose();
     return out;
   }
+
+  // ---------- Propositions de prix pour la liste partagée (validées par l'administrateur) ----------
+  function curMonthIso(){ var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-01'; }
+  function proposals(en){
+    var reg = regionOf(en), grd = $(en === 'e' ? 'grdE' : 'grdG').value, name = contractName(en), out = [];
+    if (!reg) return out;
+    var keys = {en: name ? {type: 'energie', cle: name} : null, re: grd ? {type: 'reseau', cle: grd} : null, tx: {type: 'taxes', cle: reg}};
+    COMPS.forEach(function(c){
+      var k = keys[c.k]; if (!k) return;
+      var v = VAL[en][c.k], src = SRC[en][c.k], row = {type: k.type, energie: en, cle: k.cle, region: reg}, changed = false, any = false;
+      ['k', 'j', 'n', 'f'].forEach(function(f){
+        var x = v[f]; if (x === undefined) x = null;
+        row[FIELD_DB[f]] = x;
+        if (x !== null){ any = true; if (!src || +src[FIELD_DB[f]] !== +x) changed = true; }
+      });
+      if (en === 'e' && c.k === 're'){
+        var pr = pnum($('prosRate').value), prSrc = pnum($('prosRate').dataset.src || '');
+        if (pr !== null){ row.prosumer_kwe = pr; any = true; if (pr !== prSrc) changed = true; }
+      }
+      if (any && changed) out.push(row);
+    });
+    return out;
+  }
+  function refreshPropose(){
+    ['e', 'g'].forEach(function(en){
+      var K = en === 'e' ? 'E' : 'G', box = $('prop' + K), list = proposals(en);
+      box.hidden = $(en === 'e' ? 'blkE' : 'blkG').hidden || !list.length;
+      if (list.length) $('btnProp' + K).textContent = 'Proposer ' + (list.length > 1 ? 'ces ' + list.length + ' prix' : 'ce prix') + ' pour la liste';
+    });
+  }
+  ['e', 'g'].forEach(function(en){
+    var K = en === 'e' ? 'E' : 'G';
+    $('btnProp' + K).addEventListener('click', function(){
+      var rows = proposals(en), btn = this, m = $('pmsg' + K);
+      if (!rows.length) return;
+      btn.disabled = true; m.className = 'hint'; m.textContent = 'Envoi…';
+      fetch(SB_URL + '/rest/v1/rpc/conso_prix_proposer', {method: 'POST', headers: {'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY, 'Content-Type': 'application/json'},
+        body: JSON.stringify({p_mois: (T && T.mois) || curMonthIso(), p_rows: rows, p_note: $('note' + K).value.trim() || null})})
+        .then(function(r){ if (!r.ok) throw new Error(r.status); return r.json(); })
+        .then(function(n){ m.className = 'hint ok'; m.textContent = n + ' prix envoyé' + (n > 1 ? 's' : '') + '. Ils seront ajoutés à la liste après validation.'; })
+        .catch(function(){ m.className = 'hint err'; m.textContent = "L'envoi n'a pas fonctionné. Réessayez plus tard."; })
+        .then(function(){ btn.disabled = false; });
+    });
+    $('note' + K).addEventListener('input', function(e){ e.stopPropagation(); });
+  });
 
   function onPick(en){
     if (en === 'e' && $('same').checked){
