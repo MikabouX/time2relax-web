@@ -110,6 +110,7 @@
   .sug button{display:block;width:100%;text-align:left;border:0;background:none;padding:6px 10px;font:inherit;cursor:pointer;color:inherit}
   .sug button:hover,.sug button:focus{background:#eef3fb}
   .cost .acpart span:last-child{font-weight:600}
+  details.explain p{margin:6px 0;font-size:.92em;line-height:1.45}
 </style>
 </head>
 <body>
@@ -232,6 +233,12 @@
             <div class="row" style="margin-top:6px"><input type="text" inputmode="decimal" class="px" id="kwe"> <span>kWe (puissance de l'onduleur ; par défaut = kWc)</span></div>
             <div class="row" style="margin-top:6px"><input type="text" inputmode="decimal" class="px" id="prosRate"> <span>€/kWe/an HTVA – tarif prosumer du gestionnaire</span></div>
             <div class="hint" id="prosSrc"></div>
+            <details class="explain" style="margin-top:6px"><summary><strong>Comment l'expliquer au client</strong></summary>
+              <p><strong>Le principe de la compensation</strong> : sur l'année, l'électricité que vos panneaux envoient sur le réseau est déduite de celle que vous prenez au réseau. Vous ne payez l'énergie que sur la différence, si vous avez consommé plus que produit. Ce régime vaut pour les installations certifiées avant 2024 et reste d'application jusqu'à fin 2030.</p>
+              <p><strong>Avec un compteur classique (qui tourne à l'envers)</strong> : vous payez chaque année un forfait réseau, le tarif prosumer, calculé sur la puissance de votre onduleur (kWe × tarif du gestionnaire). Il est le même quelle que soit votre consommation.</p>
+              <p><strong>Avec un compteur communicant</strong> : le compteur mesure séparément ce que vous prenez au réseau et ce que vous y envoyez. L'énergie compensée reste gratuite, mais vous payez le transport par le réseau de l'électricité que vous avez réellement prise. Ce montant ne peut jamais dépasser l'ancien forfait prosumer : si vous consommez surtout pendant que vos panneaux produisent, vous payez moins que le forfait (c'est une ristourne). Si vous consommez plus que ce que vous produisez, chaque kWh en plus est payé normalement : énergie, réseau et taxes.</p>
+              <p><strong>En pratique</strong> : plus on consomme au moment où les panneaux produisent (en journée, au soleil), plus on économise avec un compteur communicant.</p>
+            </details>
           </div>
         </div>
       </fieldset>
@@ -700,7 +707,7 @@
       o.source = head.join(' · ');
       out[en] = o;
       if ((en === 'e' && showE) || (en === 'g' && showG)){
-        out.txt += '\nContrat ' + (en === 'e' ? 'électricité' : 'gaz') + ' : ' + (name || 'non renseigné') + (head.length ? ' (' + head.join(', ') + ')' : '');
+        out.txt += '\nContrat ' + (en === 'e' ? 'électricité' : 'gaz') + ' : ' + (name || 'non renseigné') + (en === 'e' ? ' (' + (tri() ? 'compteur tri-horaire' : bi() ? 'compteur bi-horaire' : 'compteur simple') + ')' : '');
       }
     });
     refreshPropose();
@@ -906,7 +913,7 @@
     } else { s.hidden = true; }
 
     // ---- coût et acompte
-    var kE = knE !== null ? knE : (r.solar ? (r.solar.mode === 'comp' ? r.solar.net : r.solar.reseau) : r.e);
+    var kE = knE !== null ? knE : (r.solar ? (r.solar.mode === 'comp' ? r.solar.net : r.solar.reseau) : r.e), kE0 = r.e, acTxt = '';
     var kRes = knE !== null ? knE : (r.solar ? r.solar.reseau : r.e);   // kWh prélevés (tarif prosumer proportionnel)
     var cst = document.getElementById('cost'), costTxt = '', html = '', tot = 0, nOk = 0, nMiss = 0, totEn = {e: 0, g: 0}, okEn = {e: false, g: false};
     function costLine(lbl, kwh, pr, fixe){
@@ -965,6 +972,7 @@
       }
       html += '<div class="line acompte"><span>' + (both ? 'Acompte total (électricité + gaz)' : 'Acompte mensuel ' + (okEn.g ? 'gaz' : 'électricité')) + (nMiss ? ' (partiel)' : '') + '</span><span>' + fmt(acompte) + ' € TVAC</span></div>';
       if (pro) html += '<div class="line"><span>soit hors TVA</span><span>' + fmt(acompteH) + ' € HTVA</span></div>';
+      acTxt = (both ? 'électricité ' + fmt(acE) + ' € + gaz ' + fmt(acG) + ' € = ' : '') + fmt(acompte) + ' €/mois TVAC' + (nMiss ? ' (partiel)' : '');
       if (r.solar && r.solar.mode === 'inj') html += '<div class="hint">Revenu de l\'injection non déduit.</div>';
       costTxt = '\n\nCoût estimé (' + (pro ? 'HTVA' : 'TVAC') + ') :' + costTxt + (pro ? '\nTotal : ' + fmt(tot) + ' €/an HTVA + TVA 21 % ' + fmt(tva) + ' € = ' + fmt(ttc) + ' €/an TVAC' : '\nTotal : ' + fmt(ttc) + ' €/an TVAC (dont TVA 6 % : ' + fmt(tva) + ' €)') +
         (both ? '\nAcompte électricité : ' + fmt(acE) + ' € TVAC' + (pro ? ' (' + fmt(acEH) + ' € HTVA)' : '') + '\nAcompte gaz : ' + fmt(acG) + ' € TVAC' + (pro ? ' (' + fmt(acGH) + ' € HTVA)' : '') : '') +
@@ -988,22 +996,17 @@
     }).join('\n');
     var etatTxt = debutLbl() ? 'début le ' + debutLbl() : '';
     var acS = pnum($('acSouh').value);
-    lastText = 'Infos de la demande client :' +
+    var pvTxt = inp.pv ? 'oui, ' + String(inp.kwc).replace('.', ',') + ' kWc, ' + (inp.comp ? 'compensation (certifié avant 2024)' + ($('prosBox').hidden ? '' : ', compteur ' + (val('pcpt') === 'comm' ? 'communicant' : 'classique')) : 'sans compensation (injection)') : 'non';
+    lastText = 'Demande : ' + ($('dem').value || 'non précisée') + (etatTxt ? ', ' + etatTxt : '') +
       '\nClient : ' + (SEG() === 'P' ? 'professionnel' : 'particulier') +
-      '\nDemande : ' + ($('dem').value || 'non précisée') + (etatTxt ? ', ' + etatTxt : '') +
       '\nÉnergies : ' + enLbl + P.txt +
-      '\n\nDétail en bref :' +
-      '\nMénage : ' + inp.persons + (inp.persons >= 5 ? '+' : '') + ' pers., ' + typeLbl +
-      '\nChauffage : ' + heatLbl +
-      '\nEau chaude : ' + waterLbl +
-      (showE ? '\nVéhicule électrique : ' + evLbl + '\nPanneaux solaires : ' + pvLbl + '\nBatterie domestique : ' + (inp.pv && inp.bat ? 'oui' : 'non') : '') +
-      '\n\nDétail :\n' + detailTxt +
-      (showE ? '\nÉlectricité : ' + (knE !== null ? fmt(knE) + ' kWh/an prélevés (connue' + (knEN !== null ? ', dont ' + fmt(knEN) + ' de nuit' : '') + ' ; estimation ' + fmt(r.e) + ')' : fmt(r.e) + ' kWh/an') : '') +
-      (showG ? '\nGaz : ' + (knG !== null ? fmt(knG) + ' kWh/an (connue ; estimation ' + fmt(r.g) + ')' : fmt(r.g) + ' kWh/an') : '') + (solarTxt ? '\n' + solarTxt : '') + costTxt +
-      '\n\nAcompte souhaité : ' + (acS !== null ? fmt(acS) + ' €/mois' : 'non précisé');
+      '\nMénage : ' + inp.persons + (inp.persons >= 5 ? '+' : '') + ' pers., ' + typeLbl + ' ; chauffage ' + heatLbl + ' ; eau chaude ' + waterLbl +
+      (showE ? '\nVéhicule électrique : ' + evLbl + '\nPanneaux solaires : ' + pvTxt + (inp.pv ? '\nBatterie domestique : ' + (inp.bat ? 'oui' : 'non') : '') : '') +
+      '\nConsommation ' + ((showE && knE !== null) || (showG && knG !== null) ? 'utilisée' : 'estimée') + ' : ' + [showE ? 'électricité ' + fmt(knE !== null ? knE : kE0) + ' kWh/an' + (knE !== null ? ' (connue)' : '') : '', showG ? 'gaz ' + fmt(knG !== null ? knG : r.g) + ' kWh/an' + (knG !== null ? ' (connue)' : '') : ''].filter(Boolean).join(', ') +
+      (acTxt ? '\nAcompte estimé : ' + acTxt : '') +
+      (acS !== null ? '\nAcompte souhaité : ' + fmt(acS) + ' €/mois' : '');
   }
 
-  [1, 2, 3].forEach(function(i){ $('ev' + i + 't').addEventListener('change', function(){ var c = $('ev' + i + 'c'); if (c.value === '18' || c.value === '20' || !c.value) c.value = this.value === 'h' ? '20' : '18'; if (i > 1 || true){ var k = $(i === 1 ? 'km' : 'km' + i); if (this.value === 'h' && k.value === '15000') k.value = '8000'; else if (this.value === 'e' && k.value === '8000') k.value = '15000'; } }); });
   document.getElementById('f').addEventListener('input', render);
   document.getElementById('f').addEventListener('change', render);
   document.getElementById('reset').addEventListener('click', function(){ document.getElementById('f').reset(); $('cpHint').textContent = CP_HINT; hideSug(); resetPrices(); onDebut(); render(); });
