@@ -289,7 +289,7 @@
           <div class="opts"><label><input type="radio" name="etat" value="cours" checked>En cours</label><label><input type="radio" name="etat" value="nouveau">Pas encore établi</label></div>
         </div>
         <div class="row"><span class="clbl">Code postal</span><span class="cpbox"><input type="text" id="cp" maxlength="60" autocomplete="off" placeholder="Code postal ou localité" style="width:220px"><span class="sug" id="cpSug" role="listbox" hidden></span></span><span class="hint" id="cpHint">remplit le gestionnaire de réseau</span></div>
-        <div class="row" id="debutRow" hidden><span class="clbl">Début prévu</span><input type="month" id="debut"><span class="hint" id="debutHint"></span></div>
+        <div class="row" id="debutRow" hidden><span class="clbl">Début prévu</span><input type="date" id="debut"><span class="hint" id="debutHint"></span></div>
         <div class="row" id="moisRow" hidden><span class="clbl">Prix de</span><select id="mois"></select></div>
         <label class="check" id="sameRow"><input type="checkbox" id="same" checked> Même contrat pour l'électricité et le gaz</label>
 
@@ -833,7 +833,8 @@
       .catch(function(){ if (my === cpSeq) h.textContent = 'Recherche impossible : choisissez le gestionnaire à la main.'; });
   }
   document.querySelectorAll('input[name="seg"]').forEach(function(r){ r.addEventListener('change', function(e){ e.stopPropagation(); fillContracts('e'); fillContracts('g'); applyPrices('e'); applyPrices('g'); render(); }); });
-  function debutIso(){ return document.querySelector('input[name="etat"]:checked').value === 'nouveau' && $('debut').value ? $('debut').value + '-01' : null; }
+  function debutIso(){ return document.querySelector('input[name="etat"]:checked').value === 'nouveau' && /^\d{4}-\d{2}/.test($('debut').value) ? $('debut').value.slice(0, 7) + '-01' : null; }
+  function debutLbl(){ var v = $('debut').value, m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v); return m ? (+m[3]) + ' ' + moisLbl(m[1] + '-' + m[2] + '-01') : ''; }
   function onDebut(){
     var d = debutIso(), h = $('debutHint');
     $('debutRow').hidden = document.querySelector('input[name="etat"]:checked').value !== 'nouveau';
@@ -979,7 +980,7 @@
       if (showG && l.g) parts.push('gaz ' + (l.g > 0 ? '+' : '−') + fmt(Math.abs(l.g)));
       return '- ' + l.label + ' : ' + parts.join(' / ') + ' kWh';
     }).join('\n');
-    var etatTxt = document.querySelector('input[name="etat"]:checked').value === 'nouveau' ? 'contrat pas encore établi' + ($('debut').value ? ', début ' + moisLbl($('debut').value + '-01') : '') : '';
+    var etatTxt = document.querySelector('input[name="etat"]:checked').value === 'nouveau' ? 'contrat pas encore établi' + (debutLbl() ? ', début le ' + debutLbl() : '') : '';
     var acS = pnum($('acSouh').value);
     lastText = 'Infos de la demande client :' +
       '\nClient : ' + (SEG() === 'P' ? 'professionnel' : 'particulier') +
