@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="../icon.svg" type="image/svg+xml">
+<link rel="icon" href="../icon-32.png" sizes="32x32" type="image/png">
+<title>Prix du simulateur – administration</title>
+<style>
+  :root{--bg:#f5f6f4;--card:#fff;--ink:#1d2a24;--muted:#5d6b64;--line:#dde3df;--accent:#1f7a5a;--accent-soft:#e3f2ec;--elec:#c98a00;--gas:#2e6fb7;--err:#9a3b2b}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink);font-size:14.5px;line-height:1.45}
+  header{background:var(--accent);color:#fff;padding:16px 20px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+  header h1{margin:0;font-size:19px}
+  header .who{font-size:13px;opacity:.9}
+  header button{background:transparent;color:#fff;border-color:rgba(255,255,255,.5)}
+  main{max-width:1100px;margin:0 auto;padding:18px 16px 40px;display:grid;gap:16px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+  h2{font-size:16px;margin:0 0 10px}
+  h3{font-size:14.5px;margin:0 0 4px}
+  .row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .hint{color:var(--muted);font-size:12.5px}
+  input,select,button{font:inherit;font-size:14px}
+  input[type=text],input[type=email],input[type=password],input[type=month],select{padding:6px 8px;border:1px solid var(--line);border-radius:7px;background:#fff}
+  button{border:1px solid var(--line);background:#fff;border-radius:8px;padding:6px 12px;cursor:pointer}
+  button:hover{border-color:var(--accent)}
+  button.main{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:600}
+  button.danger{color:var(--err)}
+  button:disabled{opacity:.5;cursor:default}
+  .tabs{display:flex;gap:6px}
+  .tabs button.on{background:var(--accent-soft);border-color:var(--accent);font-weight:600}
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th,td{text-align:left;padding:5px 4px;border-bottom:1px solid var(--line);vertical-align:middle}
+  th{color:var(--muted);font-weight:600;font-size:12.5px}
+  td input.px{width:78px;text-align:right}
+  td input.nm{width:100%;min-width:140px}
+  td input.note{width:100%;min-width:120px}
+  .sec{display:grid;gap:8px;margin-top:14px}
+  .msg{font-size:13.5px;min-height:18px}
+  .msg.ok{color:var(--accent)} .msg.err{color:var(--err)}
+  .login{max-width:380px}
+  .login .row{margin-bottom:8px}
+  .login input{width:100%}
+  .chips{display:flex;gap:6px;flex-wrap:wrap}
+  .chip{font-size:12.5px;border:1px solid var(--line);border-radius:20px;padding:2px 10px;background:#fff;cursor:pointer}
+  .chip.cur{border-color:var(--accent);background:var(--accent-soft)}
+  .tw{overflow-x:auto}
+  [hidden]{display:none !important}
+</style>
+</head>
+<body>
+<header>
+  <h1>Prix du simulateur de consommation</h1>
+  <div class="row"><span class="who" id="who"></span><button id="logout" hidden>Se déconnecter</button></div>
+</header>
+<main>
+  <section class="card login" id="loginCard">
+    <h2>Connexion administrateur</h2>
+    <p class="hint">Même compte que T2R Admin.</p>
+    <form id="loginForm">
+      <div class="row"><input type="email" id="email" placeholder="E-mail" autocomplete="username" required></div>
+      <div class="row"><input type="password" id="pwd" placeholder="Mot de passe" autocomplete="current-password" required></div>
+      <button class="main" type="submit">Se connecter</button>
+      <div class="msg" id="loginMsg"></div>
+    </form>
+  </section>
+
+  <section class="card" id="app" hidden>
+    <div class="row" style="justify-content:space-between">
+      <div class="row">
+        <label for="mois"><strong>Mois</strong></label>
+        <input type="month" id="mois">
+        <button id="copyPrev">Copier le mois précédent ici</button>
+        <button id="delMonth" class="danger">Supprimer ce mois</button>
+      </div>
+      <div class="tabs"><button id="tabE" class="on">Électricité</button><button id="tabG">Gaz</button></div>
+    </div>
+    <div class="row" style="margin-top:8px"><span class="hint">Mois en ligne (6 mois conservés, les plus anciens sont effacés automatiquement) :</span><div class="chips" id="chips"></div></div>
+    <p class="hint" style="margin:8px 0 0">Tous les montants sont <strong>TVAC</strong> : prix en c€/kWh, frais fixes en €/an. Laissez vide ce qui ne s'applique pas. Pour un compteur bi-horaire, remplissez Jour et Nuit ; si une ligne n'a qu'un prix, il sert pour le jour et la nuit.</p>
+
+    <div class="sec">
+      <h3>1. Énergie – prix des contrats (par région)</h3>
+      <div class="tw"><table id="tEn"></table></div>
+      <div><button id="addEn">+ Ajouter un contrat</button></div>
+    </div>
+    <div class="sec">
+      <h3>2. Coûts de réseau (par gestionnaire)</h3>
+      <p class="hint" style="margin:0">Distribution + transport. Prosumer (électricité, Wallonie) : tarif capacitaire en €/kWe par an, pour les panneaux avec compensation (installés avant 2024).</p>
+      <div class="tw"><table id="tRe"></table></div>
+    </div>
+    <div class="sec">
+      <h3>3. Taxes et surcharges (par région)</h3>
+      <div class="tw"><table id="tTx"></table></div>
+    </div>
+    <div class="row" style="margin-top:14px">
+      <button class="main" id="save">Enregistrer</button>
+      <span class="msg" id="msg"></span>
+    </div>
+  </section>
+</main>
+<script>
+(function(){
+  "use strict";
+  var URL = 'https://gxftbzbvbveocwpdavtt.supabase.co', KEY = 'sb_publishable_9fKWGXevueh6hHJpGQvmhg_EFOd_-dR';
+  var REGIONS = ['Wallonie', 'Bruxelles', 'Flandre'];
+  var S = {access: null, refresh: null, email: ''}, en = 'e', DATA = null, dirty = false;
+  function $(id){ return document.getElementById(id); }
+  function esc(t){ return String(t === null || t === undefined ? '' : t).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  function shown(x){ return x === null || x === undefined ? '' : String(+x).replace('.', ','); }
+  function pnum(v){ v = String(v || '').trim().replace(/\s/g, '').replace(',', '.'); if (v === '') return null; var n = parseFloat(v); return isFinite(n) && n >= 0 ? n : NaN; }
+  function moisLbl(iso){ var m = String(iso).slice(0, 7).split('-'); return ['janv.','févr.','mars','avr.','mai','juin','juil.','août','sept.','oct.','nov.','déc.'][+m[1] - 1] + ' ' + m[0]; }
+  function store(){ try { sessionStorage.setItem('conso-admin', JSON.stringify(S)); } catch (e) {} }
+  function restore(){ try { var x = JSON.parse(sessionStorage.getItem('conso-admin') || 'null'); if (x && x.refresh) S = x; } catch (e) {} }
+  function msg(id, t, cls){ var m = $(id); m.textContent = t; m.className = 'msg' + (cls ? ' ' + cls : ''); }
+
+  function call(path, body, auth){
+    var h = {'apikey': KEY, 'Content-Type': 'application/json'};
+    if (auth !== false && S.access) h.Authorization = 'Bearer ' + S.access;
+    return fetch(URL + path, {method: 'POST', headers: h, body: JSON.stringify(body || {})}).then(function(r){
+      return r.text().then(function(t){
+        var d = t ? JSON.parse(t) : null;
+        if (!r.ok){ var e = new Error(d && (d.message || d.msg || d.error_description || d.error) || ('Erreur ' + r.status)); e.status = r.status; throw e; }
+        return d;
+      });
+    });
+  }
+  function renew(){
+    return call('/auth/v1/token?grant_type=refresh_token', {refresh_token: S.refresh}, false).then(function(d){ S.access = d.access_token; S.refresh = d.refresh_token; store(); });
+  }
+  function rpc(fn, args){
+    return call('/rest/v1/rpc/' + fn, args).catch(function(e){
+      if ((e.status === 401 || /JWT/.test(e.message)) && S.refresh) return renew().then(function(){ return call('/rest/v1/rpc/' + fn, args); });
+      throw e;
+    });
+  }
+  function enter(){
+    return rpc('t2r_is_admin', {}).then(function(ok){
+      if (ok !== true) throw new Error("Ce compte n'est pas administrateur.");
+      $('loginCard').hidden = true; $('app').hidden = false; $('logout').hidden = false; $('who').textContent = S.email;
+      var d = new Date(); $('mois').value = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+      return load();
+    });
+  }
+  $('loginForm').addEventListener('submit', function(e){
+    e.preventDefault(); msg('loginMsg', 'Connexion…');
+    S.email = $('email').value.trim();
+    call('/auth/v1/token?grant_type=password', {email: S.email, password: $('pwd').value}, false)
+      .then(function(d){ S.access = d.access_token; S.refresh = d.refresh_token; store(); $('pwd').value = ''; return enter(); })
+      .catch(function(err){ S = {access: null, refresh: null, email: ''}; store(); msg('loginMsg', /Invalid login/i.test(err.message) ? 'E-mail ou mot de passe incorrect.' : err.message, 'err'); });
+  });
+  $('logout').addEventListener('click', function(){ S = {access: null, refresh: null, email: ''}; store(); location.reload(); });
+
+  function monthIso(){ return $('mois').value ? $('mois').value + '-01' : null; }
+  function load(){
+    msg('msg', 'Chargement…');
+    return rpc('conso_prix_get', {p_mois: monthIso()}).then(function(d){
+      DATA = d; dirty = false;
+      $('chips').innerHTML = (d.mois_dispo || []).map(function(m){ return '<span class="chip' + (m.slice(0, 7) === $('mois').value ? ' cur' : '') + '" data-m="' + m.slice(0, 7) + '">' + moisLbl(m) + '</span>'; }).join('') || '<span class="hint">aucun</span>';
+      draw(); msg('msg', (d.prix || []).length ? '' : 'Aucun prix pour ce mois. Utilisez « Copier le mois précédent ici » pour repartir du mois d\'avant.');
+    }).catch(function(e){ msg('msg', e.message, 'err'); });
+  }
+  $('chips').addEventListener('click', function(e){ var m = e.target.getAttribute('data-m'); if (m && confirmLeave()){ $('mois').value = m; load(); } });
+  $('mois').addEventListener('change', function(){ if (confirmLeave()) load(); });
+  function confirmLeave(){ return !dirty || confirm('Des modifications ne sont pas enregistrées. Continuer sans enregistrer ?'); }
+  function setTab(x){ if (x === en || !confirmLeave()) return; en = x; $('tabE').classList.toggle('on', en === 'e'); $('tabG').classList.toggle('on', en === 'g'); dirty = false; draw(); msg('msg', ''); }
+  $('tabE').addEventListener('click', function(){ setTab('e'); });
+  $('tabG').addEventListener('click', function(){ setTab('g'); });
+
+  function rows(type){ return (DATA && DATA.prix || []).filter(function(p){ return p.type === type && p.energie === en; }); }
+  function priceCells(p, prosumer){
+    var c = '<td><input class="px" data-f="prix_kwh" value="' + esc(shown(p.prix_kwh)) + '"></td>';
+    if (en === 'e') c += '<td><input class="px" data-f="prix_jour" value="' + esc(shown(p.prix_jour)) + '"></td><td><input class="px" data-f="prix_nuit" value="' + esc(shown(p.prix_nuit)) + '"></td>';
+    c += '<td><input class="px" data-f="fixe_an" value="' + esc(shown(p.fixe_an)) + '"></td>';
+    if (prosumer !== undefined) c += '<td>' + (prosumer ? '<input class="px" data-f="prosumer_kwe" value="' + esc(shown(p.prosumer_kwe)) + '">' : '<span class="hint">–</span>') + '</td>';
+    return c + '<td><input class="note" data-f="note" maxlength="200" value="' + esc(p.note) + '" placeholder="Source"></td>';
+  }
+  function head(first){
+    return '<tr><th>' + first + '</th>' + (first === 'Contrat' ? '<th>Région</th>' : '') + '<th>' + (en === 'e' ? 'Simple' : 'Prix') + ' c€/kWh</th>' + (en === 'e' ? '<th>Jour c€/kWh</th><th>Nuit c€/kWh</th>' : '') + '<th>Fixe €/an</th>' + (first === 'Gestionnaire' && en === 'e' ? '<th>Prosumer €/kWe</th>' : '') + '<th>Source / remarque</th>' + (first === 'Contrat' ? '<th></th>' : '') + '</tr>';
+  }
+  function regSel(v){ return '<select data-f="region">' + REGIONS.map(function(r){ return '<option' + (r === v ? ' selected' : '') + '>' + r + '</option>'; }).join('') + '</select>'; }
+  function enRow(p){ return '<tr><td><input class="nm" data-f="cle" maxlength="80" value="' + esc(p.cle) + '" placeholder="Nom du contrat"></td><td>' + regSel(p.region || 'Wallonie') + '</td>' + priceCells(p) + '<td><button class="danger del" title="Retirer">✕</button></td></tr>'; }
+  function draw(){
+    var en_ = rows('energie').slice().sort(function(a, b){ return a.cle.localeCompare(b.cle, 'fr') || REGIONS.indexOf(a.region) - REGIONS.indexOf(b.region); });
+    $('tEn').innerHTML = head('Contrat') + en_.map(enRow).join('');
+    var re = {}; rows('reseau').forEach(function(p){ re[p.cle] = p; });
+    $('tRe').innerHTML = head('Gestionnaire') + (DATA.grd || []).filter(function(g){ return en === 'e' ? g.elec : g.gaz; }).map(function(g){
+      var p = re[g.code] || {}; return '<tr data-cle="' + esc(g.code) + '" data-region="' + esc(g.region) + '"><td>' + esc(g.nom) + ' <span class="hint">' + esc(g.region) + '</span></td>' + priceCells(p, en === 'e' ? g.region === 'Wallonie' : undefined) + '</tr>';
+    }).join('');
+    var tx = {}; rows('taxes').forEach(function(p){ tx[p.cle] = p; });
+    $('tTx').innerHTML = head('Région') + REGIONS.map(function(r){ var p = tx[r] || {}; return '<tr data-cle="' + r + '" data-region="' + r + '"><td>' + r + '</td>' + priceCells(p) + '</tr>'; }).join('');
+  }
+  $('addEn').addEventListener('click', function(){
+    var tb = $('tEn').tBodies[0] || $('tEn').appendChild(document.createElement('tbody'));
+    tb.insertAdjacentHTML('beforeend', enRow({})); dirty = true; tb.lastElementChild.querySelector('input').focus();
+  });
+  $('tEn').addEventListener('click', function(e){ if (e.target.classList.contains('del')){ e.target.closest('tr').remove(); dirty = true; } });
+  document.getElementById('app').addEventListener('input', function(){ dirty = true; });
+
+  function collect(table, withKey){
+    var out = [], bad = [];
+    $(table).querySelectorAll('tr').forEach(function(tr, i){
+      if (i === 0) return;
+      var r = {cle: withKey ? '' : tr.getAttribute('data-cle'), region: tr.getAttribute('data-region')}, any = false;
+      tr.querySelectorAll('[data-f]').forEach(function(el){
+        var f = el.getAttribute('data-f');
+        if (f === 'cle' || f === 'region' || f === 'note') r[f] = el.value.trim();
+        else { var n = pnum(el.value); if (isNaN(n)){ bad.push(el); n = null; } r[f] = n; if (n !== null) any = true; }
+      });
+      if (withKey ? r.cle : any) out.push(r);
+    });
+    return {rows: out, bad: bad};
+  }
+  $('save').addEventListener('click', function(){
+    var m = monthIso(); if (!m) return;
+    var a = collect('tEn', true), b = collect('tRe'), c = collect('tTx');
+    var bad = a.bad.concat(b.bad, c.bad);
+    document.querySelectorAll('#app input').forEach(function(el){ el.style.borderColor = ''; });
+    if (bad.length){ bad.forEach(function(el){ el.style.borderColor = 'var(--err)'; }); msg('msg', 'Certaines valeurs ne sont pas des nombres (en rouge).', 'err'); return; }
+    var seen = {}, dup = a.rows.filter(function(r){ var k = r.cle + '|' + r.region; if (seen[k]) return true; seen[k] = 1; return false; });
+    if (dup.length){ msg('msg', 'Le contrat « ' + dup[0].cle + ' » apparaît deux fois pour la région ' + dup[0].region + '.', 'err'); return; }
+    $('save').disabled = true; msg('msg', 'Enregistrement…');
+    rpc('conso_prix_save', {p_mois: m, p_type: 'energie', p_energie: en, p_rows: a.rows})
+      .then(function(){ return rpc('conso_prix_save', {p_mois: m, p_type: 'reseau', p_energie: en, p_rows: b.rows}); })
+      .then(function(){ return rpc('conso_prix_save', {p_mois: m, p_type: 'taxes', p_energie: en, p_rows: c.rows}); })
+      .then(function(){ return load(); })
+      .then(function(){ msg('msg', 'Enregistré (' + (en === 'e' ? 'électricité' : 'gaz') + ', ' + moisLbl(m) + ').', 'ok'); })
+      .catch(function(e){ msg('msg', e.message, 'err'); })
+      .then(function(){ $('save').disabled = false; });
+  });
+  $('copyPrev').addEventListener('click', function(){
+    var m = monthIso(); if (!m) return;
+    var d = new Date(m + 'T12:00:00'); d.setMonth(d.getMonth() - 1);
+    var from = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-01';
+    if (!confirm('Copier tous les prix de ' + moisLbl(from) + ' vers ' + moisLbl(m) + ' ? (Ce qui existe déjà n\'est pas écrasé.)')) return;
+    rpc('conso_prix_copy', {p_from: from, p_to: m}).then(function(n){ return load().then(function(){ msg('msg', n + ' ligne(s) copiée(s) depuis ' + moisLbl(from) + '.', 'ok'); }); }).catch(function(e){ msg('msg', e.message, 'err'); });
+  });
+  $('delMonth').addEventListener('click', function(){
+    var m = monthIso(); if (!m) return;
+    if (!confirm('Supprimer TOUS les prix de ' + moisLbl(m) + ' (électricité et gaz) ?')) return;
+    rpc('conso_prix_delete_month', {p_mois: m}).then(function(n){ return load().then(function(){ msg('msg', n + ' ligne(s) supprimée(s).', 'ok'); }); }).catch(function(e){ msg('msg', e.message, 'err'); });
+  });
+  window.addEventListener('beforeunload', function(e){ if (dirty){ e.preventDefault(); e.returnValue = ''; } });
+
+  restore();
+  if (S.refresh){ renew().then(enter).catch(function(){ S = {access: null, refresh: null, email: ''}; store(); }); }
+})();
+</script>
+</body>
+</html>
