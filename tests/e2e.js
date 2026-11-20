@@ -1596,7 +1596,7 @@ async function dogTests(browser) {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(data) });
   });
   await page.reload();
-  check(await page.locator('.dog-card svg').isVisible(), 'carte du cocker visible sur l’accueil');
+  check(await page.locator('.dog-card .dog svg').isVisible(), 'carte du cocker visible sur l’accueil');
   eq(calls.length, 0, 'aucune lecture tant qu’on n’appuie pas');
   await page.locator('.dog-card .btn').first().click(); // pas encore de nom : il est demandé dans une fenêtre
   await page.locator('.dlg .field').fill('  Mika ');
@@ -1716,8 +1716,8 @@ async function meTests(browser) {
   eq(patchSent && patchSent.pause_minutes, 18, 'réglage du site envoyé au serveur');
   // Connexion par QR
   await page.evaluate(() => { localStorage.removeItem('t2r.dogName'); go('home'); });
-  await page.evaluate(() => { askDogName(); });
-  await page.getByRole('button', { name: 'Avec le téléphone (QR)' }).click();
+  // Sans nom : le bouton QR est sur la carte du cocker (et dans la fenêtre du nom).
+  await page.locator('.dog-card').getByRole('button', { name: 'Avec le téléphone (QR)' }).click();
   await page.waitForSelector('.pair-qr svg');
   const secret = await page.evaluate(() => {
     const d = document.querySelector('.pair-qr').innerHTML.length > 100;

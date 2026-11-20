@@ -232,7 +232,9 @@ function dogCard() {
         on: { click: () => (name ? dogFetch(name) : askDogName()) },
       }, DOG.busy ? t('dog_busy') : t('dog_btn'))),
     name ? h('button', { type: 'button', class: 'btn text small dog-change', on: { click: askDogName } },
-      t('dog_change', { name })) : null,
+      t('dog_change', { name }))
+      // Pas encore de nom : connexion en un scan depuis l'appli (1.9.2).
+      : h('button', { type: 'button', class: 'btn tonal wide', on: { click: pairDialog } }, icon('qr_code', 18), t('pair_btn')),
     out);
 }
 
@@ -254,6 +256,9 @@ function askDogKey(n, wrong) {
       h('h2', {}, t('dog_key_title')),
       h('p', {}, wrong ? t('dog_key_wrong') : t('dog_key_note', { name: n })),
       h('form', { class: 'dlg-fields', on: { submit: (e) => { e.preventDefault(); go(); } } }, input),
+      // Plus simple que taper le code : le téléphone l'envoie en scannant un QR.
+      h('button', { type: 'button', class: 'btn tonal wide', on: { click: () => { close(null); pairDialog(); } } },
+        icon('qr_code', 18), t('pair_btn')),
       h('div', { class: 'dlg-actions' },
         h('button', { type: 'button', class: 'btn text', on: { click: () => close(null) } }, t('cancel')),
         h('button', { type: 'button', class: 'btn filled', on: { click: go } }, t('dog_btn'))));
