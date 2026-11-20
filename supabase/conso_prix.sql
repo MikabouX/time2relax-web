@@ -165,3 +165,9 @@ revoke all on public.conso_cp from anon, authenticated;
 -- conso_prix.doc = code de la carte (ex. E_EASY_R_GREEN_C_I_12_W_F) ; renvoyé par conso_prix_get, gardé par conso_prix_save
 -- (coalesce si la page admin ne l'envoie pas) et recopié par conso_prix_copy. Le simulateur affiche « Carte ENGIE (PDF) ».
 alter table public.conso_prix add column if not exists doc text check (doc is null or doc ~ '^[EG]_[A-Z_]+_[RP]_(GREEN|GREY)_C_[IF]_[0-9]{2}_[VBW]_F$');
+
+-- ===== Énergie verte séparée (migration conso_prix_vert, 20 novembre 2026) =====
+-- conso_prix.vert_kwh = coût énergie verte / cogénération (c€/kWh HTVA) des contrats électricité, hors prix_kwh/jour/nuit.
+-- Renvoyé par conso_prix_get, enregistré par conso_prix_save (gardé si la clé est absente), recopié par conso_prix_copy.
+alter table public.conso_prix add column if not exists vert_kwh numeric check (vert_kwh is null or vert_kwh >= 0);
+-- Premier encodage : 115 lignes pour novembre 2026 (cartes ENGIE), via execute_sql.

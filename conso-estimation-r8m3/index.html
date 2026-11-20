@@ -103,6 +103,8 @@
   .avis strong{color:var(--accent)}
   footer{grid-column:1/-1;color:var(--muted);font-size:12px;text-align:center;margin-top:6px}
   .doclink{font-size:.85em;white-space:nowrap;margin-left:.4em}
+  table.comp tr.sub td{font-style:italic;color:var(--muted,#666)}
+  table.comp tr.tvac td{font-weight:700}
 </style>
 </head>
 <body>
@@ -439,7 +441,7 @@
   var SB_URL = 'https://gxftbzbvbveocwpdavtt.supabase.co', SB_KEY = 'sb_publishable_9fKWGXevueh6hHJpGQvmhg_EFOd_-dR';
   var T = null;  // {mois, mois_dispo, grd, prix}
   var AUTRE = '__autre';
-  var COMPS = [{k: 'en', lbl: 'Énergie (contrat)'}, {k: 're', lbl: 'Réseau'}, {k: 'tx', lbl: 'Taxes et surcharges'}];
+  var COMPS = [{k: 'en', lbl: 'Énergie (contrat)'}, {k: 'vt', lbl: 'Énergie verte'}, {k: 're', lbl: 'Réseau'}, {k: 'tx', lbl: 'Taxes et surcharges'}];
   var VAL = {e: {}, g: {}}, SRC = {e: {}, g: {}};   // valeurs utilisées / valeurs de la liste
   COMPS.forEach(function(c){ VAL.e[c.k] = {}; VAL.g[c.k] = {}; SRC.e[c.k] = null; SRC.g[c.k] = null; });
   function $(id){ return document.getElementById(id); }
@@ -457,6 +459,9 @@
   function segOf(type){ return type === 'reseau' ? '*' : SEG(); }
   function fields(en){ return en === 'e' && bi() ? ['j', 'n', 'f'] : ['k', 'f']; }
   var FIELD_DB = {k: 'prix_kwh', j: 'prix_jour', n: 'prix_nuit', f: 'fixe_an'};
+  // Énergie verte : même ligne de la liste que l'énergie, colonne vert_kwh (identique jour/nuit, pas de fixe).
+  function fdb(c, f){ return c === 'vt' ? (f === 'f' ? null : 'vert_kwh') : FIELD_DB[f]; }
+  function rv(r, c, f){ var k = fdb(c, f); return r && k && r[k] !== null && r[k] !== undefined ? +r[k] : null; }
   var FIELD_LBL = {k: 'c€/kWh', j: 'Jour c€/kWh', n: 'Nuit c€/kWh', f: '€/an'};
 
   function names(en){
@@ -503,13 +508,15 @@
   // Prend les valeurs de la liste pour une énergie ; garde ce que l'utilisateur a corrigé à la main.
   function applyPrices(en){
     var reg = regionOf(en), grd = $(en === 'e' ? 'grdE' : 'grdG').value, name = contractName(en);
-    var rows = {en: name && reg ? findRow('energie', en, name, reg) : null, re: grd ? findRow('reseau', en, grd, reg) : null, tx: reg ? findRow('taxes', en, reg, reg) : null};
+    var enRow = name && reg ? findRow('energie', en, name, reg) : null;
+    var rows = {en: enRow, vt: enRow && enRow.vert_kwh !== null && enRow.vert_kwh !== undefined ? enRow : null, re: grd ? findRow('reseau', en, grd, reg) : null, tx: reg ? findRow('taxes', en, reg, reg) : null};
     COMPS.forEach(function(c){
       var old = SRC[en][c.k], v = VAL[en][c.k], r = rows[c.k];
       ['k', 'j', 'n', 'f'].forEach(function(f){
-        var was = old ? old[FIELD_DB[f]] : null, cur = v[f];
-        var userEdited = cur !== null && cur !== undefined && (was === null || was === undefined ? true : +cur !== +was);
-        if (!userEdited || (r && !old)) v[f] = r ? (r[FIELD_DB[f]] === null ? null : +r[FIELD_DB[f]]) : (userEdited ? cur : null);
+        if (c.k === 'vt' && f === 'f'){ v[f] = null; return; }
+        var was = rv(old, c.k, f), cur = v[f];
+        var userEdited = cur !== null && cur !== undefined && (was === null ? true : +cur !== +was);
+        if (!userEdited || (r && !old)) v[f] = r ? rv(r, c.k, f) : (userEdited ? cur : null);
       });
       SRC[en][c.k] = r;
     });
@@ -532,7 +539,7 @@
     a.title = 'Carte tarifaire ENGIE ' + (T && T.mois ? T.mois.slice(0, 7) : '') + ' (' + d + ')';
     a.hidden = false;
   }
-  function isEdited(en, comp, f){ var r = SRC[en][comp], v = VAL[en][comp][f]; if (!r) return false; var w = r[FIELD_DB[f]]; return (v === null || v === undefined ? null : +v) !== (w === null ? null : +w); }
+  function isEdited(en, comp, f){ var r = SRC[en][comp], v = VAL[en][comp][f]; if (!r) return false; var w = rv(r, comp, f); return (v === null || v === undefined ? null : +v) !== w; }
 
   function sums(en){
     var fs = fields(en), out = {};
@@ -564,20 +571,30 @@
     box.dataset.sig = sig;
     var html = '<table class="comp"><tr><th></th>' + fs.map(function(f){ return '<th class="n">' + FIELD_LBL[f] + '</th>'; }).join('') + '</tr>';
     COMPS.forEach(function(c){
+      if (c.k === 'vt' && en === 'g') return;
       var lbl = c.lbl + (c.k === 're' && grd ? '<span class="tag">' + esc(grd.nom) + '</span>' : '') + (c.k === 'tx' && grd ? '<span class="tag">' + esc(grd.region) + '</span>' : '');
       html += '<tr><td>' + lbl + '</td>' + fs.map(function(f){
+        if (c.k === 'vt' && f === 'f') return '<td class="n hint">–</td>';
         var v = VAL[en][c.k][f];
         if ((f === 'j' || f === 'n') && (v === null || v === undefined) && VAL[en][c.k].k !== null && VAL[en][c.k].k !== undefined && !SRC[en][c.k]) v = null;
         return '<td class="n"><input type="text" inputmode="decimal" class="px' + (isEdited(en, c.k, f) ? ' edit' : '') + '" data-en="' + en + '" data-c="' + c.k + '" data-f="' + f + '" value="' + shownum(v) + '"></td>';
       }).join('') + '</tr>';
+      if (c.k === 'vt' && en === 'e') html += '<tr class="sub"><td>Énergie + énergie verte</td>' + fs.map(function(f){ return '<td class="n" data-sub="' + f + '"></td>'; }).join('') + '</tr>';
     });
-    var s = sums(en);
-    html += '<tr class="sum"><td>Total HTVA</td>' + fs.map(function(f){ return '<td class="n" data-sum="' + f + '">' + (s[f] === null ? '–' : num2(s[f])) + '</td>'; }).join('') + '</tr></table>';
+    html += '<tr class="sum"><td>Total HTVA</td>' + fs.map(function(f){ return '<td class="n" data-sum="' + f + '"></td>'; }).join('') + '</tr>';
+    html += '<tr class="sum tvac"><td>Prix réel TVAC <span class="hint" data-tva></span></td>' + fs.map(function(f){ return '<td class="n" data-tvac="' + f + '"></td>'; }).join('') + '</tr></table>';
+    box.innerHTML = html;
+    refreshSums(en);
+    return;
     box.innerHTML = html;
   }
   function refreshSums(en){
-    var s = sums(en);
-    $(en === 'e' ? 'tabE' : 'tabG').querySelectorAll('[data-sum]').forEach(function(td){ var f = td.getAttribute('data-sum'); td.textContent = s[f] === null ? '–' : num2(s[f]); });
+    var s = sums(en), box = $(en === 'e' ? 'tabE' : 'tabG'), t = 1 + tvaRate();
+    function g(c, f){ var v = VAL[en][c][f]; if ((f === 'j' || f === 'n') && (v === null || v === undefined)) v = VAL[en][c].k; return v === null || v === undefined ? null : +v; }
+    box.querySelectorAll('[data-sum]').forEach(function(td){ var f = td.getAttribute('data-sum'); td.textContent = s[f] === null ? '–' : num2(s[f]); });
+    box.querySelectorAll('[data-tvac]').forEach(function(td){ var f = td.getAttribute('data-tvac'); td.textContent = s[f] === null ? '–' : num2(s[f] * t); });
+    box.querySelectorAll('[data-sub]').forEach(function(td){ var f = td.getAttribute('data-sub'); if (f === 'f'){ td.textContent = ''; return; } var a = g('en', f), b = g('vt', f); td.textContent = a === null && b === null ? '–' : num2((a || 0) + (b || 0)); });
+    box.querySelectorAll('[data-tva]').forEach(function(sp){ sp.textContent = '(' + Math.round(tvaRate() * 100) + ' %)'; });
   }
   ['tabE', 'tabG'].forEach(function(id){
     $(id).addEventListener('input', function(e){
@@ -619,6 +636,7 @@
         } else if (v.k !== null && v.k !== undefined) bits.push(num2(v.k) + ' c€/kWh');
         if (v.f) bits.push(fmt(v.f) + ' €/an');
         var edited = fs.some(function(f){ return isEdited(en, c.k, f); });
+        if (c.k === 'vt' && (en === 'g' || !bits.length)) return;  // énergie verte : électricité seulement, facultative
         parts.push({lbl: c.lbl.replace(' (contrat)', ''), txt: bits.length ? bits.join(' + ') : 'non renseigné', edited: edited, list: !!SRC[en][c.k], manual: bits.length > 0 && !SRC[en][c.k]});
       });
       o.parts = parts; o.anyList = anyList;
@@ -644,9 +662,9 @@
   function proposals(en){
     var reg = regionOf(en), grd = $(en === 'e' ? 'grdE' : 'grdG').value, name = contractName(en), out = [];
     if (!reg) return out;
-    var keys = {en: name ? {type: 'energie', cle: name} : null, re: grd ? {type: 'reseau', cle: grd} : null, tx: {type: 'taxes', cle: reg}};
+    var keys = {vt: null, en: name ? {type: 'energie', cle: name} : null, re: grd ? {type: 'reseau', cle: grd} : null, tx: {type: 'taxes', cle: reg}};
     COMPS.forEach(function(c){
-      var k = keys[c.k]; if (!k) return;
+      var k = keys[c.k]; if (!k) return;  // énergie verte : pas proposée séparément
       var v = VAL[en][c.k], src = SRC[en][c.k], row = {segment: segOf(k.type), type: k.type, energie: en, cle: k.cle, region: reg}, changed = false, any = false;
       ['k', 'j', 'n', 'f'].forEach(function(f){
         var x = v[f]; if (x === undefined) x = null;

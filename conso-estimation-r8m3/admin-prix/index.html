@@ -172,6 +172,7 @@
     if (p.prix_kwh !== null && p.prix_kwh !== undefined) b.push(shown(p.prix_kwh) + ' c€');
     if (p.prix_jour !== null && p.prix_jour !== undefined) b.push('jour ' + shown(p.prix_jour));
     if (p.prix_nuit !== null && p.prix_nuit !== undefined) b.push('nuit ' + shown(p.prix_nuit));
+    if (p.vert_kwh !== null && p.vert_kwh !== undefined) b.push('verte ' + shown(p.vert_kwh));
     if (p.fixe_an !== null && p.fixe_an !== undefined) b.push(shown(p.fixe_an) + ' €/an');
     if (p.prosumer_kwe !== null && p.prosumer_kwe !== undefined) b.push('prosumer ' + shown(p.prosumer_kwe) + ' €/kWe');
     return b.join(' · ') || '–';
@@ -225,18 +226,19 @@
   $('tabG').addEventListener('click', function(){ setTab('g'); });
 
   function rows(type){ var sg = type === 'reseau' ? '*' : seg; return (DATA && DATA.prix || []).filter(function(p){ return p.segment === sg && p.type === type && p.energie === en; }); }
-  function priceCells(p, prosumer){
+  function priceCells(p, prosumer, contrat){
     var c = '<td><input class="px" data-f="prix_kwh" value="' + esc(shown(p.prix_kwh)) + '"></td>';
     if (en === 'e') c += '<td><input class="px" data-f="prix_jour" value="' + esc(shown(p.prix_jour)) + '"></td><td><input class="px" data-f="prix_nuit" value="' + esc(shown(p.prix_nuit)) + '"></td>';
+    if (en === 'e' && contrat) c += '<td><input class="px" data-f="vert_kwh" value="' + esc(shown(p.vert_kwh)) + '"></td>';
     c += '<td><input class="px" data-f="fixe_an" value="' + esc(shown(p.fixe_an)) + '"></td>';
     if (prosumer !== undefined) c += '<td>' + (prosumer ? '<input class="px" data-f="prosumer_kwe" value="' + esc(shown(p.prosumer_kwe)) + '">' : '<span class="hint">–</span>') + '</td>';
     return c + '<td><input class="note" data-f="note" maxlength="200" value="' + esc(p.note) + '" placeholder="Source"></td>';
   }
   function head(first){
-    return '<tr><th>' + first + '</th>' + (first === 'Contrat' ? '<th>Région</th>' : '') + '<th>' + (en === 'e' ? 'Simple' : 'Prix') + ' c€/kWh</th>' + (en === 'e' ? '<th>Jour c€/kWh</th><th>Nuit c€/kWh</th>' : '') + '<th>Fixe €/an</th>' + (first === 'Gestionnaire' && en === 'e' ? '<th>Prosumer €/kWe</th>' : '') + '<th>Source / remarque</th>' + (first === 'Contrat' ? '<th></th>' : '') + '</tr>';
+    return '<tr><th>' + first + '</th>' + (first === 'Contrat' ? '<th>Région</th>' : '') + '<th>' + (en === 'e' ? 'Simple' : 'Prix') + ' c€/kWh</th>' + (en === 'e' ? '<th>Jour c€/kWh</th><th>Nuit c€/kWh</th>' : '') + (en === 'e' && first === 'Contrat' ? '<th>Énergie verte c€/kWh</th>' : '') + '<th>Fixe €/an</th>' + (first === 'Gestionnaire' && en === 'e' ? '<th>Prosumer €/kWe</th>' : '') + '<th>Source / remarque</th>' + (first === 'Contrat' ? '<th></th>' : '') + '</tr>';
   }
   function regSel(v){ return '<select data-f="region">' + REGIONS.map(function(r){ return '<option' + (r === v ? ' selected' : '') + '>' + r + '</option>'; }).join('') + '</select>'; }
-  function enRow(p){ return '<tr><td><input class="nm" data-f="cle" maxlength="80" value="' + esc(p.cle) + '" placeholder="Nom du contrat"></td><td>' + regSel(p.region || 'Wallonie') + '</td>' + priceCells(p) + '<td><button class="danger del" title="Retirer">✕</button></td></tr>'; }
+  function enRow(p){ return '<tr><td><input class="nm" data-f="cle" maxlength="80" value="' + esc(p.cle) + '" placeholder="Nom du contrat"></td><td>' + regSel(p.region || 'Wallonie') + '</td>' + priceCells(p, undefined, true) + '<td><button class="danger del" title="Retirer">✕</button></td></tr>'; }
   function draw(){
     var en_ = rows('energie').slice().sort(function(a, b){ return a.cle.localeCompare(b.cle, 'fr') || REGIONS.indexOf(a.region) - REGIONS.indexOf(b.region); });
     $('tEn').innerHTML = head('Contrat') + en_.map(enRow).join('');
