@@ -171,3 +171,16 @@ alter table public.conso_prix add column if not exists doc text check (doc is nu
 -- Renvoyé par conso_prix_get, enregistré par conso_prix_save (gardé si la clé est absente), recopié par conso_prix_copy.
 alter table public.conso_prix add column if not exists vert_kwh numeric check (vert_kwh is null or vert_kwh >= 0);
 -- Premier encodage : 115 lignes pour novembre 2026 (cartes ENGIE), via execute_sql.
+
+-- ===== Recherche par localité (migrations conso_cp_nom, conso_cp_search, 20 novembre 2026) =====
+-- conso_cp_nom(code, nom, commune) : 2757 localités bpost (ODWB « code-postaux-belge ») + noms français des villes flamandes
+-- (Anvers, Gand, Louvain, Bruges, Malines…). Import fait par une fonction temporaire, supprimée ensuite.
+-- conso_cp_search(p_q text) -> [{code, nom, commune}] (12 max) : début de code postal ou nom (sans accents) ; public (anon).
+create table if not exists public.conso_cp_nom (
+  code int not null check (code between 1000 and 9999),
+  nom text not null check (length(nom) between 1 and 80),
+  commune text,
+  primary key (code, nom));
+alter table public.conso_cp_nom enable row level security;
+revoke all on public.conso_cp_nom from anon, authenticated;
+create extension if not exists unaccent schema extensions;

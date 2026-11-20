@@ -105,6 +105,10 @@
   .doclink{font-size:.85em;white-space:nowrap;margin-left:.4em}
   table.comp tr.sub td{font-style:italic;color:var(--muted,#666)}
   table.comp tr.tvac td{font-weight:700}
+  .cpbox{position:relative;display:inline-block}
+  .sug{position:absolute;left:0;top:100%;z-index:20;min-width:100%;max-width:340px;max-height:260px;overflow:auto;background:#fff;border:1px solid #ccd;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.12);margin-top:2px}
+  .sug button{display:block;width:100%;text-align:left;border:0;background:none;padding:6px 10px;font:inherit;cursor:pointer;color:inherit}
+  .sug button:hover,.sug button:focus{background:#eef3fb}
 </style>
 </head>
 <body>
@@ -264,7 +268,7 @@
         <div class="row"><span class="clbl">Contrat</span>
           <div class="opts"><label><input type="radio" name="etat" value="cours" checked>En cours</label><label><input type="radio" name="etat" value="nouveau">Pas encore établi</label></div>
         </div>
-        <div class="row"><span class="clbl">Code postal</span><input type="text" id="cp" inputmode="numeric" maxlength="4" placeholder="ex. 5000" style="width:90px"><span class="hint" id="cpHint">remplit le gestionnaire de réseau</span></div>
+        <div class="row"><span class="clbl">Code postal</span><span class="cpbox"><input type="text" id="cp" maxlength="60" autocomplete="off" placeholder="Code postal ou localité" style="width:220px"><span class="sug" id="cpSug" role="listbox" hidden></span></span><span class="hint" id="cpHint">remplit le gestionnaire de réseau</span></div>
         <div class="row" id="debutRow" hidden><span class="clbl">Début prévu</span><input type="month" id="debut"><span class="hint" id="debutHint"></span></div>
         <div class="row" id="moisRow" hidden><span class="clbl">Prix de</span><select id="mois"></select></div>
         <label class="check" id="sameRow"><input type="checkbox" id="same" checked> Même contrat pour l'électricité et le gaz</label>
@@ -724,19 +728,48 @@
   }
   $('mois').addEventListener('change', function(e){ e.stopPropagation(); loadMonth(this.value); });
   // ---------- Code postal -> gestionnaire(s) de réseau ----------
-  var cpSeq = 0;
+  var cpSeq = 0, sugSeq = 0, sugT = null, CP_HINT = 'remplit le gestionnaire de réseau';
+  function rpcPub(fn, body){ return fetch(SB_URL + '/rest/v1/rpc/' + fn, {method: 'POST', headers: {'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY, 'Content-Type': 'application/json'}, body: JSON.stringify(body)}).then(function(r){ if (!r.ok) throw new Error(r.status); return r.json(); }); }
+  function cpCode(){ var m = /^\s*(\d{4})(?!\d)/.exec($('cp').value); return m ? m[1] : ''; }
+  function hideSug(){ $('cpSug').hidden = true; $('cpSug').innerHTML = ''; }
+  function sugLbl(x){ return x.code + ' ' + x.nom + (x.commune ? ' (' + x.commune + ')' : ''); }
+  function showSug(list){
+    var box = $('cpSug');
+    if (!list.length){ box.innerHTML = '<span class="hint" style="padding:6px 8px;display:block">Aucune localité trouvée</span>'; box.hidden = false; return; }
+    box.innerHTML = list.map(function(x){ return '<button type="button" role="option" data-code="' + x.code + '" data-nom="' + esc(x.nom) + '">' + esc(sugLbl(x)) + '</button>'; }).join('');
+    box.hidden = false;
+  }
+  $('cpSug').addEventListener('mousedown', function(e){ e.preventDefault(); });  // garder le focus dans le champ
+  $('cpSug').addEventListener('click', function(e){
+    var b = e.target.closest('button[data-code]'); if (!b) return;
+    $('cp').value = b.dataset.code + ' ' + b.dataset.nom; hideSug(); lookupCp(b.dataset.code, b.dataset.nom);
+  });
+  $('cp').addEventListener('keydown', function(e){
+    if (e.key === 'Escape'){ hideSug(); return; }
+    if (e.key === 'Enter'){ var b = $('cpSug').querySelector('button[data-code]'); e.preventDefault(); if (b && !$('cpSug').hidden) b.click(); }
+  });
+  $('cp').addEventListener('blur', function(){ setTimeout(hideSug, 150); });
   $('cp').addEventListener('input', function(e){
     e.stopPropagation();
-    var v = this.value.replace(/\D/g, '').slice(0, 4), h = $('cpHint');
-    if (v !== this.value) this.value = v;
-    if (v.length < 4){ h.textContent = 'remplit le gestionnaire de réseau'; return; }
-    var my = ++cpSeq; h.textContent = 'Recherche…';
-    fetch(SB_URL + '/rest/v1/rpc/conso_cp_get', {method: 'POST', headers: {'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY, 'Content-Type': 'application/json'}, body: JSON.stringify({p_code: +v})})
-      .then(function(r){ if (!r.ok) throw new Error(r.status); return r.json(); })
-      .then(function(d){
+    var raw = this.value, t = raw.trim(), code = cpCode(), h = $('cpHint');
+    clearTimeout(sugT);
+    if (/^\d{4}$/.test(t)){ hideSug(); lookupCp(t, null); return; }      // code postal tapé
+    if (code && /\D/.test(t.slice(4))){ hideSug(); return; }               // « 5000 Namur » déjà choisi
+    if (t.length < 2 || /^\d{1,3}$/.test(t)){ hideSug(); if (!code){ ++cpSeq; h.textContent = CP_HINT; } return; }
+    var my = ++sugSeq;
+    sugT = setTimeout(function(){
+      rpcPub('conso_cp_search', {p_q: t}).then(function(list){ if (my === sugSeq && $('cp').value.trim() === t) showSug(list); }).catch(function(){ if (my === sugSeq) hideSug(); });
+    }, 200);
+  });
+  function lookupCp(v, nom){
+    var h = $('cpHint'), my = ++cpSeq; h.textContent = 'Recherche…';
+    Promise.all([rpcPub('conso_cp_get', {p_code: +v}), nom ? Promise.resolve(null) : rpcPub('conso_cp_search', {p_q: v}).catch(function(){ return null; })])
+      .then(function(res){
+        var d = res[0], locs = res[1];
         if (my !== cpSeq) return;
-        if (!d.connu){ h.textContent = 'Code postal inconnu : choisissez le gestionnaire à la main.'; return; }
-        var msgs = [];
+        var place = nom ? '' : (locs && locs.length ? locs.slice(0, 4).map(function(x){ return x.nom; }).join(', ') + (locs.length > 4 ? '…' : '') : '');
+        if (!d.connu){ h.textContent = (place ? place + ' · ' : '') + 'Code postal inconnu : choisissez le gestionnaire à la main.'; return; }
+        var msgs = place ? [place] : [];
         function apply(en, list){
           var sel = $(en === 'e' ? 'grdE' : 'grdG'), lbl = en === 'e' ? 'Électricité' : 'Gaz';
           if (!list.length){ sel.value = ''; if (en === 'g') msgs.push('pas de réseau de gaz connu'); return; }
@@ -749,7 +782,7 @@
         fillContracts('e'); fillContracts('g'); applyPrices('e'); applyPrices('g'); render();
       })
       .catch(function(){ if (my === cpSeq) h.textContent = 'Recherche impossible : choisissez le gestionnaire à la main.'; });
-  });
+  }
   document.querySelectorAll('input[name="seg"]').forEach(function(r){ r.addEventListener('change', function(e){ e.stopPropagation(); fillContracts('e'); fillContracts('g'); applyPrices('e'); applyPrices('g'); render(); }); });
   function debutIso(){ return document.querySelector('input[name="etat"]:checked').value === 'nouveau' && $('debut').value ? $('debut').value + '-01' : null; }
   function onDebut(){
@@ -869,7 +902,7 @@
     lastText = 'Estimation indicative de consommation annuelle' +
       '\nClient : ' + (SEG() === 'P' ? 'professionnel' : 'particulier') +
       '\nContrat : ' + (document.querySelector('input[name="etat"]:checked').value === 'nouveau' ? 'pas encore établi' + ($('debut').value ? ', début prévu ' + moisLbl($('debut').value + '-01') : '') : 'en cours') +
-      ($('cp').value.length === 4 ? '\nCode postal : ' + $('cp').value : '') +
+      (cpCode() ? '\nCode postal : ' + $('cp').value.trim() : '') +
       '\nÉnergies : ' + enLbl + P.txt +
       '\nMénage : ' + inp.persons + (inp.persons >= 5 ? '+' : '') + ' pers., ' + typeLbl +
       '\nChauffage : ' + heatLbl +
@@ -881,7 +914,7 @@
 
   document.getElementById('f').addEventListener('input', render);
   document.getElementById('f').addEventListener('change', render);
-  document.getElementById('reset').addEventListener('click', function(){ document.getElementById('f').reset(); $('cpHint').textContent = 'remplit le gestionnaire de réseau'; resetPrices(); onDebut(); render(); });
+  document.getElementById('reset').addEventListener('click', function(){ document.getElementById('f').reset(); $('cpHint').textContent = CP_HINT; hideSug(); resetPrices(); onDebut(); render(); });
   document.getElementById('copy').addEventListener('click', function(){
     var btn = this;
     function done(ok){ btn.textContent = ok ? 'Copié ✓' : 'Copie impossible'; setTimeout(function(){ btn.textContent = 'Copier le résultat'; }, 1500); }
