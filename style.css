@@ -510,3 +510,12 @@ button.tile { border: 0; font: inherit; cursor: pointer; }
 .fw-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 10px; }
 .fw-legend span { display: inline-flex; align-items: center; gap: 6px; }
 .fw-sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; }
+
+/* ---------- Mes données (pointeuse, Mes heures, QR) ---------- */
+.fw-day.tap { cursor: pointer; }
+.fw-day.tap:hover { background: var(--high); }
+.me-clock .row { align-items: center; gap: 12px; }
+.me-row { padding: 10px 14px; border-bottom: 1px solid var(--outline); align-items: center; }
+.me-row:last-child { border-bottom: 0; }
+.pair-qr { display: flex; justify-content: center; margin: 12px 0; }
+.pair-qr svg { border-radius: 8px; }

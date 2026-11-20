@@ -439,6 +439,8 @@ async function main() {
     await dogTests(browser);
     console.log('Horaires reçus, lecture automatique du nom, réglages de l’appli');
     await followsTests(browser);
+    console.log('Mes données : pointeuse, Mes heures, calendrier, réglages envoyés, connexion par QR');
+    await meTests(browser);
   } finally {
     await browser.close();
     server.kill();
@@ -1609,7 +1611,7 @@ async function dogTests(browser) {
   check(writes.some((w) => w.fn === 't2r_delete' && w.body.p_ids.join() === 'gone1'), 'pause supprimée sur le site supprimée en ligne');
   eq(await page.evaluate(() => window.t2r.state.entries.map((e) => e.id).sort().join()), 'a,b,c,w1', 'historique aligné : supprimée dans l’appli retirée');
   writes.length = 0;
-  check(calls.every((c) => c.includes(':mika:POST')) && calls.length === 4, `quatre lectures (nom, chrono, pauses, réglages), nom normalisé (${calls.join(', ')})`);
+  check(calls.every((c) => c.includes(':mika:POST')) && calls.length === 5, `cinq lectures (nom, chrono, pauses, réglages, données), nom normalisé (${calls.join(', ')})`);
   // le cadran suit le chrono du téléphone (17 min pour 15 prévues : dépassé de 2 min)
   check((await text(page, '#ringBig')).startsWith('+02:0'), `cadran : dépassement du téléphone (${await text(page, '#ringBig')})`);
   check((await text(page, '#ringCap')).startsWith('📱'), 'cadran : légende « téléphone »');
@@ -1633,7 +1635,7 @@ async function dogTests(browser) {
   eq(await text(page, '.start'), 'Démarrer le break', 'retour au bouton normal');
   writes.length = 0;
   running = true;
-  check(calls.every((c) => /^t2r_(name_check|run_get|list|settings_get):/.test(c)), 'pas d’autre appel que ceux prévus');
+  check(calls.every((c) => /^t2r_(name_check|run_get|list|settings_get|data_get):/.test(c)), 'pas d’autre appel que ceux prévus');
   eq(await page.evaluate(() => localStorage.getItem('t2r.dogName')), 'mika', 'nom retenu dans le navigateur');
   const ids = await page.evaluate(() => window.t2r.state.entries.map((e) => e.id).sort().join());
   eq(ids, 'a,b,c,r1,w1', 'historique du profil récupéré, plus le break arrêté ici (avec leur identifiant)');
@@ -1652,6 +1654,83 @@ async function dogTests(browser) {
   await page.locator('.dlg').getByRole('button', { name: 'Va chercher mon chrono !' }).click();
   check((await text(page, '.dog-card')).includes('2 à 40 caractères'), 'nom trop court refusé');
   check(errors.length === 0, `aucune erreur console (${errors.join(' | ')})`);
+  await context.close();
+}
+
+async function meTests(browser) {
+  const calls = [];
+  const store = { clock: { d: { v: 1, shifts: [{ s: '2026-10-29T08:00:00.000', b: 0, bs: 0, l: 0, ls: 0 }] }, u: '2026-10-29T07:00:00Z', dev: 'phone' },
+    plan: { d: { v: 1, items: [{ t: '2026-10-29T10:00:00.000', m: 15, y: 'break' }, { t: '2026-10-29T09:00:00.000', m: 60, y: 'other', l: 'Phone' }], off: ['2026-10-30'] }, u: 'x', dev: 'phone' },
+    absences: { d: { v: 1, days: { '2026-10-27': 'leave' }, labels: { '2026-10-27': 'Récup' } }, u: 'x', dev: 'phone' } };
+  let pairAnswer = null;
+  let patchSent = null;
+  const { page, context, errors } = await newPage(browser, { setup: () => {
+    localStorage.setItem('t2r.prefs', JSON.stringify({ setupDone: true }));
+    localStorage.setItem('t2r.dogName', 'mika');
+  } });
+  await context.route('**/rest/v1/rpc/**', async (route) => {
+    const fn = route.request().url().split('/rpc/')[1];
+    const body = JSON.parse(route.request().postData() || '{}');
+    calls.push(fn);
+    let data = [];
+    if (fn === 't2r_name_check') data = 'open';
+    if (fn === 't2r_settings_get') data = { clock_on: true, clock_remote: true, clock_remote_days: ['3'], pause_minutes: 12 };
+    if (fn === 't2r_data_get') data = store;
+    if (fn === 't2r_data_set') { store[body.p_kind] = { d: body.p_data, u: '2026-10-29T09:00:00Z', dev: body.p_device }; data = '2026-10-29T09:00:00Z'; }
+    if (fn === 't2r_settings_set') { patchSent = body.p_patch; data = {}; }
+    if (fn === 't2r_pair_take') data = pairAnswer;
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(data) });
+  });
+  await page.reload();
+  await page.waitForSelector('.me-clock');
+  check((await text(page, '.me-clock')).includes('Arrivé à 08:00'), 'pointeuse : journée du téléphone en cours');
+  await page.locator('.me-clock button.btn.danger-outline').click();
+  await page.getByRole('button', { name: 'Fin', exact: true }).last().click();
+  await page.waitForFunction(() => document.querySelector('.me-clock').textContent.includes('Journée terminée'), null, { timeout: 3000 }).catch(() => {});
+  check(!!store.clock.d.shifts[0].e && store.clock.dev === 'web', 'fin pointée sur le site, envoyée au serveur');
+  check(calls.filter((c) => c === 't2r_data_get').length >= 2, 'relu avant de modifier (rien écrasé)');
+  // Mes heures : corriger l'arrivée
+  await page.getByRole('button', { name: 'Mes heures' }).click();
+  await page.waitForSelector('.me-row');
+  await page.locator('.icon-btn[title="Corriger"]').first().click();
+  await page.locator('.dlg input[type=time]').first().fill('07:30');
+  await page.locator('.dlg').getByRole('button', { name: 'Enregistrer' }).click();
+  await page.waitForTimeout(400);
+  eq(store.clock.d.shifts[0].s, '2026-10-29T07:30:00.000', 'arrivée corrigée (heure locale, comme l’appli)');
+  await page.goBack().catch(() => {});
+  await page.evaluate(() => go('home'));
+  // Calendrier : Moi
+  await page.locator('.icon-btn[title="Calendrier"]').click();
+  await page.waitForSelector('.fw-grid');
+  check((await text(page, '.fw-grid')).includes('Récup'), 'congé du téléphone (avec son nom)');
+  eq(await page.locator('.fw-blk.brk').count(), 1, 'break du planning importé');
+  check((await text(page, '.fw-legend')).includes('Phone'), 'activité principale du planning');
+  eq(await page.locator('.fw-place.remote svg').count() >= 1, true, 'télétravail le mercredi (réglages de l’appli)');
+  await page.locator('.fw-day.tap').nth(0).click();
+  await page.locator('.dlg').getByRole('button', { name: 'Absent' }).click();
+  await page.waitForTimeout(400);
+  eq(store.absences.d.days['2026-10-26'], 'absent', 'absence ajoutée depuis le calendrier');
+  // Réglage changé sur le site : envoyé (sans relecture automatique)
+  await page.evaluate(() => { window.t2r.state.ui.pauseMinutes = 18; saveUi(); settingsChanged(); });
+  await page.waitForTimeout(1800);
+  eq(patchSent && patchSent.pause_minutes, 18, 'réglage du site envoyé au serveur');
+  // Connexion par QR
+  await page.evaluate(() => { localStorage.removeItem('t2r.dogName'); go('home'); });
+  await page.evaluate(() => { askDogName(); });
+  await page.getByRole('button', { name: 'Avec le téléphone (QR)' }).click();
+  await page.waitForSelector('.pair-qr svg');
+  const secret = await page.evaluate(() => {
+    const d = document.querySelector('.pair-qr').innerHTML.length > 100;
+    return d;
+  });
+  check(secret, 'QR affiché');
+  // Le téléphone a déposé le nom ; clé chiffrée = clé « ABC… » décalée du secret (inconnu ici) : on vérifie le nom seulement.
+  pairAnswer = { n: 'mika', b: '' };
+  await page.waitForFunction(() => localStorage.getItem('t2r.dogName') === 'mika', null, { timeout: 6000 }).catch(() => {});
+  eq(await page.evaluate(() => localStorage.getItem('t2r.dogName')), 'mika', 'nom repris après le scan du téléphone');
+  eq(await page.evaluate(() => pairDecode(pairEncodeForTest('ABCDEFGHJKMNPQRSTUVW', '23456789ABCDEFGHJKMN'), '23456789ABCDEFGHJKMN')), 'ABCDEFGHJKMNPQRSTUVW', 'clé déchiffrée comme le téléphone la chiffre');
+  const real = errors.filter((e) => !e.includes('ERR_FAILED'));
+  check(real.length === 0, `aucune erreur console (${real.join(' | ')})`);
   await context.close();
 }
 
@@ -1698,6 +1777,8 @@ async function followsTests(browser) {
   await page.waitForTimeout(500);
   eq(await page.evaluate(() => window.t2r.state.ui.pauseMinutes), 20, 'réglage changé sur le site : gardé');
 
+  // Sans nom de l'appli : seulement les horaires reçus (avec le nom, « Moi » vient en premier).
+  await page.evaluate(() => { localStorage.removeItem('t2r.dogName'); render(); });
   await page.locator('.icon-btn[title="Horaires reçus"]').click();
   check((await text(page, '.page')).includes("Entre le code d'invitation"), 'horaires reçus : invitation à entrer un code');
   await page.locator('.icon-btn[title="Ajouter un code"]').click();

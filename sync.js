@@ -178,6 +178,7 @@ function saveSettingsState() {
 
 /** Après chaque enregistrement local : quels réglages ont changé depuis la dernière fois ? Ils partent à la prochaine synchro. */
 function settingsChanged() {
+  if (!applyingSettings && typeof meSettingsChanged === 'function') meSettingsChanged(); // nom de l'appli (1.9.2)
   if (applyingSettings || !S.session || !syncEnabled()) return;
   const now = snapshotSettings();
   const seen = setSeen || {};

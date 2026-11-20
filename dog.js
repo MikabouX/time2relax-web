@@ -172,7 +172,10 @@ async function dogFetch(name, quiet) {
       DOG.prefsAt = Date.now();
       setPhoneColor(prefs.theme_color);
       applyPhoneSettings(prefs);
+      meSetPrefs(prefs);
     }
+    // Pointeuse, planning importé, congés (1.9.2).
+    await meFetch(n).catch(() => {});
     const today = dayKey(new Date());
     const day = (Array.isArray(rows) ? rows : []).filter((r) => r.date === today);
     const sum = (k) => day.filter((r) => (k === 'lunch') === (r.type === 'lunch')).reduce((a, r) => a + (r.seconds || 0), 0);
@@ -270,6 +273,8 @@ function askDogName() {
       h('h2', {}, t('dog_ask_title')),
       h('form', { class: 'dlg-fields', on: { submit: (e) => { e.preventDefault(); go(); } } }, input),
       h('p', { class: 'small muted' }, t('dog_note')),
+      h('button', { type: 'button', class: 'btn tonal wide', on: { click: () => { close(null); pairDialog(); } } },
+        icon('qr_code', 18), t('pair_btn')),
       h('div', { class: 'dlg-actions' },
         h('button', { type: 'button', class: 'btn text', on: { click: () => close(null) } }, t('cancel')),
         h('button', { type: 'button', class: 'btn filled', on: { click: go } }, t('dog_btn'))));

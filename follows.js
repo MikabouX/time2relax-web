@@ -20,7 +20,7 @@ function saveFollowsWeb(list) {
   try { localStorage.setItem(FOLLOWS_KEY, JSON.stringify(list)); } catch (_) { /* navigateur sans stockage */ }
 }
 const codeText = (c) => String(c).replace(/(\d{4})(?=\d)/g, '$1 ');
-const followLabel = (f) => f.name || codeText(f.code);
+const followLabel = (f) => (f.mine ? t('me_me') : f.name || codeText(f.code));
 
 function cachedFollow(code) {
   try { return JSON.parse(localStorage.getItem(FOLLOW_CACHE + code) || 'null'); } catch (_) { return null; }
@@ -50,10 +50,14 @@ async function fetchFollowWeb(code) {
 }
 
 /** Ouverture de la page (ou retour sur l'onglet) : relit l'horaire affiché s'il date de plus de 5 minutes. */
+/** « Moi » (avec le nom de l'appli) puis les horaires reçus. */
+const calSources = () => [...(dogName() ? [{ mine: true, code: 'me', name: '' }] : []), ...readFollowsWeb()];
+
 function followsMaybeFetch() {
-  const list = readFollowsWeb();
+  const list = calSources();
   if (!list.length) return;
   const f = list[Math.min(FW.sel, list.length - 1)];
+  if (f.mine) return; // mes données arrivent avec la lecture du nom (ouverture, retour sur l'onglet)
   if (!(f.code in FW.data)) FW.data[f.code] = cachedFollow(f.code);
   if (!FW.busy[f.code] && Date.now() - (FW.at[f.code] || 0) > 300000) fetchFollowWeb(f.code);
 }
@@ -127,14 +131,14 @@ const addDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + 
 /* ---------- Page ---------- */
 
 function followsView() {
-  const list = readFollowsWeb();
+  const list = calSources();
   if (FW.sel >= list.length) FW.sel = 0;
   const f = list[FW.sel];
   return h('div', { class: 'page' },
     h('header', { class: 'top' },
       iconBtn('arrow_back', t('back'), goBack),
-      h('h1', { class: 'grow' }, t('fw_title')),
-      f ? iconBtn('refresh', t('fw_refresh'), () => fetchFollowWeb(f.code)) : null,
+      h('h1', { class: 'grow' }, dogName() ? t('me_calendar') : t('fw_title')),
+      f ? iconBtn('refresh', t('fw_refresh'), () => (f.mine ? dogFetch(dogName(), true) : fetchFollowWeb(f.code))) : null,
       iconBtn('add', t('fw_add'), addFollowDialog, 'accent')),
     list.length === 0
       ? h('div', { class: 'empty' }, icon('people', 56), h('p', {}, t('fw_intro')),
@@ -142,18 +146,19 @@ function followsView() {
       : [
         list.length > 1 ? h('div', { class: 'chips' }, list.map((x, i) => chip(followLabel(x), i === FW.sel, () => { FW.sel = i; render(); followsMaybeFetch(); }))) : null,
         followWeek(f),
-        h('div', { class: 'row fw-foot' },
-          h('button', { type: 'button', class: 'btn text small', on: { click: () => removeFollow(f) } }, icon('delete', 18), t('fw_remove', { name: followLabel(f) }))),
+        f.mine ? h('p', { class: 'small muted center' }, t('me_cal_note'))
+          : h('div', { class: 'row fw-foot' },
+            h('button', { type: 'button', class: 'btn text small', on: { click: () => removeFollow(f) } }, icon('delete', 18), t('fw_remove', { name: followLabel(f) }))),
       ]);
 }
 
 function followWeek(f) {
-  const data = FW.data[f.code];
-  const busy = FW.busy[f.code];
-  const err = FW.err[f.code];
+  const data = f.mine ? null : FW.data[f.code];
+  const busy = f.mine ? ME.busy : FW.busy[f.code];
+  const err = f.mine ? '' : FW.err[f.code];
   if (!FW.monday) FW.monday = fwMonday(new Date());
   const monday = FW.monday;
-  const { days, main } = followDays(data);
+  const { days, main } = f.mine ? myDays(monday) : followDays(data);
   const keys = [0, 1, 2, 3, 4, 5, 6].map((i) => dayKey(addDays(monday, i)));
   const week = keys.map((k) => days[k] || null);
   let lo = 24 * 60;
@@ -165,7 +170,8 @@ function followWeek(f) {
   const today = dayKey(new Date());
   const empty = week.every((d) => !d || (!d.off && !d.blocks.length && !d.place));
   const anyPlace = week.some((d) => d && d.place);
-  const updated = data && data.updated ? new Date(data.updated) : null;
+  const meU = f.mine && ME.data.clock ? ME.data.clock.u : null;
+  const updated = f.mine ? (meU ? new Date(meU) : null) : data && data.updated ? new Date(data.updated) : null;
 
   const status = err
     ? h('p', { class: 'small center fw-err' }, err)
@@ -183,14 +189,16 @@ function followWeek(f) {
     keys.map((k, i) => {
       const d = addDays(monday, i);
       const pl = week[i] && !week[i].off ? week[i].place : null;
-      return h('div', { class: `fw-day${k === today ? ' now' : ''}` },
+      // Mon calendrier : un appui sur le jour pour un congé ou une absence.
+      return h('div', { class: `fw-day${k === today ? ' now' : ''}${f.mine ? ' tap' : ''}`,
+        ...(f.mine ? { role: 'button', tabindex: '0', title: t('me_abs_title'), on: { click: () => absenceDialog(k) } } : {}) },
         h('div', { class: 'small muted' }, d.toLocaleDateString(LANG, { weekday: 'short' })),
         h('div', { class: 'strong' }, String(d.getDate())),
         anyPlace ? h('div', { class: `fw-place ${pl || ''}` }, pl ? icon(pl === 'remote' ? 'home' : 'directions_car', 15) : null) : null);
     }));
 
   let grid;
-  if (busy && !data) grid = h('p', { class: 'center muted pad' }, t('fw_loading'));
+  if (!f.mine && busy && !data) grid = h('p', { class: 'center muted pad' }, t('fw_loading'));
   else if (empty) grid = h('p', { class: 'center muted pad' }, t('fw_empty_week'));
   else {
     const y = (m) => ((m - h0 * 60) / 60) * FW_HOUR;
