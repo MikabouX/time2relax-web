@@ -39,6 +39,7 @@
   .tot .lbl{font-size:13px;color:var(--muted)}
   .tot .val{font-size:26px;font-weight:700;font-variant-numeric:tabular-nums}
   .tot .unit{font-size:13px;font-weight:500;color:var(--muted)}
+  .totals.one{grid-template-columns:1fr}
   .tot.e{border-top:4px solid var(--elec)} .tot.g{border-top:4px solid var(--gas)}
   .solar{background:var(--accent-soft);border-radius:10px;padding:10px 12px;margin-bottom:14px;font-size:14px}
   .solar[hidden]{display:none}
@@ -74,6 +75,15 @@
     <h2>Le ménage</h2>
     <form id="f" autocomplete="off">
       <fieldset>
+        <legend>Énergies à estimer</legend>
+        <div class="opts">
+          <label><input type="radio" name="en" value="both" checked>Électricité + gaz</label>
+          <label><input type="radio" name="en" value="e">Électricité seule</label>
+          <label><input type="radio" name="en" value="g">Gaz seul</label>
+        </div>
+      </fieldset>
+
+      <fieldset>
         <legend>Nombre de personnes</legend>
         <div class="opts">
           <label><input type="radio" name="p" value="1">1</label>
@@ -100,6 +110,9 @@
           <label><input type="radio" name="h" value="gaz" checked>Gaz</label>
           <label><input type="radio" name="h" value="elec">Électrique (convecteurs, accumulation)</label>
           <label><input type="radio" name="h" value="pac">Pompe à chaleur</label>
+          <label><input type="radio" name="h" value="mazout">Chaudière mazout</label>
+          <label><input type="radio" name="h" value="poelemaz">Poêle à mazout</label>
+          <label><input type="radio" name="h" value="pellets">Poêle à pellets</label>
         </div>
       </fieldset>
 
@@ -108,10 +121,11 @@
         <div class="opts">
           <label><input type="radio" name="w" value="gaz" checked>Gaz</label>
           <label><input type="radio" name="w" value="elec">Boiler électrique</label>
+          <label><input type="radio" name="w" value="autre">Chaudière mazout / autre</label>
         </div>
       </fieldset>
 
-      <fieldset>
+      <fieldset id="evSet">
         <legend>Voiture électrique rechargée à domicile</legend>
         <div class="opts">
           <label><input type="radio" name="ev" value="0" checked>Non</label>
@@ -123,7 +137,7 @@
         </div>
       </fieldset>
 
-      <fieldset>
+      <fieldset id="pvSet">
         <legend>Panneaux solaires</legend>
         <div class="opts">
           <label><input type="radio" name="pv" value="0" checked>Non</label>
@@ -158,12 +172,12 @@
   <section class="card" aria-label="Résultat" aria-live="polite">
     <h2>Consommation estimée</h2>
     <div class="totals">
-      <div class="tot e"><div class="lbl">Électricité</div><div class="val" id="totE">–</div><div class="unit" id="totEsub">kWh / an</div></div>
-      <div class="tot g"><div class="lbl">Gaz naturel</div><div class="val" id="totG">–</div><div class="unit">kWh / an</div></div>
+      <div class="tot e" id="boxE"><div class="lbl">Électricité</div><div class="val" id="totE">–</div><div class="unit" id="totEsub">kWh / an</div></div>
+      <div class="tot g" id="boxG"><div class="lbl">Gaz naturel</div><div class="val" id="totG">–</div><div class="unit">kWh / an</div></div>
     </div>
     <div class="solar" id="solar" hidden></div>
     <table>
-      <thead><tr><th>Détail</th><th class="n">Électricité</th><th class="n">Gaz</th></tr></thead>
+      <thead id="head"></thead>
       <tbody id="detail"></tbody>
     </table>
 
@@ -174,6 +188,7 @@
         <li>La base gaz comprend le chauffage et l'eau chaude au gaz. Eau chaude au gaz : 800 kWh par personne et par an (Homegrade).</li>
         <li>Boiler électrique : 850 kWh par personne et par an (Homegrade).</li>
         <li>Chauffage électrique : 0,9 kWh d'électricité par kWh de gaz remplacé (rendement de la chaudière). Pompe à chaleur : 3 fois moins (COP saisonnier de 3, ecoconso).</li>
+        <li>Chaudière mazout : environ 300 kWh d'électricité par an (brûleur et circulateur ; un circulateur seul consomme de 50 à 450 kWh selon son âge, Test-Achats). Poêle à pellets : environ 100 kWh par an (ENGIE). Poêle à mazout : environ 50 kWh par an, souvent rien sans ventilateur. Le combustible (mazout, pellets) n'est pas compté.</li>
         <li>Voiture électrique : 18 kWh pour 100 km, pertes de recharge comprises.</li>
         <li>Panneaux solaires : 900 kWh produits par kWc et par an en Belgique. Part consommée directement : 30 % sans batterie, 65 % avec batterie.</li>
         <li>Les cinq personnes et plus utilisent la ligne « 5 personnes ». La cuisson n'est pas comptée à part.</li>
@@ -215,7 +230,17 @@
     evKwh100: 18,
     pvKwhKwc: 900,
     autoSans: 0.30,
-    autoBat: 0.65
+    autoBat: 0.65,
+    auxMazout: 300,   // chaudière mazout : brûleur + circulateur (kWh élec / an)
+    auxPoeleMaz: 50,  // poêle à mazout : ventilateur / électronique, souvent 0
+    auxPellets: 100   // poêle à pellets : allumage, vis, ventilateur
+  };
+  var HEAT = {
+    elec:     {label: "Chauffage électrique"},
+    pac:      {label: "Chauffage par pompe à chaleur"},
+    mazout:   {label: "Chauffage par chaudière mazout", aux: 'auxMazout'},
+    poelemaz: {label: "Chauffage par poêle à mazout", aux: 'auxPoeleMaz'},
+    pellets:  {label: "Chauffage par poêle à pellets", aux: 'auxPellets'}
   };
 
   function val(name){ var el = document.querySelector('input[name="'+name+'"]:checked'); return el ? el.value : null; }
@@ -234,16 +259,22 @@
     var e = baseE, g = baseG;
 
     if (input.heating !== 'gaz'){
-      var chaleur = heatGas * K.rendChaudiere;
-      var add = input.heating === 'pac' ? chaleur / K.copPac : chaleur;
-      add = r100(add);
-      lines.push({label: input.heating === 'pac' ? "Chauffage par pompe à chaleur" : "Chauffage électrique", e: add, g: -heatGas});
+      var h = HEAT[input.heating], add;
+      if (h.aux) add = K[h.aux];
+      else {
+        var chaleur = heatGas * K.rendChaudiere;
+        add = r100(input.heating === 'pac' ? chaleur / K.copPac : chaleur);
+      }
+      lines.push({label: h.label, e: add, g: -heatGas});
       e += add; g -= heatGas;
     }
     if (input.water === 'elec'){
       var b = K.ecsElec * p;
       lines.push({label: "Boiler électrique (" + p + (p >= 5 ? "+" : "") + " pers.)", e: b, g: -ecsGas});
       e += b; g -= ecsGas;
+    } else if (input.water === 'autre'){
+      lines.push({label: "Eau chaude sans gaz ni électricité", e: 0, g: -ecsGas});
+      g -= ecsGas;
     }
     if (input.ev && input.km > 0){
       var ev = r100(input.km * K.evKwh100 / 100);
@@ -269,6 +300,7 @@
     return {
       persons: parseInt(val('p'), 10),
       type: parseInt(val('t'), 10),
+      energies: val('en'),
       heating: val('h'),
       water: val('w'),
       ev: val('ev') === '1',
@@ -285,19 +317,28 @@
 
   function render(){
     var inp = read();
+    var showE = inp.energies !== 'g', showG = inp.energies !== 'e';
+    if (!showE){ inp.ev = false; inp.pv = false; }
+    document.getElementById('evSet').hidden = !showE;
+    document.getElementById('pvSet').hidden = !showE;
     document.getElementById('evBox').hidden = !inp.ev;
     document.getElementById('pvBox').hidden = !inp.pv;
+    document.getElementById('boxE').hidden = !showE;
+    document.getElementById('boxG').hidden = !showG;
+    document.querySelector('.totals').classList.toggle('one', !(showE && showG));
     var r = compute(inp);
 
     document.getElementById('totE').textContent = fmt(r.e);
     document.getElementById('totG').textContent = fmt(r.g);
     document.getElementById('totEsub').textContent = r.solar ? 'kWh / an consommés au total' : 'kWh / an';
 
-    var rows = r.lines.map(function(l, k){
-      if (k === 0) return '<tr><td>' + l.label + '</td><td class="n">' + fmt(l.e) + '</td><td class="n">' + fmt(l.g) + '</td></tr>';
-      return '<tr><td>' + l.label + '</td>' + cell(l.e) + cell(l.g) + '</tr>';
+    document.getElementById('head').innerHTML = '<tr><th>Détail</th>' + (showE ? '<th class="n">Électricité</th>' : '') + (showG ? '<th class="n">Gaz</th>' : '') + '</tr>';
+    var lines = r.lines.filter(function(l, k){ return k === 0 || (showE && l.e) || (showG && l.g); });
+    var rows = lines.map(function(l, k){
+      if (k === 0) return '<tr><td>' + l.label + '</td>' + (showE ? '<td class="n">' + fmt(l.e) + '</td>' : '') + (showG ? '<td class="n">' + fmt(l.g) + '</td>' : '') + '</tr>';
+      return '<tr><td>' + l.label + '</td>' + (showE ? cell(l.e) : '') + (showG ? cell(l.g) : '') + '</tr>';
     }).join('');
-    rows += '<tr class="tot-row"><td>Total consommé</td><td class="n">' + fmt(r.e) + '</td><td class="n">' + fmt(r.g) + '</td></tr>';
+    rows += '<tr class="tot-row"><td>Total consommé</td>' + (showE ? '<td class="n">' + fmt(r.e) + '</td>' : '') + (showG ? '<td class="n">' + fmt(r.g) + '</td>' : '') + '</tr>';
     document.getElementById('detail').innerHTML = rows;
 
     var s = document.getElementById('solar'), solarTxt = '';
@@ -313,25 +354,26 @@
     } else { s.hidden = true; }
 
     var typeLbl = ['appartement', '2 façades', '3 façades', '4 façades'][inp.type];
-    var heatLbl = {gaz: 'gaz', elec: 'électrique', pac: 'pompe à chaleur'}[inp.heating];
-    var waterLbl = inp.water === 'elec' ? 'boiler électrique' : 'gaz';
+    var heatLbl = {gaz: 'gaz', elec: 'électrique', pac: 'pompe à chaleur', mazout: 'chaudière mazout', poelemaz: 'poêle à mazout', pellets: 'poêle à pellets'}[inp.heating];
+    var waterLbl = {gaz: 'gaz', elec: 'boiler électrique', autre: 'chaudière mazout / autre'}[inp.water];
+    var enLbl = {both: 'électricité + gaz', e: 'électricité seule', g: 'gaz seul'}[inp.energies];
     var evLbl = inp.ev ? 'oui, ' + fmt(inp.km) + ' km/an rechargés à domicile' : 'non';
     var pvLbl = inp.pv ? 'oui, ' + String(inp.kwc).replace('.', ',') + ' kWc, ' + (inp.bat ? 'avec' : 'sans') + ' batterie, ' + (inp.comp ? 'avec compensation' : 'sans compensation (injection)') : 'non';
-    var detailTxt = r.lines.map(function(l, k){
-      if (k === 0) return '- ' + l.label + ' : élec ' + fmt(l.e) + ' / gaz ' + fmt(l.g) + ' kWh';
+    var detailTxt = lines.map(function(l, k){
+      if (k === 0) return '- ' + l.label + ' : ' + [showE ? 'élec ' + fmt(l.e) : '', showG ? 'gaz ' + fmt(l.g) : ''].filter(Boolean).join(' / ') + ' kWh';
       var parts = [];
-      if (l.e) parts.push('élec ' + (l.e > 0 ? '+' : '−') + fmt(Math.abs(l.e)));
-      if (l.g) parts.push('gaz ' + (l.g > 0 ? '+' : '−') + fmt(Math.abs(l.g)));
+      if (showE && l.e) parts.push('élec ' + (l.e > 0 ? '+' : '−') + fmt(Math.abs(l.e)));
+      if (showG && l.g) parts.push('gaz ' + (l.g > 0 ? '+' : '−') + fmt(Math.abs(l.g)));
       return '- ' + l.label + ' : ' + parts.join(' / ') + ' kWh';
     }).join('\n');
     lastText = 'Estimation indicative de consommation annuelle' +
+      '\nÉnergies : ' + enLbl +
       '\nMénage : ' + inp.persons + (inp.persons >= 5 ? '+' : '') + ' pers., ' + typeLbl +
       '\nChauffage : ' + heatLbl +
       '\nEau chaude : ' + waterLbl +
-      '\nVoiture électrique : ' + evLbl +
-      '\nPanneaux solaires : ' + pvLbl +
+      (showE ? '\nVoiture électrique : ' + evLbl + '\nPanneaux solaires : ' + pvLbl : '') +
       '\n\nDétail :\n' + detailTxt +
-      '\n\nÉlectricité : ' + fmt(r.e) + ' kWh/an' + '\nGaz : ' + fmt(r.g) + ' kWh/an' + (solarTxt ? '\n' + solarTxt : '');
+      '\n' + (showE ? '\nÉlectricité : ' + fmt(r.e) + ' kWh/an' : '') + (showG ? '\nGaz : ' + fmt(r.g) + ' kWh/an' : '') + (solarTxt ? '\n' + solarTxt : '');
   }
 
   document.getElementById('f').addEventListener('input', render);
