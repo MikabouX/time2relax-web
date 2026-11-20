@@ -137,7 +137,7 @@
           <label><input type="radio" name="h" value="elec">Électrique (convecteurs, accumulation)</label>
           <label><input type="radio" name="h" value="pac">Pompe à chaleur</label>
           <label><input type="radio" name="h" value="mazout">Chaudière mazout</label>
-          <label><input type="radio" name="h" value="poelemaz">Poêle à mazout</label>
+          <label><input type="radio" name="h" value="poelegaz">Poêle au gaz</label>
           <label><input type="radio" name="h" value="pellets">Poêle à pellets</label>
         </div>
       </fieldset>
@@ -250,7 +250,7 @@
         <li>La base gaz comprend le chauffage et l'eau chaude au gaz. Eau chaude au gaz : 800 kWh par personne et par an (Homegrade).</li>
         <li>Boiler électrique : 850 kWh par personne et par an (Homegrade).</li>
         <li>Chauffage électrique : 0,9 kWh d'électricité par kWh de gaz remplacé (rendement de la chaudière). Pompe à chaleur : 3 fois moins (COP saisonnier de 3, ecoconso).</li>
-        <li>Chaudière mazout : environ 300 kWh d'électricité par an (brûleur et circulateur ; un circulateur seul consomme de 50 à 450 kWh selon son âge, Test-Achats). Poêle à pellets : environ 100 kWh par an (ENGIE). Poêle à mazout : environ 50 kWh par an, souvent rien sans ventilateur. Le combustible (mazout, pellets) n'est pas compté.</li>
+        <li>Chaudière mazout : environ 300 kWh d'électricité par an (brûleur et circulateur ; un circulateur seul consomme de 50 à 450 kWh selon son âge, Test-Achats). Poêle à pellets : environ 100 kWh par an (ENGIE). Le combustible (mazout, pellets) n'est pas compté. Poêle au gaz : 70 % du gaz de chauffage d'une chaudière (il chauffe surtout les pièces de vie et n'a pas les pertes du circuit de chauffage) – estimation.</li>
         <li>Voiture électrique : 18 kWh pour 100 km, pertes de recharge comprises.</li>
         <li>Panneaux solaires : 900 kWh produits par kWc et par an en Belgique. Part consommée directement : 30 % sans batterie, 65 % avec batterie.</li>
         <li>Coût : kWh facturés × prix du kWh + frais fixes annuels ; acompte = coût annuel ÷ 12, arrondi à l'euro. Avec panneaux solaires, on facture la consommation nette (compensation) ou l'électricité prélevée (injection), sans compter le revenu de l'injection. Compteur bi-horaire : prix moyen selon la part de nuit indiquée.</li>
@@ -296,14 +296,14 @@
     autoSans: 0.30,
     autoBat: 0.65,
     auxMazout: 300,   // chaudière mazout : brûleur + circulateur (kWh élec / an)
-    auxPoeleMaz: 50,  // poêle à mazout : ventilateur / électronique, souvent 0
+    poeleGaz: 0.7,    // poêle au gaz : part du gaz de chauffage d'une chaudière (chauffe surtout les pièces de vie, pas de pertes du circuit)
     auxPellets: 100   // poêle à pellets : allumage, vis, ventilateur
   };
   var HEAT = {
     elec:     {label: "Chauffage électrique"},
     pac:      {label: "Chauffage par pompe à chaleur"},
     mazout:   {label: "Chauffage par chaudière mazout", aux: 'auxMazout'},
-    poelemaz: {label: "Chauffage par poêle à mazout", aux: 'auxPoeleMaz'},
+    poelegaz: {label: "Chauffage par poêle au gaz (au lieu d'une chaudière)", gasFactor: 'poeleGaz'},
     pellets:  {label: "Chauffage par poêle à pellets", aux: 'auxPellets'}
   };
 
@@ -324,6 +324,12 @@
 
     if (input.heating !== 'gaz'){
       var h = HEAT[input.heating], add;
+      if (h.gasFactor){
+        var moins = r100(heatGas * (1 - K[h.gasFactor]));
+        lines.push({label: h.label, e: 0, g: -moins});
+        g -= moins;
+        heatGas = 0;
+      } else {
       if (h.aux) add = K[h.aux];
       else {
         var chaleur = heatGas * K.rendChaudiere;
@@ -331,6 +337,7 @@
       }
       lines.push({label: h.label, e: add, g: -heatGas});
       e += add; g -= heatGas;
+      }
     }
     if (input.water === 'elec'){
       var b = K.ecsElec * p;
@@ -660,7 +667,7 @@
     cst.innerHTML = html; cst.hidden = !nOk;
 
     var typeLbl = ['appartement', '2 façades', '3 façades', '4 façades'][inp.type];
-    var heatLbl = {gaz: 'gaz', elec: 'électrique', pac: 'pompe à chaleur', mazout: 'chaudière mazout', poelemaz: 'poêle à mazout', pellets: 'poêle à pellets'}[inp.heating];
+    var heatLbl = {gaz: 'gaz', elec: 'électrique', pac: 'pompe à chaleur', mazout: 'chaudière mazout', poelegaz: 'poêle au gaz', pellets: 'poêle à pellets'}[inp.heating];
     var waterLbl = {gaz: 'gaz', elec: 'boiler électrique', autre: 'chaudière mazout / autre'}[inp.water];
     var enLbl = {both: 'électricité + gaz', e: 'électricité seule', g: 'gaz seul'}[inp.energies];
     var evLbl = inp.ev ? 'oui, ' + fmt(inp.km) + ' km/an rechargés à domicile' : 'non';
