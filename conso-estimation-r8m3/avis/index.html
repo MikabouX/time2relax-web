@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="../icon.svg" type="image/svg+xml">
+<link rel="icon" href="../icon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="../icon-180.png">
+<title>Donnez votre avis – estimation de consommation</title>
+<style>
+  :root{--bg:#f5f6f4;--card:#fff;--ink:#1d2a24;--muted:#5d6b64;--line:#dde3df;--accent:#1f7a5a;--accent-soft:#e3f2ec;--star:#e0a800}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink);font-size:15px;line-height:1.45}
+  header{background:var(--accent);color:#fff;padding:18px 20px}
+  header h1{margin:0;font-size:20px;font-weight:650}
+  header p{margin:4px 0 0;opacity:.9;font-size:13px}
+  main{max-width:620px;margin:0 auto;padding:18px 16px 40px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px}
+  h2{font-size:16px;margin:0 0 10px}
+  .stars{display:flex;gap:4px;margin-bottom:4px}
+  .stars button{font-size:32px;line-height:1;background:none;border:0;padding:2px;cursor:pointer;color:#c9cfcb}
+  .stars button.on{color:var(--star)}
+  .stars button:focus-visible{outline:2px solid var(--accent);border-radius:6px}
+  .lbl{color:var(--muted);font-size:13px;min-height:18px;margin-bottom:14px}
+  textarea{width:100%;min-height:130px;padding:10px;border:1px solid var(--line);border-radius:8px;font:inherit;resize:vertical}
+  .hint{color:var(--muted);font-size:12.5px;margin:6px 0 14px}
+  .send{background:var(--accent);color:#fff;border:0;border-radius:8px;padding:10px 18px;font:inherit;font-weight:600;cursor:pointer}
+  .send:disabled{opacity:.5;cursor:default}
+  .msg{margin-top:12px;font-size:14px}
+  .msg.ok{background:var(--accent-soft);padding:10px 12px;border-radius:8px}
+  .msg.err{color:#9a3b2b}
+  a{color:var(--accent)}
+  .back{display:inline-block;margin-top:16px;font-size:14px}
+  footer{color:var(--muted);font-size:12px;text-align:center;margin-top:18px}
+</style>
+</head>
+<body>
+<header>
+  <h1>Enquête de satisfaction</h1>
+  <p>Outil d'estimation de consommation – donnez votre avis</p>
+</header>
+<main>
+  <div class="card" id="formCard">
+    <h2>Que pensez-vous de l'outil ?</h2>
+    <div class="stars" id="stars" role="radiogroup" aria-label="Note de 1 à 5">
+      <button type="button" data-v="1" aria-label="1 sur 5">★</button>
+      <button type="button" data-v="2" aria-label="2 sur 5">★</button>
+      <button type="button" data-v="3" aria-label="3 sur 5">★</button>
+      <button type="button" data-v="4" aria-label="4 sur 5">★</button>
+      <button type="button" data-v="5" aria-label="5 sur 5">★</button>
+    </div>
+    <div class="lbl" id="lbl">Choisissez une note</div>
+
+    <label for="c"><strong>Votre commentaire</strong> (facultatif)</label>
+    <textarea id="c" maxlength="2000" placeholder="Ce qui vous aide, ce qui manque, une valeur qui vous semble fausse…"></textarea>
+    <div class="hint">Avis anonyme. N'indiquez aucune donnée de client (nom, adresse, numéro de client…). <span id="count">0</span>/2000</div>
+
+    <button class="send" id="send" disabled>Envoyer mon avis</button>
+    <div class="msg" id="msg" role="status"></div>
+  </div>
+  <a class="back" href="../">← Retour à l'estimation</a>
+  <footer>Seuls la note, le commentaire et la date sont enregistrés (hébergeur : Supabase). Aucun nom ni cookie : la page ne demande pas qui vous êtes.</footer>
+</main>
+<script>
+(function(){
+  "use strict";
+  var URL = 'https://gxftbzbvbveocwpdavtt.supabase.co';
+  var KEY = 'sb_publishable_9fKWGXevueh6hHJpGQvmhg_EFOd_-dR';
+  var LABELS = ['', 'Pas satisfait', 'Peu satisfait', 'Correct', 'Satisfait', 'Très satisfait'];
+  var note = 0;
+  var stars = document.querySelectorAll('#stars button');
+  var send = document.getElementById('send'), msg = document.getElementById('msg'), c = document.getElementById('c');
+
+  function paint(v){ stars.forEach(function(b){ b.classList.toggle('on', +b.dataset.v <= v); b.setAttribute('aria-checked', +b.dataset.v === note ? 'true' : 'false'); }); }
+  stars.forEach(function(b){
+    b.addEventListener('click', function(){ note = +b.dataset.v; paint(note); document.getElementById('lbl').textContent = LABELS[note]; send.disabled = false; });
+    b.addEventListener('mouseenter', function(){ paint(+b.dataset.v); });
+  });
+  document.getElementById('stars').addEventListener('mouseleave', function(){ paint(note); });
+  c.addEventListener('input', function(){ document.getElementById('count').textContent = c.value.length; });
+
+  send.addEventListener('click', function(){
+    if (!note) return;
+    send.disabled = true; msg.className = 'msg'; msg.textContent = 'Envoi…';
+    fetch(URL + '/rest/v1/rpc/conso_avis_add', {
+      method: 'POST',
+      headers: {'apikey': KEY, 'Authorization': 'Bearer ' + KEY, 'Content-Type': 'application/json'},
+      body: JSON.stringify({p_note: note, p_commentaire: c.value.slice(0, 2000)})
+    }).then(function(r){
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      document.getElementById('formCard').innerHTML = '<h2>Merci pour votre avis !</h2><p>Il a bien été enregistré et aidera à améliorer l\'outil.</p>';
+    }).catch(function(){
+      msg.className = 'msg err'; msg.textContent = "L'envoi n'a pas fonctionné. Réessayez dans quelques minutes.";
+      send.disabled = false;
+    });
+  });
+})();
+</script>
+</body>
+</html>
