@@ -832,13 +832,8 @@
   document.querySelectorAll('input[name="seg"]').forEach(function(r){ r.addEventListener('change', function(e){ e.stopPropagation(); fillContracts('e'); fillContracts('g'); applyPrices('e'); applyPrices('g'); render(); }); });
   function debutIso(){ return /^\d{4}-\d{2}/.test($('debut').value) ? $('debut').value.slice(0, 7) + '-01' : null; }
   function debutLbl(){ var v = $('debut').value, m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v); return m ? (+m[3]) + ' ' + moisLbl(m[1] + '-' + m[2] + '-01') : ''; }
-  function onDebut(){
-    var d = debutIso(), h = $('debutHint');
-    h.textContent = d ? '' : 'facultatif';
-    if (!d || !T) return;
-    if ((T.mois_dispo || []).indexOf(d) >= 0){ if (T.mois !== d) loadMonth(d); }
-    else h.textContent = 'Pas encore de prix pour ce mois : prix ' + deMois(T.mois) + ' utilisés.';
-  }
+  // Les prix sont ceux du mois où le contrat est conclu (cartes « contrats conclus en … »), pas ceux du mois de début.
+  function onDebut(){ $('debutHint').textContent = debutIso() ? 'prix du mois de signature' : 'facultatif'; }
   $('debut').addEventListener('change', function(e){ e.stopPropagation(); onDebut(); render(); });
   function resetPrices(){
     COMPS.forEach(function(c){ VAL.e[c.k] = {}; VAL.g[c.k] = {}; SRC.e[c.k] = null; SRC.g[c.k] = null; });
