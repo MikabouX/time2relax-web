@@ -888,7 +888,11 @@
       costTxt += '\n' + lbl + ' : ' + fmt(kwh) + ' kWh × ' + num2(pr * df) + ' c€/kWh' + (fixe ? ' + ' + fmt(fixe * df) + ' €/an' : '') + ' = ' + fmt(c * df) + ' €/an ' + u;
     }
     if (showE) costLine('Électricité', kE, P.e.prixMoyen, P.e.fixe);
-    if (showE && r.solar && r.solar.mode === 'comp'){
+    if (showE && r.solar && r.solar.mode === 'comp' && SOCIAL.e){
+      html += '<div class="line"><span>Tarif prosumer</span><span class="hint">pas dû avec le tarif social</span></div>'; costTxt += '\nTarif prosumer : pas dû avec le tarif social';
+      $('prosSrc').textContent = 'Pas de tarif prosumer avec le tarif social.';
+    }
+    if (showE && r.solar && r.solar.mode === 'comp' && !SOCIAL.e){
       var kwe = pnum($('kwe').value); if (kwe === null) kwe = inp.kwc;
       var rate = pnum($('prosRate').value), comm = val('pcpt') === 'comm';
       var reS = sums('e'), reK = (VAL.e.re.k !== null && VAL.e.re.k !== undefined) ? +VAL.e.re.k : null;
