@@ -253,8 +253,9 @@
       <fieldset id="knSet">
         <legend>Consommations connues <span class="hint">(facultatif)</span></legend>
         <div class="hint" style="margin:-2px 0 6px">D'après la facture ou les relevés du compteur : remplace l'estimation dans le calcul du prix.</div>
-        <div class="row" id="knERow"><span class="clbl">Électricité</span><input type="text" inputmode="numeric" class="px" id="knE" maxlength="7"> <span>kWh/an prélevés (compteur simple) ou heures pleines</span></div>
-        <div class="row" id="knENRow"><span class="clbl"></span><input type="text" inputmode="numeric" class="px" id="knEN" maxlength="7"> <span>heures creuses (bi-horaire : les deux index séparés)</span></div>
+        <div class="row" id="knERow"><span class="clbl">Électricité</span><input type="text" inputmode="numeric" class="px" id="knE" maxlength="7"> <span>kWh/an heures pleines (ou total)</span></div>
+        <div class="row" id="knENRow"><span class="clbl"></span><input type="text" inputmode="numeric" class="px" id="knEN" maxlength="7"> <span>kWh/an heures creuses</span></div>
+        <div class="hint" id="knEHint" style="margin:-2px 0 6px">Deux index connus : ils sont additionnés (compteur simple) ou gardent leur répartition (bi-horaire). Une seule valeur avec un compteur bi-horaire : 50 % pleines, 50 % creuses.</div>
         <div class="row" id="knPRow"><span class="clbl">Panneaux</span><input type="text" inputmode="numeric" class="px" id="knP" maxlength="7"> <span>kWh/an produits</span> <input type="text" inputmode="numeric" class="px" id="knI" maxlength="7"> <span>kWh/an injectés</span></div>
         <div class="row" id="knGRow"><span class="clbl">Gaz</span><input type="text" inputmode="numeric" class="px" id="knG" maxlength="7"> <span>kWh/an</span></div>
       </fieldset>
@@ -918,10 +919,11 @@
     var knEP = showE ? pnum($('knE').value) : null, knEN = showE ? pnum($('knEN').value) : null, knG = showG ? pnum($('knG').value) : null;
     // Bi-horaire : le compteur donne deux index séparés (pleines, creuses) ; leur somme = prélèvement total.
     var knE = knEP !== null ? knEP + (knEN || 0) : null;
-    $('knERow').hidden = $('knENRow').hidden = !showE; $('knGRow').hidden = !showG;
+    $('knERow').hidden = $('knENRow').hidden = $('knEHint').hidden = !showE; $('knGRow').hidden = !showG;
     if (knE !== null) knE = Math.round(knE); if (knG !== null) knG = Math.round(knG);
     var pctEl = $('pct'), autoPct = knE && knEN !== null && knEN <= knE;
-    if (autoPct){ pctEl.value = String(Math.round(knEN / knE * 1000) / 10).replace('.', ','); pctEl.readOnly = true; pctEl.title = 'Calculé à partir des consommations connues'; }
+    if (autoPct){ pctEl.value = String(Math.round(knEN / knE * 1000) / 10).replace('.', ','); pctEl.readOnly = true; pctEl.title = 'Calculé à partir des index heures pleines et heures creuses'; }
+    else if (knE && knEN === null){ pctEl.value = '50'; pctEl.readOnly = true; pctEl.title = 'Une seule consommation connue : 50 % heures pleines, 50 % heures creuses'; autoPct = true; }
     else if (pctEl.readOnly){ pctEl.readOnly = false; pctEl.title = ''; pctEl.value = '50'; }
     var knP = showE && inp.pv ? pnum($('knP').value) : null, knI = showE && inp.pv ? pnum($('knI').value) : null;
     $('knPRow').hidden = !(showE && inp.pv);
