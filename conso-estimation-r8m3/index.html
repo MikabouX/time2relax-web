@@ -47,7 +47,7 @@
   input[type=text]{flex:1;min-width:180px;padding:6px 8px;border:1px solid var(--line);border-radius:7px;font-size:14px}
   .clbl{min-width:100px;font-size:14px}
   #prixSet{display:grid;gap:10px}
-  #prixSet [hidden], #knSet [hidden], .veh[hidden], #knPRow[hidden]{display:none}
+  #prixSet [hidden], #knSet [hidden], .veh[hidden], #knPRow[hidden], #evHomeBox[hidden]{display:none}
   .pblock{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:grid;gap:8px}
   .ptitle{font-weight:650;font-size:14px;padding-left:8px}
   .ptitle.e{border-left:4px solid var(--elec)} .ptitle.g{border-left:4px solid var(--gas)}
@@ -136,14 +136,6 @@
         </div>
       </fieldset>
 
-      <fieldset id="knSet">
-        <legend>Consommations connues <span class="hint">(facultatif)</span></legend>
-        <div class="hint" style="margin:-2px 0 6px">D'après la facture ou les relevés du compteur : remplace l'estimation dans le calcul du prix.</div>
-        <div class="row" id="knERow"><span class="clbl">Électricité</span><input type="text" inputmode="numeric" class="px" id="knE" maxlength="7"> <span>kWh/an prélevés</span></div>
-        <div class="row" id="knENRow"><span class="clbl"></span><input type="text" inputmode="numeric" class="px" id="knEN" maxlength="7"> <span>dont nuit / heures creuses (bi-horaire)</span></div>
-        <div class="row" id="knPRow"><span class="clbl">Panneaux</span><input type="text" inputmode="numeric" class="px" id="knP" maxlength="7"> <span>kWh/an produits</span> <input type="text" inputmode="numeric" class="px" id="knI" maxlength="7"> <span>kWh/an injectés</span></div>
-        <div class="row" id="knGRow"><span class="clbl">Gaz</span><input type="text" inputmode="numeric" class="px" id="knG" maxlength="7"> <span>kWh/an</span></div>
-      </fieldset>
 
       <fieldset>
         <legend>Nombre de personnes</legend>
@@ -186,22 +178,13 @@
           <label><input type="radio" name="w" value="autre">Chaudière mazout / autre</label>
         </div>
       </fieldset>
-
-      <fieldset id="evSet">
-        <legend>Voiture électrique ou hybride rechargeable, rechargée à domicile</legend>
+      <fieldset id="commSet">
+        <legend>Compteur communicant (intelligent)</legend>
         <div class="opts">
-          <label><input type="radio" name="ev" value="0" checked>Non</label>
-          <label><input type="radio" name="ev" value="1">Oui</label>
-        </div>
-        <div class="sub" id="evBox" hidden>
-          <div class="row"><span class="clbl">Nombre</span><select id="evN"><option value="1">1 véhicule</option><option value="2">2 véhicules</option><option value="3">3 véhicules</option></select></div>
-          <div class="row veh" id="veh1"><span class="clbl">Véhicule 1</span><select id="ev1t"><option value="e">Électrique</option><option value="h">Hybride rechargeable</option></select> <input type="number" id="km" min="0" step="1000" value="15000" style="width:90px"> <span>km/an à domicile</span> <input type="text" inputmode="decimal" class="px" id="ev1c" value="18" style="width:50px"> <span>kWh/100 km</span></div>
-          <div class="row veh" id="veh2" hidden><span class="clbl">Véhicule 2</span><select id="ev2t"><option value="e">Électrique</option><option value="h">Hybride rechargeable</option></select> <input type="number" id="km2" min="0" step="1000" value="15000" style="width:90px"> <span>km/an à domicile</span> <input type="text" inputmode="decimal" class="px" id="ev2c" value="18" style="width:50px"> <span>kWh/100 km</span></div>
-          <div class="row veh" id="veh3" hidden><span class="clbl">Véhicule 3</span><select id="ev3t"><option value="e">Électrique</option><option value="h">Hybride rechargeable</option></select> <input type="number" id="km3" min="0" step="1000" value="15000" style="width:90px"> <span>km/an à domicile</span> <input type="text" inputmode="decimal" class="px" id="ev3c" value="18" style="width:50px"> <span>kWh/100 km</span></div>
-          <span class="hint">Consommation selon le modèle : citadine 14–16, berline 16–19, SUV ou grande voiture 20–25 kWh/100 km (recharge comprise). Hybride rechargeable : seulement les km roulés en électrique (souvent 6 000 à 10 000 par an), environ 20 kWh/100 km. Moyenne belge : environ 15 000 km par an.</span>
+          <label><input type="radio" name="pcpt" value="classique" checked>Non</label>
+          <label><input type="radio" name="pcpt" value="comm">Oui</label>
         </div>
       </fieldset>
-
       <fieldset id="pvSet">
         <legend>Panneaux solaires</legend>
         <div class="opts">
@@ -209,14 +192,7 @@
           <label><input type="radio" name="pv" value="1">Oui</label>
         </div>
         <div class="sub" id="pvBox" hidden>
-          <div class="row"><input type="number" id="kwc" min="0" step="0.5" value="4"> <span>kWc installés</span></div>
-          <div>
-            <div class="hint" style="margin-bottom:4px">Batterie domestique ?</div>
-            <div class="opts">
-              <label><input type="radio" name="bat" value="0" checked>Non</label>
-              <label><input type="radio" name="bat" value="1">Oui</label>
-            </div>
-          </div>
+          <div class="row"><input type="number" id="kwc" min="0" step="0.5" value="4.5"> <span>kWc installés (4,5 si inconnu)</span></div>
           <div>
             <div class="hint" style="margin-bottom:4px">Compensation (certifié avant 2024) ?</div>
             <div class="opts">
@@ -226,12 +202,8 @@
             <div class="hint" style="margin-top:4px">Seulement en Wallonie, pour des panneaux installés avant 2024 (jusqu'à fin 2030). En Flandre et à Bruxelles : toujours Non.</div>
           </div>
           <div id="prosBox" hidden>
-            <div class="hint" style="margin-bottom:4px">Tarif prosumer – type de compteur</div>
-            <div class="opts">
-              <label><input type="radio" name="pcpt" value="classique" checked>Classique (tourne à l'envers)</label>
-              <label><input type="radio" name="pcpt" value="comm">Double flux ou communicant</label>
-            </div>
-            <div class="row" style="margin-top:6px"><input type="text" inputmode="decimal" class="px" id="kwe"> <span>kWe (puissance de l'onduleur ; par défaut = kWc)</span></div>
+            <div class="hint" style="margin-bottom:4px">Tarif prosumer</div>
+            <div class="row" style="margin-top:6px"><input type="text" inputmode="decimal" class="px" id="kwe"> <span>kVA / kWe (puissance de l'onduleur ; par défaut = kWc)</span></div>
             <div class="row" style="margin-top:6px"><input type="text" inputmode="decimal" class="px" id="prosRate"> <span>€/kWe/an HTVA – tarif prosumer du gestionnaire</span></div>
             <div class="hint" id="prosSrc"></div>
             <details class="explain" style="margin-top:6px"><summary><strong>Comment l'expliquer au client</strong></summary>
@@ -243,6 +215,51 @@
           </div>
         </div>
       </fieldset>
+      <fieldset id="evSet">
+        <legend>Véhicule électrique ou hybride rechargeable</legend>
+        <div class="opts">
+          <label><input type="radio" name="ev" value="0" checked>Non</label>
+          <label><input type="radio" name="ev" value="1">Oui</label>
+        </div>
+        <div class="sub" id="evBox" hidden>
+          <div class="row"><span class="clbl">Nombre</span><select id="evN"><option value="1">1 véhicule</option><option value="2">2 véhicules</option><option value="3">3 véhicules</option></select></div>
+          <div class="row"><span class="clbl">Charge à la maison</span><div class="opts"><label><input type="radio" name="evh" value="1" checked>Oui</label><label><input type="radio" name="evh" value="0">Non</label></div></div>
+          <div id="evHomeBox">
+          <div class="row veh" id="veh1"><span class="clbl">Véhicule 1</span><select id="ev1t"><option value="e">Électrique</option><option value="h">Hybride rechargeable</option></select> <input type="number" id="km" min="0" step="1000" value="15000" style="width:90px"> <span>km/an à domicile</span> <input type="text" inputmode="decimal" class="px" id="ev1c" value="18" style="width:50px"> <span>kWh/100 km</span></div>
+          <div class="row veh" id="veh2" hidden><span class="clbl">Véhicule 2</span><select id="ev2t"><option value="e">Électrique</option><option value="h">Hybride rechargeable</option></select> <input type="number" id="km2" min="0" step="1000" value="15000" style="width:90px"> <span>km/an à domicile</span> <input type="text" inputmode="decimal" class="px" id="ev2c" value="18" style="width:50px"> <span>kWh/100 km</span></div>
+          <div class="row veh" id="veh3" hidden><span class="clbl">Véhicule 3</span><select id="ev3t"><option value="e">Électrique</option><option value="h">Hybride rechargeable</option></select> <input type="number" id="km3" min="0" step="1000" value="15000" style="width:90px"> <span>km/an à domicile</span> <input type="text" inputmode="decimal" class="px" id="ev3c" value="18" style="width:50px"> <span>kWh/100 km</span></div>
+          <span class="hint">Consommation selon le modèle : citadine 14–16, berline 16–19, SUV ou grande voiture 20–25 kWh/100 km (recharge comprise). Hybride rechargeable : seulement les km roulés en électrique (souvent 6 000 à 10 000 par an), environ 20 kWh/100 km. Moyenne belge : environ 15 000 km par an.</span>
+          </div>
+        </div>
+      </fieldset>
+      <fieldset id="climSet">
+        <legend>Climatisation</legend>
+        <div class="opts">
+          <label><input type="radio" name="clim" value="0" checked>Non</label>
+          <label><input type="radio" name="clim" value="1">Oui</label>
+        </div>
+        <div class="sub" id="climBox" hidden>
+          <div class="row"><select id="climN"><option value="1">1 appareil</option><option value="2">2 appareils</option><option value="3">3 appareils</option><option value="4">4 appareils</option></select> <input type="text" inputmode="numeric" class="px" id="climK" value="300" style="width:60px"> <span>kWh/an par appareil</span></div>
+          <span class="hint">Climatiseur (split) utilisé en été en Belgique : environ 200 à 400 kWh par an et par appareil.</span>
+        </div>
+      </fieldset>
+      <fieldset id="batSet">
+        <legend>Batterie domestique</legend>
+        <div class="opts">
+          <label><input type="radio" name="bat" value="0" checked>Non</label>
+          <label><input type="radio" name="bat" value="1">Oui</label>
+        </div>
+      </fieldset>
+      <fieldset id="knSet">
+        <legend>Consommations connues <span class="hint">(facultatif)</span></legend>
+        <div class="hint" style="margin:-2px 0 6px">D'après la facture ou les relevés du compteur : remplace l'estimation dans le calcul du prix.</div>
+        <div class="row" id="knERow"><span class="clbl">Électricité</span><input type="text" inputmode="numeric" class="px" id="knE" maxlength="7"> <span>kWh/an prélevés</span></div>
+        <div class="row" id="knENRow"><span class="clbl"></span><input type="text" inputmode="numeric" class="px" id="knEN" maxlength="7"> <span>dont nuit / heures creuses (bi-horaire)</span></div>
+        <div class="row" id="knPRow"><span class="clbl">Panneaux</span><input type="text" inputmode="numeric" class="px" id="knP" maxlength="7"> <span>kWh/an produits</span> <input type="text" inputmode="numeric" class="px" id="knI" maxlength="7"> <span>kWh/an injectés</span></div>
+        <div class="row" id="knGRow"><span class="clbl">Gaz</span><input type="text" inputmode="numeric" class="px" id="knG" maxlength="7"> <span>kWh/an</span></div>
+      </fieldset>
+
+
 
       </div>
       <div class="card result" aria-live="polite">
@@ -265,6 +282,7 @@
         <li>Boiler électrique : 850 kWh par personne et par an (Homegrade).</li>
         <li>Chauffage électrique : 0,9 kWh d'électricité par kWh de gaz remplacé (rendement de la chaudière). Pompe à chaleur : 3 fois moins (COP saisonnier de 3, ecoconso).</li>
         <li>Chaudière mazout : environ 300 kWh d'électricité par an (brûleur et circulateur ; un circulateur seul consomme de 50 à 450 kWh selon son âge, Test-Achats). Poêle à pellets : environ 100 kWh par an (ENGIE). Le combustible (mazout, pellets) n'est pas compté. Poêle au gaz : 70 % du gaz de chauffage d'une chaudière (il chauffe surtout les pièces de vie et n'a pas les pertes du circuit de chauffage) – estimation.</li>
+        <li>Climatisation : 300 kWh par an et par appareil par défaut (modifiable).</li>
         <li>Voiture électrique : 18 kWh pour 100 km par défaut (modifiable par véhicule), pertes de recharge comprises. Hybride rechargeable : km roulés en électrique × 20 kWh pour 100 km par défaut.</li>
         <li>Panneaux solaires : 900 kWh produits par kWc et par an en Belgique. Part consommée directement : 30 % sans batterie, 65 % avec batterie.</li>
         <li>Prix encodés HTVA ; TVA de 6 % pour les particuliers et de 21 % pour les professionnels. Coût : kWh facturés × prix du kWh + frais fixes annuels ; acompte = coût annuel TVAC ÷ 12, arrondi à l'euro. Avec panneaux solaires, on facture la consommation nette (compensation) ou l'électricité prélevée (injection), sans compter le revenu de l'injection. Compteur bi-horaire : prix moyen selon la part de nuit indiquée.</li>
@@ -376,6 +394,7 @@
     rendChaudiere: 0.9,
     copPac: 3,
     evKwh100: 18,
+    climKwh: 300,
     pvKwhKwc: 900,
     autoSans: 0.30,
     autoBat: 0.65,
@@ -431,7 +450,7 @@
       lines.push({label: "Eau chaude sans gaz ni électricité", e: 0, g: -ecsGas});
       g -= ecsGas;
     }
-    if (input.ev) (input.vehicles || [{t: 'e', km: input.km, c: K.evKwh100}]).forEach(function(v, i, all){
+    if (input.ev && input.evHome !== false) (input.vehicles || [{t: 'e', km: input.km, c: K.evKwh100}]).forEach(function(v, i, all){
       if (!(v.km > 0)) return;
       var ev = r100(v.km * (v.c || K.evKwh100) / 100);
       lines.push({label: (v.t === 'h' ? 'Hybride rechargeable' : 'Voiture électrique') + (all.length > 1 ? ' ' + (i + 1) : '') + ' (' + fmt(v.km) + ' km × ' + String(v.c || K.evKwh100).replace('.', ',') + ' kWh/100 km)', e: ev, g: 0});
@@ -442,6 +461,11 @@
     g = Math.max(0, g);
 
     var solar = null;
+    if (input.clim && input.climN > 0){
+      var cl = r100(input.climN * (input.climK || K.climKwh));
+      lines.push({label: 'Climatisation (' + input.climN + ' appareil' + (input.climN > 1 ? 's' : '') + ')', e: cl, g: 0});
+      e += cl;
+    }
     if (input.pv && (input.kwc > 0 || input.prodKnown > 0)){
       // Production et injection connues (relevés) : elles remplacent l'estimation (kWc × 900, 30 % / 65 % autoconsommés).
       var prod = input.prodKnown > 0 ? Math.round(input.prodKnown) : r100(input.kwc * K.pvKwhKwc);
@@ -469,6 +493,10 @@
       vehicles: (function(){ var n = +($('evN') ? $('evN').value : 1), out = []; for (var i = 1; i <= n; i++) out.push({t: $('ev' + i + 't').value, km: num(i === 1 ? 'km' : 'km' + i), c: num('ev' + i + 'c') || (($('ev' + i + 't').value === 'h') ? 20 : 18)}); return out; })(),
       pv: val('pv') === '1',
       kwc: num('kwc'),
+      evHome: val('evh') !== '0',
+      clim: val('clim') === '1',
+      climN: +$('climN').value,
+      climK: num('climK'),
       bat: val('bat') === '1',
       comp: val('comp') === '1'
     };
@@ -872,10 +900,13 @@
   function render(){
     var inp = read();
     var showE = inp.energies !== 'g', showG = inp.energies !== 'e';
-    if (!showE){ inp.ev = false; inp.pv = false; }
+    if (!showE){ inp.ev = false; inp.pv = false; inp.clim = false; }
     document.getElementById('evSet').hidden = !showE;
     document.getElementById('pvSet').hidden = !showE;
     document.getElementById('evBox').hidden = !inp.ev;
+    $('evHomeBox').hidden = !inp.evHome;
+    $('climSet').hidden = !showE; $('climBox').hidden = !inp.clim; $('commSet').hidden = !showE;
+    $('batSet').hidden = !(showE && inp.pv);
     for (var vi = 2; vi <= 3; vi++) $('veh' + vi).hidden = +$('evN').value < vi;
     document.getElementById('pvBox').hidden = !inp.pv;
     $('prosBox').hidden = !(inp.pv && inp.comp);
@@ -1000,7 +1031,7 @@
     var waterLbl = {gaz: 'gaz', elec: 'boiler électrique', autre: 'chaudière mazout / autre'}[inp.water];
     var enLbl = {both: 'électricité + gaz', e: 'électricité seule', g: 'gaz seul'}[inp.energies];
     var evV = (inp.vehicles || []).filter(function(v){ return v.km > 0; });
-    var evLbl = inp.ev && evV.length ? 'oui, ' + (evV.length > 1 ? evV.length + ' véhicules : ' : '') + evV.map(function(v){ return (v.t === 'h' ? 'hybride rechargeable ' : 'électrique ') + fmt(v.km) + ' km/an (' + String(v.c).replace('.', ',') + ' kWh/100 km)'; }).join(' ; ') + ', recharge à domicile' : 'non';
+    var evLbl = inp.ev && !inp.evHome ? 'oui, ' + $('evN').value + ' véhicule' + (+$('evN').value > 1 ? 's' : '') + ', pas de charge à la maison' : inp.ev && evV.length ? 'oui, ' + (evV.length > 1 ? evV.length + ' véhicules : ' : '') + evV.map(function(v){ return (v.t === 'h' ? 'hybride rechargeable ' : 'électrique ') + fmt(v.km) + ' km/an (' + String(v.c).replace('.', ',') + ' kWh/100 km)'; }).join(' ; ') + ', recharge à domicile' : 'non';
     var pvLbl = inp.pv ? 'oui, ' + String(inp.kwc).replace('.', ',') + ' kWc, ' + (inp.comp ? 'compensation' : 'injection') : 'non';
     var detailTxt = lines.map(function(l, k){
       if (k === 0) return '- ' + l.label + ' : ' + [showE ? 'élec ' + fmt(l.e) : '', showG ? 'gaz ' + fmt(l.g) : ''].filter(Boolean).join(' / ') + ' kWh';
@@ -1011,12 +1042,12 @@
     }).join('\n');
     var etatTxt = debutLbl() ? 'début le ' + debutLbl() : '';
     var acS = pnum($('acSouh').value);
-    var pvTxt = inp.pv ? 'oui, ' + String(inp.kwc).replace('.', ',') + ' kWc, ' + (inp.comp ? 'compensation (certifié avant 2024)' + ($('prosBox').hidden ? '' : ', compteur ' + (val('pcpt') === 'comm' ? 'communicant' : 'classique')) : 'sans compensation (injection)') : 'non';
+    var pvTxt = inp.pv ? 'oui, ' + String(inp.kwc).replace('.', ',') + ' kWc, ' + (inp.comp ? 'compensation (certifié avant 2024)' : 'sans compensation (injection)') : 'non';
     lastText = 'Demande : ' + ($('dem').value || 'non précisée') + (etatTxt ? ', ' + etatTxt : '') +
       '\nClient : ' + (SEG() === 'P' ? 'professionnel' : 'particulier') +
       '\nÉnergies : ' + enLbl + P.txt +
       '\nMénage : ' + inp.persons + (inp.persons >= 5 ? '+' : '') + ' pers., ' + typeLbl + ' ; chauffage ' + heatLbl + ' ; eau chaude ' + waterLbl +
-      (showE ? '\nVéhicule électrique : ' + evLbl + '\nPanneaux solaires : ' + pvTxt + (knP !== null || knI !== null ? ' ; relevés : ' + [knP !== null ? 'production ' + fmt(knP) + ' kWh/an' : '', knI !== null ? 'injection ' + fmt(knI) + ' kWh/an' : ''].filter(Boolean).join(', ') : '') + (inp.pv ? '\nBatterie domestique : ' + (inp.bat ? 'oui' : 'non') : '') : '') +
+      (showE ? '\nCompteur communicant : ' + (val('pcpt') === 'comm' ? 'oui' : 'non') + '\nPanneaux solaires : ' + pvTxt + (knP !== null || knI !== null ? ' ; relevés : ' + [knP !== null ? 'production ' + fmt(knP) + ' kWh/an' : '', knI !== null ? 'injection ' + fmt(knI) + ' kWh/an' : ''].filter(Boolean).join(', ') : '') + '\nVéhicule électrique : ' + evLbl + '\nClimatisation : ' + (inp.clim ? 'oui, ' + inp.climN + ' appareil' + (inp.climN > 1 ? 's' : '') : 'non') + (inp.pv ? '\nBatterie domestique : ' + (inp.bat ? 'oui' : 'non') : '') : '') +
       '\nConsommation ' + ((showE && knE !== null) || (showG && knG !== null) ? 'utilisée' : 'estimée') + ' : ' + [showE ? 'électricité ' + fmt(knE !== null ? knE : kE0) + ' kWh/an' + (knE !== null ? ' (connue)' : '') : '', showG ? 'gaz ' + fmt(knG !== null ? knG : r.g) + ' kWh/an' + (knG !== null ? ' (connue)' : '') : ''].filter(Boolean).join(', ') +
       (acTxt ? '\nAcompte estimé : ' + acTxt : '') +
       (acS !== null ? '\nAcompte souhaité : ' + fmt(acS) + ' €/mois' : '');
