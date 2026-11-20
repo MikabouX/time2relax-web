@@ -47,7 +47,7 @@
   input[type=text]{flex:1;min-width:180px;padding:6px 8px;border:1px solid var(--line);border-radius:7px;font-size:14px}
   .clbl{min-width:100px;font-size:14px}
   #prixSet{display:grid;gap:10px}
-  #prixSet [hidden]{display:none}
+  #prixSet [hidden], #knSet [hidden]{display:none}
   .pblock{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:grid;gap:8px}
   .ptitle{font-weight:650;font-size:14px;padding-left:8px}
   .ptitle.e{border-left:4px solid var(--elec)} .ptitle.g{border-left:4px solid var(--gas)}
@@ -132,6 +132,14 @@
           <label><input type="radio" name="en" value="e">Électricité seule</label>
           <label><input type="radio" name="en" value="g">Gaz seul</label>
         </div>
+      </fieldset>
+
+      <fieldset id="knSet">
+        <legend>Consommations connues <span class="hint">(facultatif)</span></legend>
+        <div class="hint" style="margin:-2px 0 6px">D'après la facture ou les relevés du compteur : remplace l'estimation dans le calcul du prix.</div>
+        <div class="row" id="knERow"><span class="clbl">Électricité</span><input type="text" inputmode="numeric" class="px" id="knE" maxlength="7"> <span>kWh/an prélevés</span></div>
+        <div class="row" id="knENRow"><span class="clbl"></span><input type="text" inputmode="numeric" class="px" id="knEN" maxlength="7"> <span>dont nuit / heures creuses (bi-horaire)</span></div>
+        <div class="row" id="knGRow"><span class="clbl">Gaz</span><input type="text" inputmode="numeric" class="px" id="knG" maxlength="7"> <span>kWh/an</span></div>
       </fieldset>
 
       <fieldset>
@@ -229,7 +237,7 @@
         <h3>Consommation estimée</h3>
     <div class="totals">
       <div class="tot e" id="boxE"><div class="lbl">Électricité</div><div class="val" id="totE">–</div><div class="unit" id="totEsub">kWh / an</div></div>
-      <div class="tot g" id="boxG"><div class="lbl">Gaz naturel</div><div class="val" id="totG">–</div><div class="unit">kWh / an</div></div>
+      <div class="tot g" id="boxG"><div class="lbl">Gaz naturel</div><div class="val" id="totG">–</div><div class="unit" id="totGsub">kWh / an</div></div>
     </div>
     <div class="solar" id="solar" hidden></div>
     <table>
@@ -816,12 +824,20 @@
     document.getElementById('boxE').hidden = !showE;
     document.getElementById('boxG').hidden = !showG;
     document.querySelector('.totals').classList.toggle('one', !(showE && showG));
+    // Consommations connues (facture / compteur) : elles remplacent l'estimation pour le prix.
+    var knE = showE ? pnum($('knE').value) : null, knEN = showE ? pnum($('knEN').value) : null, knG = showG ? pnum($('knG').value) : null;
+    $('knERow').hidden = $('knENRow').hidden = !showE; $('knGRow').hidden = !showG;
+    if (knE !== null) knE = Math.round(knE); if (knG !== null) knG = Math.round(knG);
+    var pctEl = $('pct'), autoPct = knE && knEN !== null && knEN <= knE;
+    if (autoPct){ pctEl.value = String(Math.round(knEN / knE * 1000) / 10).replace('.', ','); pctEl.readOnly = true; pctEl.title = 'Calculé à partir des consommations connues'; }
+    else if (pctEl.readOnly){ pctEl.readOnly = false; pctEl.title = ''; pctEl.value = '50'; }
     var P = prixUI(showE, showG);
     var r = compute(inp);
 
-    document.getElementById('totE').textContent = fmt(r.e);
-    document.getElementById('totG').textContent = fmt(r.g);
-    document.getElementById('totEsub').textContent = r.solar ? 'kWh / an consommés au total' : 'kWh / an';
+    document.getElementById('totE').textContent = fmt(knE !== null ? knE : r.e);
+    document.getElementById('totG').textContent = fmt(knG !== null ? knG : r.g);
+    document.getElementById('totEsub').textContent = knE !== null ? 'kWh / an prélevés (connus) · estimation ' + fmt(r.e) : (r.solar ? 'kWh / an consommés au total' : 'kWh / an');
+    $('totGsub').textContent = knG !== null ? 'kWh / an (connus) · estimation ' + fmt(r.g) : 'kWh / an';
 
     document.getElementById('head').innerHTML = '<tr><th>Détail</th>' + (showE ? '<th class="n">Électricité</th>' : '') + (showG ? '<th class="n">Gaz</th>' : '') + '</tr>';
     var lines = r.lines.filter(function(l, k){ return k === 0 || (showE && l.e) || (showG && l.g); });
@@ -829,7 +845,8 @@
       if (k === 0) return '<tr><td>' + l.label + '</td>' + (showE ? '<td class="n">' + fmt(l.e) + '</td>' : '') + (showG ? '<td class="n">' + fmt(l.g) + '</td>' : '') + '</tr>';
       return '<tr><td>' + l.label + '</td>' + (showE ? cell(l.e) : '') + (showG ? cell(l.g) : '') + '</tr>';
     }).join('');
-    rows += '<tr class="tot-row"><td>Total consommé</td>' + (showE ? '<td class="n">' + fmt(r.e) + '</td>' : '') + (showG ? '<td class="n">' + fmt(r.g) + '</td>' : '') + '</tr>';
+    rows += '<tr class="tot-row"><td>' + (knE !== null || knG !== null ? 'Total estimé' : 'Total consommé') + '</td>' + (showE ? '<td class="n">' + fmt(r.e) + '</td>' : '') + (showG ? '<td class="n">' + fmt(r.g) + '</td>' : '') + '</tr>';
+    if (knE !== null || knG !== null) rows += '<tr class="tot-row"><td>Connu (utilisé pour le prix)</td>' + (showE ? '<td class="n">' + (knE !== null ? fmt(knE) : '–') + '</td>' : '') + (showG ? '<td class="n">' + (knG !== null ? fmt(knG) : '–') + '</td>' : '') + '</tr>';
     document.getElementById('detail').innerHTML = rows;
 
     var s = document.getElementById('solar'), solarTxt = '';
@@ -845,7 +862,8 @@
     } else { s.hidden = true; }
 
     // ---- coût et acompte
-    var kE = r.solar ? (r.solar.mode === 'comp' ? r.solar.net : r.solar.reseau) : r.e;
+    var kE = knE !== null ? knE : (r.solar ? (r.solar.mode === 'comp' ? r.solar.net : r.solar.reseau) : r.e);
+    var kRes = knE !== null ? knE : (r.solar ? r.solar.reseau : r.e);   // kWh prélevés (tarif prosumer proportionnel)
     var cst = document.getElementById('cost'), costTxt = '', html = '', tot = 0, nOk = 0, nMiss = 0;
     function costLine(lbl, kwh, pr, fixe){
       if (pr === null){ nMiss++; html += '<div class="line"><span>' + lbl + '</span><span class="hint">prix à compléter</span></div>'; costTxt += '\n' + lbl + ' : prix non renseigné'; return; }
@@ -863,15 +881,15 @@
       var rate = pnum($('prosRate').value), comm = val('pcpt') === 'comm';
       var reS = sums('e'), reK = (VAL.e.re.k !== null && VAL.e.re.k !== undefined) ? +VAL.e.re.k : null;
       if (bi()){ var rj = VAL.e.re.j !== undefined && VAL.e.re.j !== null ? +VAL.e.re.j : reK, rn = VAL.e.re.n !== undefined && VAL.e.re.n !== null ? +VAL.e.re.n : reK, pc = pnum($('pct').value); if (pc === null || pc > 100) pc = 50; reK = rj !== null && rn !== null ? rj * (1 - pc / 100) + rn * pc / 100 : null; }
-      var forfait = rate !== null ? kwe * rate : null, prop = comm && reK !== null ? r.solar.reseau * reK / 100 : null, pros = null, how = '';
+      var forfait = rate !== null ? kwe * rate : null, prop = comm && reK !== null ? kRes * reK / 100 : null, pros = null, how = '';
       if (comm){ pros = prop !== null && forfait !== null ? Math.min(prop, forfait) : (prop !== null ? prop : forfait);
-        how = fmt(r.solar.reseau) + ' kWh prélevés × ' + (reK !== null ? num2(reK) : '?') + ' c€ (réseau)' + (forfait !== null ? ' (plafond : ' + num2(kwe) + ' kWe × ' + num2(rate) + ' € = ' + fmt(forfait) + ' €)' : ''); }
+        how = fmt(kRes) + ' kWh prélevés × ' + (reK !== null ? num2(reK) : '?') + ' c€ (réseau)' + (forfait !== null ? ' (plafond : ' + num2(kwe) + ' kWe × ' + num2(rate) + ' € = ' + fmt(forfait) + ' €)' : ''); }
       else { pros = forfait; how = num2(kwe) + ' kWe × ' + (rate !== null ? num2(rate) : '?') + ' €/kWe'; }
       if (pros === null){ nMiss++; html += '<div class="line"><span>Tarif prosumer</span><span class="hint">tarif €/kWe à compléter</span></div>'; costTxt += '\nTarif prosumer : tarif non renseigné'; }
       else { tot += pros; html += '<div class="line"><span>Tarif prosumer : ' + esc(how) + '</span><span>' + fmt(pros) + ' € HTVA</span></div>'; costTxt += '\nTarif prosumer (' + (comm ? 'compteur communicant/double flux' : 'compteur classique') + ') : ' + how + ' = ' + fmt(pros) + ' €/an HTVA'; }
       var ps = $('prosSrc'); ps.textContent = rate === null ? 'Tarif non encodé pour ce gestionnaire : à compléter.' : ($('prosRate').value === ($('prosRate').dataset.src || '') ? 'Tarif de la liste' + (T && T.mois ? ' – ' + moisLbl(T.mois) : '') + '.' : 'Tarif corrigé à la main.');
     }
-    if (showG) costLine('Gaz', r.g, P.g.prixMoyen, P.g.fixe);
+    if (showG) costLine('Gaz', knG !== null ? knG : r.g, P.g.prixMoyen, P.g.fixe);
     if (nOk){
       var rate = tvaRate(), tva = tot * rate, ttc = tot + tva, pro = SEG() === 'P';
       var acompte = Math.round(ttc / 12), acompteH = Math.round(tot / 12);
@@ -909,7 +927,8 @@
       '\nEau chaude : ' + waterLbl +
       (showE ? '\nVoiture électrique : ' + evLbl + '\nPanneaux solaires : ' + pvLbl : '') +
       '\n\nDétail :\n' + detailTxt +
-      '\n' + (showE ? '\nÉlectricité : ' + fmt(r.e) + ' kWh/an' : '') + (showG ? '\nGaz : ' + fmt(r.g) + ' kWh/an' : '') + (solarTxt ? '\n' + solarTxt : '') + costTxt;
+      '\n' + (showE ? '\nÉlectricité : ' + (knE !== null ? fmt(knE) + ' kWh/an prélevés (consommation connue' + (knEN !== null ? ', dont ' + fmt(knEN) + ' kWh de nuit' : '') + ' ; estimation : ' + fmt(r.e) + ')' : fmt(r.e) + ' kWh/an') : '') +
+      (showG ? '\nGaz : ' + (knG !== null ? fmt(knG) + ' kWh/an (consommation connue ; estimation : ' + fmt(r.g) + ')' : fmt(r.g) + ' kWh/an') : '') + (solarTxt ? '\n' + solarTxt : '') + costTxt;
   }
 
   document.getElementById('f').addEventListener('input', render);
