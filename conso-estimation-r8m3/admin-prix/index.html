@@ -99,7 +99,7 @@
         <div class="tabs"><button id="tabE" class="on">Électricité</button><button id="tabG">Gaz</button></div>
       </div>
     </div>
-    <div class="row" style="margin-top:8px"><span class="hint">Mois en ligne (6 mois conservés, les plus anciens sont effacés automatiquement) :</span><div class="chips" id="chips"></div></div>
+    <div class="row" style="margin-top:8px"><span class="hint">Mois en ligne (18 mois conservés, pour recalculer une régularisation de 15 mois ; les plus anciens sont effacés automatiquement) :</span><div class="chips" id="chips"></div></div>
     <p class="hint" style="margin:8px 0 0">Tous les montants sont <strong>HTVA</strong> : prix en c€/kWh, frais fixes en €/an (le simulateur ajoute 6 % de TVA pour les particuliers, 21 % pour les professionnels). Les contrats et les taxes sont propres à chaque type de client ; les coûts de réseau sont communs aux deux. Laissez vide ce qui ne s'applique pas. Pour un compteur bi-horaire, remplissez Jour et Nuit ; si une ligne n'a qu'un prix, il sert pour le jour et la nuit.</p>
 
     <details class="sec" id="cards">
@@ -111,6 +111,12 @@
       </div>
       <p class="hint" style="margin:6px 0 0">Les cartes arrivent dans votre dossier Téléchargements (Chrome demande la première fois d'autoriser les téléchargements multiples). Demandez ensuite à Claude de les lire. Pour un mois passé, les cartes viennent des archives d'ENGIE : essayez d'abord un lien seul.</p>
       <div id="cardLinks" class="hint" style="margin-top:6px"></div>
+    </details>
+    <details class="sec" id="tsBox">
+      <summary><strong>Tarif social CREG par trimestre</strong> <span class="hint">(jamais effacé ; sert aux régularisations au tarif social)</span></summary>
+      <p class="hint" style="margin:6px 0">Prix « hors TVA » des fiches de la CREG (<a href="https://www.creg.be/fr/consommateurs/prix-et-tarifs/tarif-social/tarif-social-pour-lenergie-quest-ce-que-cest-et-qui-y-a" target="_blank" rel="noopener">page du tarif social</a>), en c€/kWh, réseau compris. La cotisation, l'accise et la redevance de raccordement restent dans la ligne « Tarif social » des taxes du mois. Nouveau trimestre publié vers la fin du trimestre précédent.</p>
+      <div class="tw"><table id="tTs"></table></div>
+      <div class="row" style="margin-top:8px"><button type="button" id="tsSave">Enregistrer le tarif social</button> <span class="msg" id="tsMsg"></span></div>
     </details>
     <div class="sec">
       <h3>1. Énergie – prix des contrats <span id="segLbl1">particuliers</span> (par région)</h3>
@@ -173,9 +179,36 @@
       $('loginCard').hidden = true; $('app').hidden = false; $('logout').hidden = false; $('who').textContent = S.email;
       var d = new Date(); $('mois').value = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
       loadVisits();
+      loadTs();
       return load().then(loadProps);
     });
   }
+  // ---------- Tarif social CREG par trimestre ----------
+  var TS_F = [['e_mono', 'Élec simple'], ['e_jour', 'Jour'], ['e_nuit', 'Nuit'], ['e_excl', 'Excl. nuit'], ['g', 'Gaz']];
+  function qLbl(q){ var p = String(q).split('-'); return 'T' + ((+p[1] + 2) / 3) + ' ' + p[0]; }
+  function loadTs(){
+    return rpc('conso_tarif_social_get', {}).then(function(l){
+      l = l || []; var last = l.length ? String(l[0].trimestre).slice(0, 10) : null, nx;
+      var d = last ? new Date(Date.UTC(+last.slice(0, 4), +last.slice(5, 7) + 2, 1)) : new Date(Date.UTC(new Date().getFullYear(), Math.floor(new Date().getMonth() / 3) * 3, 1));
+      nx = d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0') + '-01';
+      var rows = [{trimestre: nx}].concat(l);
+      $('tTs').innerHTML = '<tr><th>Trimestre</th>' + TS_F.map(function(f){ return '<th>' + f[1] + '</th>'; }).join('') + '</tr>' + rows.map(function(r, i){
+        var q = String(r.trimestre).slice(0, 10);
+        return '<tr data-q="' + q + '"' + (i ? '' : ' class="new"') + '><td>' + qLbl(q) + (i ? '' : ' <span class="hint">(nouveau)</span>') + '</td>' + TS_F.map(function(f){ return '<td><input class="px" inputmode="decimal" data-f="' + f[0] + '" value="' + shown(r[f[0]]) + '"></td>'; }).join('') + '</tr>';
+      }).join('');
+    }).catch(function(e){ msg('tsMsg', e.message, 'err'); });
+  }
+  $('tsSave').addEventListener('click', function(){
+    var out = [], bad = false;
+    Array.prototype.forEach.call($('tTs').querySelectorAll('tr[data-q]'), function(tr){
+      var o = {trimestre: tr.dataset.q}, any = false;
+      tr.querySelectorAll('input').forEach(function(x){ var v = pnum(x.value); if (v !== v){ bad = true; } o[x.dataset.f] = v; if (v !== null) any = true; });
+      if (any || !tr.classList.contains('new')) out.push(o);
+    });
+    if (bad){ msg('tsMsg', 'Nombre invalide.', 'err'); return; }
+    msg('tsMsg', 'Enregistrement…');
+    rpc('conso_tarif_social_save', {p_rows: out}).then(function(n){ msg('tsMsg', n + ' trimestre(s) enregistré(s).', 'ok'); return loadTs(); }).catch(function(e){ msg('tsMsg', e.message, 'err'); });
+  });
   var PAGE_LBL = {app: 'Appli web (accueil)', conso: 'Estimation de consommation', 'conso-avis': 'Estimation conso – avis', confidentialite: 'Confidentialité', supprimer: 'Supprimer mes données'};
   function loadVisits(){
     return rpc('t2r_visits_stats', {}).then(function(v){
@@ -339,7 +372,7 @@
   function archUrl(code, en, s, r, ym){ return 'https://www.engie.be/api/engie/be/ms/pricing/public/v1/prices-and-conditions-document?language=FR&segment=' + (s === 'P' ? 'PROFESSIONAL' : 'RESIDENTIAL') + '&division=' + (en === 'E' ? 'ELECTRICITY' : 'GAS') + '&politicalRegion=' + ARCH_REG[r] + '&product=' + code + '&month=' + ym + (en === 'E' ? '&direction=OFFTAKE' : ''); }
   (function(){
     var sel = $('cardMonth'), d = new Date(), noms = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
-    for (var i = 0; i < 6; i++){ var x = new Date(d.getFullYear(), d.getMonth() - i, 1), ym = x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0');
+    for (var i = 0; i < 18; i++){ var x = new Date(d.getFullYear(), d.getMonth() - i, 1), ym = x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0');
       sel.insertAdjacentHTML('beforeend', '<option value="' + (i ? ym : '') + '">' + noms[x.getMonth()] + ' ' + x.getFullYear() + (i ? ' (archives)' : ' (mois en cours)') + '</option>'); }
     sel.addEventListener('change', function(){
       var past = !!this.value;

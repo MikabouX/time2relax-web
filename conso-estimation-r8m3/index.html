@@ -381,7 +381,7 @@
         <div class="pblock" id="blkE">
           <div class="ptitle e">Électricité</div>
           <div class="row lst"><span class="clbl">Gestionnaire</span><select id="grdE"></select><span class="hint" id="regE"></span></div>
-          <div class="row"><span class="clbl">Contrat</span><select id="selE" class="lst"></select><input type="text" id="cE" maxlength="80" placeholder="Nom du contrat"><a id="docE" class="doclink" target="_blank" rel="noopener" hidden>Carte ENGIE électricité (PDF)</a></div>
+          <div class="row"><span class="clbl">Contrat</span><select id="selE" class="lst"></select><input type="text" id="cE" maxlength="80" placeholder="Nom du contrat"><a id="docE" class="doclink" target="_blank" rel="noopener" hidden>Carte ENGIE électricité (PDF)</a><span id="socE" class="hint" hidden>Tarif social : prix revu chaque trimestre par la CREG (ici, celui du trimestre en cours).</span></div>
           <div class="row"><span class="clbl">Compteur</span>
             <div class="opts"><label><input type="radio" name="cpt" value="simple" checked>Simple</label><label><input type="radio" name="cpt" value="bi">Bi-horaire</label><label><input type="radio" name="cpt" value="tri">Tri-horaire / Flextime</label></div>
           </div>
@@ -399,7 +399,7 @@
           <div class="ptitle g">Gaz</div>
           <div class="row lst"><span class="clbl">Gestionnaire</span><select id="grdG"></select><span class="hint" id="regG"></span></div>
           <div class="row" id="rowCG"><span class="clbl">Contrat</span><select id="selG" class="lst"></select><input type="text" id="cG" maxlength="80" placeholder="Nom du contrat"></div>
-          <div class="row"><a id="docG" class="doclink" target="_blank" rel="noopener" hidden>Carte ENGIE gaz (PDF)</a></div>
+          <div class="row"><a id="docG" class="doclink" target="_blank" rel="noopener" hidden>Carte ENGIE gaz (PDF)</a><span id="socG" class="hint" hidden>Tarif social : prix revu chaque trimestre par la CREG (ici, celui du trimestre en cours).</span></div>
           <div id="tabG"></div>
           <div class="prop" id="propG" hidden>
             <input type="text" id="noteG" maxlength="200" placeholder="Source (ex. carte tarifaire de novembre)">
@@ -718,6 +718,7 @@
   // Lien vers la carte tarifaire ENGIE du contrat choisi (segment, région, mois de la liste de prix).
   function setDoc(en, row){
     var a = $(en === 'e' ? 'docE' : 'docG'), d = row && row.doc;
+    $(en === 'e' ? 'socE' : 'socG').hidden = !(row && (row.cle === 'Tarif social' || /_SOCIAL_/.test(d || '')));
     if (!d || !/^[EG]_[A-Z_]+_[RP]_(GREEN|GREY)_C_[IF]_\d\d_[VBW]_F$/.test(d)){ a.hidden = true; a.removeAttribute('href'); return; }
     var now = new Date(), off = 0;
     if (T && T.mois){ var p = T.mois.split('-'); off = (+p[0] - now.getFullYear()) * 12 + (+p[1] - 1 - now.getMonth()); }
@@ -1194,6 +1195,38 @@
 
   // ---------- Facture de régularisation : index début → fin, jours, acomptes versés, périodes de prix ----------
   var MCACHE = {};
+  // Tarif social CREG par trimestre (c€/kWh HTVA, réseau compris) : {'2026-10-01': {e_mono, e_jour, e_nuit, e_excl, g}}
+  var TSQ = null;
+  rpcPub('conso_tarif_social_get', {}).then(function(l){ TSQ = {}; (l || []).forEach(function(r){ TSQ[String(r.trimestre).slice(0, 10)] = r; }); render(); }).catch(function(){ TSQ = {}; });
+  function trimLbl(q){ var p = q.split('-'); return 'T' + ((+p[1] + 2) / 3) + ' ' + p[0]; }
+  // Découpe la période (dates de début et de fin) par trimestre civil : [{q, m, d}]. null sans dates.
+  function socialPieces(en){
+    var a = $('rg' + (en === 'e' ? 'E' : 'G') + 's').value, b = $('rg' + (en === 'e' ? 'E' : 'G') + 'e').value;
+    if (!a || !b) return null;
+    var cur = Date.parse(a), end = Date.parse(b), out = [];
+    if (!(end > cur)) return null;
+    while (cur < end){
+      var dt = new Date(cur), y = dt.getUTCFullYear(), qm = Math.floor(dt.getUTCMonth() / 3) * 3, nx = Math.min(Date.UTC(y, qm + 3, 1), end);
+      out.push({q: y + '-' + String(qm + 1).padStart(2, '0') + '-01', m: y + '-' + String(dt.getUTCMonth() + 1).padStart(2, '0') + '-01', d: Math.round((nx - cur) / 86400000)});
+      cur = nx;
+    }
+    return out;
+  }
+  // Prix d'un morceau au tarif social : prix CREG du trimestre + taxes « Tarif social » du mois (ou du mois de l'étape 2).
+  function socialSet(piece, en){
+    if (!TSQ) return 'load';
+    var Q = TSQ[piece.q]; if (!Q) return null;
+    var m = T && T.mois_dispo && T.mois_dispo.indexOf(piece.m) >= 0 ? piece.m : (T ? T.mois : null), tx;
+    if (T && m === T.mois) tx = function(f){ return VAL[en].tx[f]; };
+    else {
+      var d = monthData(m); if (!d) return 'load';
+      var reg = regionOf(en), seg = SEG(), row = (d.prix || []).filter(function(p){ return p.type === 'taxes' && p.energie === en && p.cle === 'Tarif social' && p.region === reg && p.segment === seg; })[0] || null;
+      tx = function(f){ return rv(row, 'tx', f); };
+    }
+    function t(f){ var v = tx(f); if ((v === null || v === undefined) && f !== 'f') v = tx('k'); return v === null || v === undefined ? 0 : +v; }
+    var k = en === 'e' ? +Q.e_mono : +Q.g, j = en === 'e' ? +(Q.e_jour !== null ? Q.e_jour : Q.e_mono) : k, n = en === 'e' ? +(Q.e_nuit !== null ? Q.e_nuit : Q.e_mono) : k;
+    return {k: k + t('k'), j: j + t('j'), n: n + t('n'), a: j + t('a'), b: n + t('b'), c: n + t('c'), f: t('f')};
+  }
   function monthData(m){
     if (T && T.mois === m) return T;
     if (MCACHE[m] && MCACHE[m] !== 'load') return MCACHE[m];
@@ -1246,12 +1279,31 @@
     document.querySelectorAll('#perList .perM').forEach(perOptions);
     var pers = perRows(), sumD = pers.reduce(function(t, p){ return t + p.d; }, 0);
     $('perHint').textContent = pers.length ? 'consommation et frais fixes répartis au prorata des jours (' + fmt(sumD) + ' jours au total)' : 'une seule période : prix de l\'étape 2';
+    var socE = showE && SOCIAL.e, socG = showG && SOCIAL.g;
+    if (socE || socG){
+      var noD = [socE && !socialPieces('e') ? 'électricité' : '', socG && !socialPieces('g') ? 'gaz' : ''].filter(Boolean);
+      $('perHint').textContent = 'Tarif social : prix CREG de chaque trimestre, découpage automatique' + (noD.length ? ' (entrez les dates de début et de fin : ' + noD.join(', ') + ')' : '') + (socE && socG ? '' : pers.length ? ' ; périodes ci-dessous pour l\'autre énergie' : '');
+    }
     if (!pers.length) pers = [{m: T ? T.mois : null, d: 1}], sumD = 1;
     var rate = tvaRate(), out = '', totT = 0, ok = 0, miss = [], loading = false;
     function d(a, b){ var x = pnum($(a).value), y = pnum($(b).value); return x !== null && y !== null ? y - x : null; }
     function days(id){ var n = pnum($(id).value); return n && n > 0 ? n : 365; }
     function periodsCost(en, tot, hp, hc, dTot){
       var c = 0, fx = 0, det = [];
+      var sp = SOCIAL[en] ? socialPieces(en) : null;
+      if (sp){   // tarif social : un prix CREG par trimestre, découpage automatique
+        var sd = sp.reduce(function(t, p){ return t + p.d; }, 0);
+        for (var k = 0; k < sp.length; k++){
+          var ws = sp[k].d / sd, SS = socialSet(sp[k], en);
+          if (SS === 'load'){ loading = true; return null; }
+          if (!SS){ miss.push('tarif social du ' + trimLbl(sp[k].q) + ' (pas encore encodé)'); return null; }
+          var kcs = kwhCost(SS, en, tot * ws, hp !== null ? hp * ws : null, hc !== null ? hc * ws : null, en === 'e' && hc === null);
+          if (kcs === null){ miss.push('prix ' + (en === 'e' ? 'électricité' : 'gaz')); return null; }
+          c += kcs; fx += (SS.f || 0) * dTot * ws / 365;
+          det.push(trimLbl(sp[k].q) + ' ' + fmt(sp[k].d) + ' j');
+        }
+        return {c: c, fx: fx, det: det, soc: true};
+      }
       for (var i = 0; i < pers.length; i++){
         var w = pers[i].d / sumD, S = priceSet(pers[i].m, en);
         if (S === 'load'){ loading = true; return null; }
@@ -1300,7 +1352,7 @@
         out += '<div class="line"><span>Acomptes versés</span><span>− ' + fmt(ac) + ' €</span></div>';
         out += '<div class="line acompte big ' + (Math.abs(diff) < 0.5 ? '' : diff > 0 ? 'apayer' : 'arembourser') + '"><span>' + (Math.abs(diff) < 0.5 ? 'Régularisation : rien à payer ni à rembourser' : diff > 0 ? 'Régularisation : à payer' : 'Régularisation : à rembourser') + '</span><span>' + fmt(Math.abs(diff)) + ' €</span></div>';
       } else out += '<div class="hint">Entrez le total des acomptes versés pour obtenir le montant de la régularisation.</div>';
-      out += '<div class="hint">Estimation : ' + (perRows().length ? 'prix de chaque période' : 'prix de l\'étape 2' + (T && T.mois ? ' (' + moisLbl(T.mois) + ')' : '')) + ', frais fixes au prorata des jours. La facture réelle peut différer (index estimés, primes, dates exactes des changements de prix).</div>';
+      out += '<div class="hint">Estimation : ' + ((socE && socialPieces('e')) || (socG && socialPieces('g')) ? 'tarif social CREG de chaque trimestre' + (perRows().length ? ' et prix de chaque période' : '') : perRows().length ? 'prix de chaque période' : 'prix de l\'étape 2' + (T && T.mois ? ' (' + moisLbl(T.mois) + ')' : '')) + ', frais fixes au prorata des jours. La facture réelle peut différer (index estimés, primes, dates exactes des changements de prix).</div>';
     }
     if (miss.length) out += '<div class="hint" style="color:#9a3b2b">Manque : ' + miss.join(', ') + '.</div>';
     $('regOut').innerHTML = out; $('regOut').hidden = !out; $('regEmpty').hidden = !!out;

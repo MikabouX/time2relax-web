@@ -196,3 +196,52 @@ alter table public.conso_prix_propositions alter column prix_kwh type numeric(10
 -- et réseau wallon Impact (PIC / MEDIUM / ECO, transport compris). Sans valeur : pleines = jour, creuses et super-creuses = nuit.
 -- Renvoyés par conso_prix_get, gardés par conso_prix_save si la clé est absente, recopiés par conso_prix_copy.
 alter table public.conso_prix add column if not exists prix_t1 numeric(10,5), add column if not exists prix_t2 numeric(10,5), add column if not exists prix_t3 numeric(10,5);
+
+-- ===== Historique 18 mois + tarif social CREG (migration conso_historique_18_mois_tarif_social, 21 novembre 2026) =====
+-- conso_prix_purge(), conso_prix_get() (mois_dispo) et conso_prix_proposer() : fenêtre portée de 5 à 17 mois en arrière
+-- (mois en cours + 17 = 18 mois), pour recalculer une régularisation de 15 mois.
+--   delete from conso_prix where mois < (date_trunc('month', now() at time zone 'Europe/Brussels') - interval '17 months')::date;
+create table if not exists public.conso_tarif_social (
+  trimestre date primary key check (extract(day from trimestre) = 1 and extract(month from trimestre) in (1,4,7,10)),
+  e_mono numeric(10,5) check (e_mono >= 0 and e_mono < 1000),
+  e_jour numeric(10,5) check (e_jour >= 0 and e_jour < 1000),
+  e_nuit numeric(10,5) check (e_nuit >= 0 and e_nuit < 1000),
+  e_excl numeric(10,5) check (e_excl >= 0 and e_excl < 1000),
+  g numeric(10,5) check (g >= 0 and g < 1000),
+  note text check (char_length(note) <= 200),
+  updated_at timestamptz not null default now());
+alter table public.conso_tarif_social enable row level security;
+revoke all on public.conso_tarif_social from anon, authenticated;
+
+create or replace function public.conso_tarif_social_get()
+returns jsonb language sql stable security definer set search_path = public as $$
+  select coalesce(jsonb_agg(jsonb_build_object('trimestre',trimestre,'e_mono',e_mono,'e_jour',e_jour,'e_nuit',e_nuit,'e_excl',e_excl,'g',g,'note',note) order by trimestre desc), '[]'::jsonb)
+  from conso_tarif_social;
+$$;
+
+create or replace function public.conso_tarif_social_save(p_rows jsonb)
+returns int language plpgsql security definer set search_path = public as $$
+declare r jsonb; t date; n int := 0;
+begin
+  if not t2r_is_admin() then raise exception 'réservé aux administrateurs'; end if;
+  for r in select * from jsonb_array_elements(coalesce(p_rows,'[]'::jsonb)) loop
+    t := date_trunc('quarter', (r->>'trimestre')::date)::date;
+    if coalesce(r->>'e_mono', r->>'e_jour', r->>'e_nuit', r->>'e_excl', r->>'g') is null then
+      delete from conso_tarif_social where trimestre = t; continue;
+    end if;
+    insert into conso_tarif_social(trimestre, e_mono, e_jour, e_nuit, e_excl, g, note, updated_at)
+    values (t, (r->>'e_mono')::numeric, (r->>'e_jour')::numeric, (r->>'e_nuit')::numeric, (r->>'e_excl')::numeric, (r->>'g')::numeric, left(nullif(btrim(r->>'note'),''), 200), now())
+    on conflict (trimestre) do update set e_mono = excluded.e_mono, e_jour = excluded.e_jour, e_nuit = excluded.e_nuit,
+      e_excl = excluded.e_excl, g = excluded.g, note = excluded.note, updated_at = now();
+    n := n + 1;
+  end loop;
+  return n;
+end $$;
+
+revoke all on function public.conso_tarif_social_get() from public;
+grant execute on function public.conso_tarif_social_get() to anon, authenticated;
+revoke all on function public.conso_tarif_social_save(jsonb) from public, anon;
+grant execute on function public.conso_tarif_social_save(jsonb) to authenticated;
+-- Données : tarifs sociaux CREG T1 2025 à T4 2026 (c€/kWh HTVA) encodés le 21 novembre 2026.
+-- Correction le même jour : taxes « Tarif social » électricité de novembre 2026 = accise 1 €/MWh
+--   → 0,10000 c€/kWh (Flandre, Bruxelles), 0,17075 (Wallonie, redevance de raccordement comprise) au lieu de 1,00000 / 1,07075.
