@@ -77,6 +77,15 @@
     <div class="msg" id="propMsg"></div>
   </section>
 
+  <section class="card" id="visitCard" hidden>
+    <details>
+      <summary><strong>Visites de time2relax.app</strong> <span class="hint" id="visitSum"></span></summary>
+      <p class="hint" style="margin:8px 0">Compteur anonyme (pages vues, sans cookie). Vos visites ne comptent plus après avoir ouvert une fois time2relax.app/?moi=1 sur chaque appareil.</p>
+      <div class="tw"><table id="tVisit"></table></div>
+      <div class="hint" id="visitDays" style="margin-top:8px"></div>
+    </details>
+  </section>
+
   <section class="card" id="app" hidden>
     <div class="row" style="justify-content:space-between">
       <div class="row">
@@ -163,8 +172,22 @@
       if (ok !== true) throw new Error("Ce compte n'est pas administrateur.");
       $('loginCard').hidden = true; $('app').hidden = false; $('logout').hidden = false; $('who').textContent = S.email;
       var d = new Date(); $('mois').value = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+      loadVisits();
       return load().then(loadProps);
     });
+  }
+  var PAGE_LBL = {app: 'Appli web (accueil)', conso: 'Estimation de consommation', confidentialite: 'Confidentialité', supprimer: 'Supprimer mes données'};
+  function loadVisits(){
+    return rpc('t2r_visits_stats', {}).then(function(v){
+      var pages = v.pages || [], n = function(x){ return x ? x : 0; }, tot = {today: 0, d7: 0, d30: 0, total: 0};
+      pages.forEach(function(p){ ['today', 'd7', 'd30', 'total'].forEach(function(k){ tot[k] += n(p[k]); }); });
+      $('visitCard').hidden = false;
+      $('visitSum').textContent = '– aujourd\'hui ' + tot.today + ' · 7 jours ' + tot.d7 + ' · 30 jours ' + tot.d30;
+      $('tVisit').innerHTML = '<tr><th>Page</th><th>Aujourd\'hui</th><th>7 jours</th><th>30 jours</th><th>Total' + (v.since ? ' (depuis le ' + new Date(v.since).toLocaleDateString('fr-BE') + ')' : '') + '</th></tr>' +
+        pages.map(function(p){ return '<tr><td>' + esc(PAGE_LBL[p.page] || p.page) + '</td><td>' + n(p.today) + '</td><td>' + n(p.d7) + '</td><td>' + n(p.d30) + '</td><td>' + n(p.total) + '</td></tr>'; }).join('') +
+        (pages.length ? '' : '<tr><td colspan="5">Aucune visite pour le moment.</td></tr>');
+      $('visitDays').textContent = (v.days || []).length ? 'Par jour : ' + v.days.map(function(d){ return new Date(d.day).toLocaleDateString('fr-BE', {day: 'numeric', month: 'short'}) + ' ' + d.n; }).join(' · ') : '';
+    }).catch(function(){});
   }
   var TYPE_LBL = {energie: 'Énergie (contrat)', reseau: 'Réseau', taxes: 'Taxes'};
   function grdNom(code){ var g = DATA && (DATA.grd || []).filter(function(x){ return x.code === code; })[0]; return g ? g.nom : code; }
