@@ -18,7 +18,8 @@
   header{background:var(--accent);color:#fff;padding:18px 20px}
   header h1{margin:0;font-size:20px;font-weight:650}
   header p{margin:4px 0 0;opacity:.9;font-size:13px}
-  main{max-width:1100px;margin:0 auto;padding:18px 16px 40px;display:grid;gap:18px}
+  main{max-width:1240px;margin:0 auto;padding:18px 16px 40px;display:grid;gap:18px;min-width:0}
+  main > *, .steps > *, .cols > *{min-width:0}
   .steps{display:grid;gap:22px}
   .step{border-radius:14px;padding:14px;background:#eaf3ee;border:1px solid #cfe3d7}
   .step.prix{background:#eaf0f8;border-color:#cad8ea}
@@ -37,11 +38,12 @@
   @media (max-width:820px){.cols{grid-template-columns:1fr}}
   .card.result{position:sticky;top:12px}
   .card h3{margin:0 0 12px;font-size:15.5px}
-  .actions.bar{justify-content:center}
+  .actions.bar{justify-content:center;position:sticky;bottom:0;z-index:15;padding:8px;margin:0 -8px;background:rgba(245,246,244,.94);backdrop-filter:blur(4px);border-top:1px solid var(--line)}
+  .actions.bar button{font-size:14.5px;padding:9px 16px}
   .banner{background:var(--warn);border:1px solid var(--warn-line);border-radius:10px;padding:10px 14px;font-size:13.5px}
   .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
   .card h2{margin:0 0 12px;font-size:16px}
-  fieldset{border:0;margin:0 0 14px;padding:0}
+  fieldset{border:0;margin:0 0 14px;padding:0;min-width:0;min-inline-size:0}
   legend{font-weight:600;margin-bottom:6px;font-size:14px}
   .opts{display:flex;flex-wrap:wrap;gap:6px}
   .opts label{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:8px;padding:6px 10px;cursor:pointer;font-size:14px;background:#fff;user-select:none}
@@ -50,7 +52,7 @@
   .sub{margin:8px 0 0 2px;padding:10px 12px;border-left:3px solid var(--accent-soft);display:grid;gap:8px}
   .sub[hidden]{display:none}
   .row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-  input[type=text]{flex:1;min-width:180px;padding:6px 8px;border:1px solid var(--line);border-radius:7px;font-size:14px}
+  input[type=text]{flex:1 1 160px;min-width:0;max-width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:7px;font-size:14px}
   .clbl{min-width:100px;font-size:14px}
   #prixSet{display:grid;gap:10px}
   #prixSet [hidden], #knSet [hidden], .veh[hidden], #knPRow[hidden], #evHomeBox[hidden]{display:none}
@@ -109,7 +111,47 @@
   .avis strong{color:var(--accent)}
   footer{grid-column:1/-1;color:var(--muted);font-size:12px;text-align:center;margin-top:6px}
   .doclink{font-size:.85em;white-space:nowrap;margin-left:.4em}
-  table.comp tr.sub td{font-style:italic;color:var(--muted,#666)}
+  table.comp tr.subtot td{font-style:italic;color:var(--muted,#666)}
+  .tblwrap{overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%}
+  .pblock > *, #prixSet > *, #regSet > *, .card > *{min-width:0}
+  input[type=date]{padding:5px 6px;border:1px solid var(--line);border-radius:7px;font:inherit;font-size:14px;max-width:100%}
+  .tvacalc input{flex:0 1 110px;min-width:70px}
+  /* Tablette : une colonne, résultats sous le formulaire */
+  @media (max-width:820px){
+    .card.result{position:static}
+    main{padding:14px 12px 30px}
+  }
+  /* Smartphone */
+  @media (max-width:600px){
+    body{font-size:14.5px}
+    header{padding:14px 14px}
+    header h1{font-size:18px}
+    main{padding:10px 8px 24px;gap:12px}
+    .steps{gap:14px}
+    .step{padding:10px 8px;border-radius:12px}
+    .stephead{gap:10px;margin-bottom:10px}
+    .stephead h2{font-size:16.5px}
+    .card{padding:12px 10px}
+    .pblock{padding:8px 6px}
+    .clbl{min-width:0;flex:1 0 100%;font-weight:600;font-size:13px;color:var(--muted);margin-left:0 !important}
+    .row{gap:6px}
+    .opts label{padding:7px 10px}
+    table.comp{font-size:12.5px}
+    table.comp th,table.comp td{padding:4px 2px}
+    table.comp td.n input.px{width:54px;padding:5px 3px;font-size:13px}
+    input.px{width:66px}
+    .totals{grid-template-columns:1fr 1fr;gap:8px}
+    .tot .val{font-size:22px}
+    .cost{padding:10px 8px}
+    .cost .line{flex-wrap:wrap;gap:2px 10px}
+    .cost .acompte{font-size:16px}
+    .tvacalc{padding:10px;gap:6px 10px}
+    .tvacalc strong{flex:1 0 100%}
+    .tvacalc label{flex:1 1 90px;flex-direction:column;align-items:flex-start;gap:2px;font-size:12.5px}
+    .tvacalc input{width:100%;flex:none}
+    .actions.bar{margin:0 -8px}
+    .actions.bar button{flex:1}
+  }
   table.comp tr.tvac td{font-weight:700}
   .cpbox{position:relative;display:inline-block}
   .sug{position:absolute;left:0;top:100%;z-index:20;min-width:100%;max-width:340px;max-height:260px;overflow:auto;background:#fff;border:1px solid #ccd;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.12);margin-top:2px}
@@ -739,15 +781,15 @@
         if (c.k === 'vt' && f === 'f') return '<td class="n hint">–</td>';
         var v = VAL[en][c.k][f];
         if ((f === 'j' || f === 'n') && (v === null || v === undefined) && VAL[en][c.k].k !== null && VAL[en][c.k].k !== undefined && !SRC[en][c.k]) v = null;
-        return '<td class="n"><input type="text" inputmode="decimal" class="px' + (isEdited(en, c.k, f) ? ' edit' : '') + '" data-en="' + en + '" data-c="' + c.k + '" data-f="' + f + '" value="' + showv(v, c.k, f) + '"></td>';
+        return '<td class="n"><input type="text" inputmode="decimal" class="px' + (isEdited(en, c.k, f) ? ' edit' : '') + '" data-en="' + en + '" data-c="' + c.k + '" data-f="' + f + '" value="' + showv(v, c.k, f) + '"' + ((f !== 'k' && f !== 'f') && (v === null || v === undefined) && VAL[en][c.k].k !== null && VAL[en][c.k].k !== undefined ? ' placeholder="' + showv(VAL[en][c.k].k, c.k, 'k') + '" title="Même prix pour toutes les heures"' : '') + '></td>';
       }).join('') + '</tr>';
-      if (c.k === 'vt' && en === 'e') html += '<tr class="sub"><td>Énergie + énergie verte</td>' + fs.map(function(f){ return '<td class="n" data-sub="' + f + '"></td>'; }).join('') + '</tr>';
+      if (c.k === 'vt' && en === 'e') html += '<tr class="subtot"><td>Énergie + énergie verte</td>' + fs.map(function(f){ return '<td class="n" data-sub="' + f + '"></td>'; }).join('') + '</tr>';
     });
     var pro = SEG() === 'P';
     html += '<tr class="sum' + (pro ? '' : ' tvac') + '"><td>' + (pro ? 'Total HTVA' : 'Prix réel TVAC <span class="hint" data-tva></span>') + '</td>' + fs.map(function(f){ return '<td class="n" data-sum="' + f + '"></td>'; }).join('') + '</tr>';
     if (pro) html += '<tr class="sum tvac"><td>Prix réel TVAC <span class="hint" data-tva></span></td>' + fs.map(function(f){ return '<td class="n" data-tvac="' + f + '"></td>'; }).join('') + '</tr>';
     html += '</table>';
-    box.innerHTML = html;
+    box.innerHTML = '<div class="tblwrap">' + html + '</div>';
     refreshSums(en);
     return;
     box.innerHTML = html;
