@@ -369,11 +369,24 @@
     <div class="cols">
       <div class="card">
       <fieldset id="regSet">
+        <div id="regCtx">
+          <legend>Client et contrat</legend>
+          <div class="row"><span class="clbl">Client</span><select id="rgSeg"><option value="R">Particulier</option><option value="P">Professionnel</option></select>
+            <span class="clbl" style="margin-left:10px">Code postal</span><input type="text" id="rgCp" inputmode="numeric" maxlength="4" style="width:70px"></div>
+          <div class="hint" id="rgCpHint" style="margin:-2px 0 6px"></div>
+          <div class="row"><span class="clbl">Compteur</span><select id="rgCpt"><option value="simple">Simple (mono-horaire)</option><option value="bi">Bi-horaire</option><option value="tri">Tri-horaire / Flextime</option></select></div>
+          <div class="row" id="rgCtrE"><span class="clbl">Contrat élec.</span><select id="rgSelE"></select>
+            <span class="hint">ou prix</span> <input type="text" inputmode="decimal" class="px" id="rgPE" placeholder="c€/kWh" style="width:70px"> <span class="hint" id="rgPEbi" hidden>pleines</span> <input type="text" inputmode="decimal" class="px" id="rgPEn" placeholder="creuses" style="width:70px" hidden> + <input type="text" inputmode="decimal" class="px" id="rgFE" placeholder="€/an" style="width:60px"></div>
+          <div class="row" id="rgCtrG"><span class="clbl">Contrat gaz</span><select id="rgSelG"></select>
+            <span class="hint">ou prix</span> <input type="text" inputmode="decimal" class="px" id="rgPG" placeholder="c€/kWh" style="width:70px"> + <input type="text" inputmode="decimal" class="px" id="rgFG" placeholder="€/an" style="width:60px"></div>
+          <div class="hint" style="margin:0 0 8px">Mêmes choix qu'à l'étape 2 (mis à jour des deux côtés). Prix tapé à la main : prix de l'énergie seul, comme sur la carte (TVAC particulier, HTVA professionnel) ; réseau, taxes et énergie verte viennent du code postal.</div>
+        </div>
         <div id="regE">
           <legend>Électricité</legend>
           <div class="row"><span class="clbl">Nombre de jours</span><input type="number" id="rgEd" min="1" max="800" value="365" style="width:80px"></div>
-          <div class="row"><span class="clbl" id="rgELbl">Index</span><input type="text" inputmode="decimal" class="px" id="rgE1" placeholder="début" style="width:90px"> → <input type="text" inputmode="decimal" class="px" id="rgE2" placeholder="fin" style="width:90px"> <span>kWh</span></div>
-          <div class="row" id="rgENRow" hidden><span class="clbl">Heures creuses</span><input type="text" inputmode="decimal" class="px" id="rgN1" placeholder="début" style="width:90px"> → <input type="text" inputmode="decimal" class="px" id="rgN2" placeholder="fin" style="width:90px"> <span>kWh</span></div>
+          <div class="row"><span class="clbl" id="rgELbl">Heures pleines</span><input type="text" inputmode="decimal" class="px" id="rgE1" placeholder="début" style="width:90px"> → <input type="text" inputmode="decimal" class="px" id="rgE2" placeholder="fin" style="width:90px"> <span>kWh</span></div>
+          <div class="hint" style="margin:-2px 0 4px">Un seul index (ancien compteur mono-horaire) : laissez « heures creuses » vide.</div>
+          <div class="row" id="rgENRow"><span class="clbl">Heures creuses</span><input type="text" inputmode="decimal" class="px" id="rgN1" placeholder="début" style="width:90px"> → <input type="text" inputmode="decimal" class="px" id="rgN2" placeholder="fin" style="width:90px"> <span>kWh</span></div>
         </div>
         <div id="regG" style="margin-top:10px">
           <legend>Gaz</legend>
@@ -391,7 +404,7 @@
       <div class="card result" aria-live="polite">
         <h3>Régularisation attendue</h3>
         <div class="cost" id="regOut" hidden></div>
-        <p class="hint" id="regEmpty">Entrez les index de début et de fin (et le contrat à l'étape 2) pour estimer la facture de régularisation.</p>
+        <p class="hint" id="regEmpty">Entrez le code postal, le contrat (ou les prix) et les index de début et de fin pour estimer la facture de régularisation.</p>
       </div>
     </div>
   </section>
@@ -1149,7 +1162,8 @@
     var rows = {en: enR, vt: vt, re: soc ? {prix_kwh: 0, prix_jour: 0, prix_nuit: 0, fixe_an: 0} : (grd ? find('reseau', grd, '*') : null), tx: find('taxes', soc ? 'Tarif social' : reg, seg)};
     return fill(function(c, f){ return rv(rows[c], c, f); });
   }
-  function kwhCost(S, en, tot, hp, hc){
+  function kwhCost(S, en, tot, hp, hc, single){
+    if (en === 'e' && single) return S.k !== null ? tot * S.k / 100 : null;   // un seul index : ancien compteur mono-horaire
     if (en === 'e' && bi() && hc !== null) return S.j !== null && S.n !== null ? hp * S.j / 100 + hc * S.n / 100 : null;
     if (en === 'e' && tri()){ var sh = triShares(); return S.a !== null ? tot * (S.a * sh[0] + S.b * sh[1] + S.c * sh[2]) / 100 : null; }
     if (en === 'e' && bi()){ var pc = pnum($('pct').value); if (pc === null || pc > 100) pc = 50; return S.j !== null ? tot * (S.j * (1 - pc / 100) + S.n * pc / 100) / 100 : null; }
@@ -1165,7 +1179,7 @@
   $('perList').addEventListener('click', function(e){ if (e.target.classList.contains('perDel')){ e.target.closest('.per').remove(); render(); } });
   function regul(showE, showG, P, prosAn){
     $('regE').hidden = !showE; $('regG').hidden = !showG;
-    $('rgENRow').hidden = !bi(); $('rgELbl').textContent = bi() ? 'Heures pleines' : 'Index';
+    regSync(showE, showG);
     $('rgGfRow').hidden = $('rgGu').value !== 'm3';
     document.querySelectorAll('#perList .perM').forEach(perOptions);
     var pers = perRows(), sumD = pers.reduce(function(t, p){ return t + p.d; }, 0);
@@ -1180,7 +1194,7 @@
         var w = pers[i].d / sumD, S = priceSet(pers[i].m, en);
         if (S === 'load'){ loading = true; return null; }
         if (!S){ miss.push((en === 'e' ? 'électricité' : 'gaz') + ' : contrat absent ' + deMois(pers[i].m)); return null; }
-        var kc = kwhCost(S, en, tot * w, hp !== null ? hp * w : null, hc !== null ? hc * w : null);
+        var kc = kwhCost(S, en, tot * w, hp !== null ? hp * w : null, hc !== null ? hc * w : null, en === 'e' && hc === null);
         if (kc === null){ miss.push('prix ' + (en === 'e' ? 'électricité' : 'gaz')); return null; }
         c += kc; fx += (S.f || 0) * dTot * w / 365;
         if (pers.length > 1) det.push(moisLbl(pers[i].m) + ' ' + fmt(pers[i].d) + ' j');
@@ -1188,7 +1202,7 @@
       return {c: c, fx: fx, det: det};
     }
     if (showE){
-      var dE = days('rgEd'), hp = d('rgE1', 'rgE2'), hc = bi() ? d('rgN1', 'rgN2') : null;
+      var dE = days('rgEd'), hp = d('rgE1', 'rgE2'), hc = d('rgN1', 'rgN2');
       if (hp !== null){
         var tot = hp + (hc || 0), perdu = 0, back = inp_pvClassic();
         // Compteur qui tourne à l'envers (panneaux, compensation) : un index en baisse est normal ; le surplus est perdu.
@@ -1196,7 +1210,7 @@
         var R = periodsCost('e', tot, hp, hc, dE);
         if (R){
           var prE = (prosAn || 0) * dE / 365, tE = (R.c + R.fx + prE) * (1 + rate); totT += tE; ok++;
-          var det = hc !== null ? fmt(hp) + ' kWh pleines + ' + fmt(hc) + ' kWh creuses' : fmt(tot) + ' kWh';
+          var det = hc !== null ? fmt(hp) + ' kWh pleines + ' + fmt(hc) + ' kWh creuses' + (bi() || tri() ? '' : ' (additionnés, compteur simple)') : fmt(tot) + ' kWh (index unique)';
           out += '<div class="line"><span>Électricité : ' + det + ' sur ' + fmt(dE) + ' jours' + (!back && (hp < 0 || (hc !== null && hc < 0)) ? ' <b style="color:#9a3b2b">(index de fin plus petit ?)</b>' : '') + '</span><span>' + fmt(tE) + ' € TVAC</span></div>';
           out += '<div class="hint used">Consommation ' + fmt(R.c * (1 + rate)) + ' € + frais fixes ' + fmt(R.fx * (1 + rate)) + ' € (' + fmt(dE) + '/365 jours)' + (prE ? ' + prosumer ' + fmt(prE * (1 + rate)) + ' €' : '') + ' TVAC' + (R.det.length ? ' · ' + R.det.join(', ') : '') + '</div>';
           if (perdu) out += '<div class="hint" style="color:#9a5b00">Production supérieure à la consommation : ' + fmt(perdu) + ' kWh de surplus, non compensés (perdus pour le client).</div>';
@@ -1229,6 +1243,34 @@
     if (miss.length) out += '<div class="hint" style="color:#9a3b2b">Manque : ' + miss.join(', ') + '.</div>';
     $('regOut').innerHTML = out; $('regOut').hidden = !out; $('regEmpty').hidden = !!out;
   }
+  function regSync(showE, showG){
+    var act = document.activeElement;
+    $('rgSeg').value = SEG(); $('rgCpt').value = tri() ? 'tri' : bi() ? 'bi' : 'simple';
+    if (act !== $('rgCp')) $('rgCp').value = cpCode();
+    $('rgCpHint').textContent = cpCode() ? $('cpHint').textContent : '';
+    [['rgSelE', 'selE'], ['rgSelG', 'selG']].forEach(function(x){ var a = $(x[0]), b = $(x[1]); if (a.innerHTML !== b.innerHTML) a.innerHTML = b.innerHTML; a.value = b.value; });
+    if ($('same').checked && showE && showG) $('rgSelG').value = $('selE').value;
+    $('rgCtrE').hidden = !showE; $('rgCtrG').hidden = !showG;
+    $('rgPEbi').hidden = $('rgPEn').hidden = !bi();
+    $('rgPE').placeholder = bi() ? 'pleines' : 'c€/kWh';
+  }
+  ['rgSeg', 'rgCpt', 'rgSelE', 'rgSelG'].forEach(function(id){ $(id).addEventListener('input', function(e){ e.stopPropagation(); }); });
+  $('rgSeg').addEventListener('change', function(e){ e.stopPropagation(); var r = document.querySelector('input[name="seg"][value="' + this.value + '"]'); r.checked = true; r.dispatchEvent(new Event('change', {bubbles: true})); });
+  $('rgCpt').addEventListener('change', function(e){ e.stopPropagation(); var r = document.querySelector('input[name="cpt"][value="' + this.value + '"]'); r.checked = true; r.dispatchEvent(new Event('change', {bubbles: true})); });
+  $('rgCp').addEventListener('input', function(e){ e.stopPropagation(); var v = this.value.replace(/\D/g, '').slice(0, 4); this.value = v; $('cp').value = v; $('cp').dispatchEvent(new Event('input')); });
+  $('rgSelE').addEventListener('change', function(e){ e.stopPropagation(); $('selE').value = this.value; $('selE').dispatchEvent(new Event('change')); });
+  $('rgSelG').addEventListener('change', function(e){ e.stopPropagation(); if ($('same').checked){ $('same').checked = false; $('same').dispatchEvent(new Event('change')); } $('selG').value = this.value; $('selG').dispatchEvent(new Event('change')); });
+  // Prix de l'énergie tapé à la main dans l'étape 3 : remplace la composante « énergie » du contrat (comme à l'étape 2).
+  function manualPrice(en){
+    var k = pnum($(en === 'e' ? 'rgPE' : 'rgPG').value), n = en === 'e' && bi() ? pnum($('rgPEn').value) : null, f = pnum($(en === 'e' ? 'rgFE' : 'rgFG').value), df = DF(), V = VAL[en].en;
+    if (k === null && f === null) return;
+    var sel = $(en === 'e' ? 'selE' : 'selG'); if (!sel.value){ sel.value = '__autre'; sel.dispatchEvent(new Event('change')); }
+    if (k !== null){ V.k = k / df; V.j = k / df; V.n = (n !== null ? n : k) / df; V.a = V.j; V.b = V.n; V.c = V.n; }
+    if (f !== null) V.f = f / df;
+    buildTable(en); render();
+  }
+  ['rgPE', 'rgPEn', 'rgFE'].forEach(function(id){ $(id).addEventListener('input', function(e){ e.stopPropagation(); manualPrice('e'); }); });
+  ['rgPG', 'rgFG'].forEach(function(id){ $(id).addEventListener('input', function(e){ e.stopPropagation(); manualPrice('g'); }); });
   function inp_pvClassic(){ return val('pv') === '1' && val('comp') === '1' && val('pcpt') !== 'comm'; }
   document.getElementById('f').addEventListener('input', render);
   document.getElementById('f').addEventListener('change', render);
