@@ -176,7 +176,7 @@
       return load().then(loadProps);
     });
   }
-  var PAGE_LBL = {app: 'Appli web (accueil)', conso: 'Estimation de consommation', confidentialite: 'Confidentialité', supprimer: 'Supprimer mes données'};
+  var PAGE_LBL = {app: 'Appli web (accueil)', conso: 'Estimation de consommation', 'conso-avis': 'Estimation conso – avis', confidentialite: 'Confidentialité', supprimer: 'Supprimer mes données'};
   function loadVisits(){
     return rpc('t2r_visits_stats', {}).then(function(v){
       var pages = v.pages || [], n = function(x){ return x ? x : 0; }, tot = {today: 0, d7: 0, d30: 0, total: 0};
