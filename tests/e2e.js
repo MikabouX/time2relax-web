@@ -46,6 +46,7 @@ const initScript = (startIso) => `
 
 async function newPage(browser, { startIso = '2026-10-29T10:00:00+01:00', lang = 'fr-BE', setup } = {}) {
   const context = await browser.newContext({ timezoneId: 'Europe/Brussels', locale: lang, viewport: { width: 420, height: 900 }, acceptDownloads: true });
+  await context.route('**/visit.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript', body: '' })); // compteur de visites hors test
   await context.addInitScript(initScript(startIso));
   const page = await context.newPage();
   const errors = [];
@@ -1011,6 +1012,7 @@ const cfgFor = (pollMs) => `window.T2R_CONFIG = { supabaseUrl: 'https://mock.sup
 // pollMs: 0 = pas de relecture automatique du chrono (les tests la déclenchent à la main, sans hasard)
 async function openWithMock(browser, db, startIso, { pollMs = 0 } = {}) {
   const context = await browser.newContext({ timezoneId: 'Europe/Brussels', locale: 'fr-BE', viewport: { width: 420, height: 900 } });
+  await context.route('**/visit.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript', body: '' })); // compteur de visites hors test
   await context.addInitScript(initScript(startIso));
   await context.route('**/config.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript', body: cfgFor(pollMs) }));
   const dev = { off: false };
