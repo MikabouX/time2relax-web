@@ -383,14 +383,14 @@
         </div>
         <div id="regE">
           <legend>Électricité</legend>
-          <div class="row"><span class="clbl">Nombre de jours</span><input type="number" id="rgEd" min="1" max="800" value="365" style="width:80px"></div>
+          <div class="row"><span class="clbl">Période</span>du <input type="date" id="rgEs"> au <input type="date" id="rgEe"> <span class="hint">ou</span> <input type="number" id="rgEd" min="1" max="800" value="365" style="width:70px"> <span>jours</span></div>
           <div class="row"><span class="clbl" id="rgELbl">Heures pleines</span><input type="text" inputmode="decimal" class="px" id="rgE1" placeholder="début" style="width:90px"> → <input type="text" inputmode="decimal" class="px" id="rgE2" placeholder="fin" style="width:90px"> <span>kWh</span></div>
           <div class="hint" style="margin:-2px 0 4px">Un seul index (ancien compteur mono-horaire) : laissez « heures creuses » vide.</div>
           <div class="row" id="rgENRow"><span class="clbl">Heures creuses</span><input type="text" inputmode="decimal" class="px" id="rgN1" placeholder="début" style="width:90px"> → <input type="text" inputmode="decimal" class="px" id="rgN2" placeholder="fin" style="width:90px"> <span>kWh</span></div>
         </div>
         <div id="regG" style="margin-top:10px">
           <legend>Gaz</legend>
-          <div class="row"><span class="clbl">Nombre de jours</span><input type="number" id="rgGd" min="1" max="800" value="365" style="width:80px"></div>
+          <div class="row"><span class="clbl">Période</span>du <input type="date" id="rgGs"> au <input type="date" id="rgGe"> <span class="hint">ou</span> <input type="number" id="rgGd" min="1" max="800" value="365" style="width:70px"> <span>jours</span></div>
           <div class="row"><span class="clbl">Index</span><input type="text" inputmode="decimal" class="px" id="rgG1" placeholder="début" style="width:90px"> → <input type="text" inputmode="decimal" class="px" id="rgG2" placeholder="fin" style="width:90px"> <select id="rgGu"><option value="m3">m³</option><option value="kwh">kWh</option></select></div>
           <div class="row" id="rgGfRow"><span class="clbl">Conversion</span><input type="text" inputmode="decimal" class="px" id="rgGf" value="10,8" style="width:60px"> <span>kWh par m³ (voir la facture ; environ 10 à 11,5)</span></div>
         </div>
@@ -1177,7 +1177,14 @@
     perOptions($('perList').lastElementChild.querySelector('.perM')); render();
   });
   $('perList').addEventListener('click', function(e){ if (e.target.classList.contains('perDel')){ e.target.closest('.per').remove(); render(); } });
+  // Dates de début et de fin → nombre de jours (fin − début), sinon le nombre de jours tapé.
+  function regDays(en){
+    var a = $('rg' + en + 's').value, b = $('rg' + en + 'e').value, d = $('rg' + en + 'd');
+    if (a && b){ var n = Math.round((Date.parse(b) - Date.parse(a)) / 86400000); if (n > 0){ d.value = n; d.readOnly = true; d.title = 'Calculé à partir des dates'; return; } }
+    if (d.readOnly){ d.readOnly = false; d.title = ''; }
+  }
   function regul(showE, showG, P, prosAn){
+    regDays('E'); regDays('G');
     $('regE').hidden = !showE; $('regG').hidden = !showG;
     regSync(showE, showG);
     $('rgGfRow').hidden = $('rgGu').value !== 'm3';
