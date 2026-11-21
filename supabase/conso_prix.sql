@@ -245,3 +245,41 @@ grant execute on function public.conso_tarif_social_save(jsonb) to authenticated
 -- Données : tarifs sociaux CREG T1 2025 à T4 2026 (c€/kWh HTVA) encodés le 21 novembre 2026.
 -- Correction le même jour : taxes « Tarif social » électricité de novembre 2026 = accise 1 €/MWh
 --   → 0,10000 c€/kWh (Flandre, Bruxelles), 0,17075 (Wallonie, redevance de raccordement comprise) au lieu de 1,00000 / 1,07075.
+
+-- ===== Formules des contrats variables et paramètres d'indexation (migration conso_formules_indices, 22 novembre 2026) =====
+-- Prix énergie d'un contrat variable (c€/kWh HTVA) = a + b × paramètre du mois de fourniture (€/MWh),
+-- avec la formule de la carte du mois de signature (identique dans les 3 régions).
+create table if not exists public.conso_formule (
+  mois date not null check (extract(day from mois) = 1),
+  segment text not null check (segment in ('R','P')),
+  energie text not null check (energie in ('e','g')),
+  cle text not null check (char_length(cle) between 1 and 80),
+  param text not null check (param ~ '^[A-Za-z0-9_]{2,20}$'),
+  k_a numeric(10,4), k_b numeric(10,5), j_a numeric(10,4), j_b numeric(10,5), n_a numeric(10,4), n_b numeric(10,5),
+  x_a numeric(10,4), x_b numeric(10,5),
+  t1_a numeric(10,4), t1_b numeric(10,5), t2_a numeric(10,4), t2_b numeric(10,5), t3_a numeric(10,4), t3_b numeric(10,5),
+  fixe_an numeric(10,4) check (fixe_an >= 0),
+  doc text check (char_length(doc) <= 80),
+  updated_at timestamptz not null default now(),
+  primary key (mois, segment, energie, cle));
+alter table public.conso_formule enable row level security;
+revoke all on public.conso_formule from anon, authenticated;
+
+create table if not exists public.conso_indice (
+  param text not null check (param ~ '^[A-Za-z0-9_]{2,20}$'),
+  mois date not null check (extract(day from mois) = 1),
+  valeur numeric(10,4) not null,
+  source text check (char_length(source) <= 120),
+  updated_at timestamptz not null default now(),
+  primary key (param, mois));
+alter table public.conso_indice enable row level security;
+revoke all on public.conso_indice from anon, authenticated;
+
+create or replace function public.conso_formule_get()
+returns jsonb language sql stable security definer set search_path = public as $$
+  select jsonb_build_object(
+    'formules', coalesce((select jsonb_agg(to_jsonb(f) - 'updated_at' order by f.mois desc, f.cle) from conso_formule f), '[]'::jsonb),
+    'indices', coalesce((select jsonb_agg(jsonb_build_object('param', i.param, 'mois', i.mois, 'valeur', i.valeur) order by i.param, i.mois) from conso_indice i), '[]'::jsonb));
+$$;
+revoke all on function public.conso_formule_get() from public;
+grant execute on function public.conso_formule_get() to anon, authenticated;
