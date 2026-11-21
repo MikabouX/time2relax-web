@@ -26,6 +26,7 @@
   .step.regul .stephead .num{background:#9a6b1f}
   #regSet legend{font-weight:600;margin-bottom:4px}
   #regSet [hidden]{display:none}
+  .perDel{padding:2px 8px}
   .cost .big{font-size:1.15em;font-weight:700}
   .stephead{display:flex;align-items:center;gap:12px;margin:0 2px 12px}
   .stephead .num{flex:none;width:34px;height:34px;border-radius:50%;background:var(--accent);color:#fff;font-weight:700;display:grid;place-items:center;font-size:17px}
@@ -379,6 +380,10 @@
           <div class="row"><span class="clbl">Nombre de jours</span><input type="number" id="rgGd" min="1" max="800" value="365" style="width:80px"></div>
           <div class="row"><span class="clbl">Index</span><input type="text" inputmode="decimal" class="px" id="rgG1" placeholder="début" style="width:90px"> → <input type="text" inputmode="decimal" class="px" id="rgG2" placeholder="fin" style="width:90px"> <select id="rgGu"><option value="m3">m³</option><option value="kwh">kWh</option></select></div>
           <div class="row" id="rgGfRow"><span class="clbl">Conversion</span><input type="text" inputmode="decimal" class="px" id="rgGf" value="10,8" style="width:60px"> <span>kWh par m³ (voir la facture ; environ 10 à 11,5)</span></div>
+        </div>
+        <div id="perBox" style="margin-top:10px">
+          <div class="row"><span class="clbl">Prix</span><span class="hint" id="perHint">une seule période : prix de l'étape 2</span> <button type="button" id="perAdd" class="sec">+ Ajouter une période de prix</button></div>
+          <div id="perList"></div>
         </div>
         <div class="row" style="margin-top:10px"><span class="clbl">Acomptes versés</span><input type="text" inputmode="decimal" class="px" id="rgAc" style="width:90px"> <span>€ TVAC au total sur la période</span></div>
       </fieldset>
@@ -1119,40 +1124,99 @@
       (acS !== null ? '\nAcompte souhaité : ' + fmt(acS) + ' €/mois' : '');
   }
 
-  // ---------- Facture de régularisation : index début → fin, jours, acomptes versés ----------
+  // ---------- Facture de régularisation : index début → fin, jours, acomptes versés, périodes de prix ----------
+  var MCACHE = {};
+  function monthData(m){
+    if (T && T.mois === m) return T;
+    if (MCACHE[m] && MCACHE[m] !== 'load') return MCACHE[m];
+    if (!MCACHE[m]){ MCACHE[m] = 'load'; rpcPub('conso_prix_get', {p_mois: m}).then(function(d){ MCACHE[m] = d; render(); }).catch(function(){ MCACHE[m] = {prix: []}; render(); }); }
+    return null;
+  }
+  // Somme des composantes (énergie + verte + réseau + taxes), HTVA, pour un mois donné.
+  function priceSet(m, en){
+    var F = ['k', 'j', 'n', 'a', 'b', 'c', 'f'], out = {};
+    function fill(get){ F.forEach(function(f){ var t = 0, any = false; COMPS.forEach(function(c){ if (c.k === 'vt' && (en === 'g' || f === 'f')) return; var v = get(c.k, f);
+      if ((f === 'j' || f === 'n') && (v === null || v === undefined)) v = get(c.k, 'k');
+      if ((f === 'a' || f === 'b' || f === 'c') && (v === null || v === undefined)){ v = get(c.k, f === 'a' ? 'j' : 'n'); if (v === null || v === undefined) v = get(c.k, 'k'); }
+      if (v !== null && v !== undefined){ t += +v; any = true; } }); out[f] = any ? t : null; }); return out; }
+    if (T && m === T.mois) return fill(function(c, f){ return VAL[en][c][f]; });
+    var d = monthData(m); if (!d) return 'load';
+    var reg = regionOf(en), grd = $(en === 'e' ? 'grdE' : 'grdG').value, name = contractName(en), seg = SEG();
+    function find(type, cle, sg){ return (d.prix || []).filter(function(p){ return p.type === type && p.energie === en && p.cle === cle && p.region === reg && p.segment === sg; })[0] || null; }
+    var enR = name && reg ? find('energie', name, seg) : null; if (!enR) return null;
+    var soc = enR.cle === 'Tarif social' || /_SOCIAL_/.test(enR.doc || '');
+    var vt = en === 'e' && !soc ? (enR.vert_kwh !== null && enR.vert_kwh !== undefined ? enR : (d.prix || []).filter(function(p){ return p.type === 'energie' && p.energie === 'e' && p.segment === seg && p.region === reg && p.vert_kwh !== null && p.vert_kwh !== undefined; })[0] || null) : null;
+    var rows = {en: enR, vt: vt, re: soc ? {prix_kwh: 0, prix_jour: 0, prix_nuit: 0, fixe_an: 0} : (grd ? find('reseau', grd, '*') : null), tx: find('taxes', soc ? 'Tarif social' : reg, seg)};
+    return fill(function(c, f){ return rv(rows[c], c, f); });
+  }
+  function kwhCost(S, en, tot, hp, hc){
+    if (en === 'e' && bi() && hc !== null) return S.j !== null && S.n !== null ? hp * S.j / 100 + hc * S.n / 100 : null;
+    if (en === 'e' && tri()){ var sh = triShares(); return S.a !== null ? tot * (S.a * sh[0] + S.b * sh[1] + S.c * sh[2]) / 100 : null; }
+    if (en === 'e' && bi()){ var pc = pnum($('pct').value); if (pc === null || pc > 100) pc = 50; return S.j !== null ? tot * (S.j * (1 - pc / 100) + S.n * pc / 100) / 100 : null; }
+    return S.k !== null ? tot * S.k / 100 : null;
+  }
+  function perRows(){ return Array.prototype.map.call(document.querySelectorAll('#perList .per'), function(r){ return {m: r.querySelector('.perM').value, d: pnum(r.querySelector('.perD').value) || 0}; }).filter(function(p){ return p.d > 0; }); }
+  function perOptions(sel){ var v = sel.value; sel.innerHTML = ((T && T.mois_dispo) || []).map(function(m){ return '<option value="' + m + '">' + moisLbl(m) + '</option>'; }).join(''); if (v) sel.value = v; if (!sel.value && T) sel.value = T.mois; }
+  $('perAdd').addEventListener('click', function(){
+    var n = document.querySelectorAll('#perList .per').length;
+    $('perList').insertAdjacentHTML('beforeend', '<div class="row per"><span class="clbl">Période ' + (n + 1) + '</span><select class="perM"></select> <input type="number" class="perD" min="1" max="800" style="width:70px" value="' + (n ? '' : (pnum($('rgEd').value) || 365)) + '"> <span>jours</span> <button type="button" class="perDel sec" title="Retirer">×</button></div>');
+    perOptions($('perList').lastElementChild.querySelector('.perM')); render();
+  });
+  $('perList').addEventListener('click', function(e){ if (e.target.classList.contains('perDel')){ e.target.closest('.per').remove(); render(); } });
   function regul(showE, showG, P, prosAn){
     $('regE').hidden = !showE; $('regG').hidden = !showG;
     $('rgENRow').hidden = !bi(); $('rgELbl').textContent = bi() ? 'Heures pleines' : 'Index';
     $('rgGfRow').hidden = $('rgGu').value !== 'm3';
-    var rate = tvaRate(), out = '', totT = 0, ok = 0, miss = [];
+    document.querySelectorAll('#perList .perM').forEach(perOptions);
+    var pers = perRows(), sumD = pers.reduce(function(t, p){ return t + p.d; }, 0);
+    $('perHint').textContent = pers.length ? 'consommation et frais fixes répartis au prorata des jours (' + fmt(sumD) + ' jours au total)' : 'une seule période : prix de l\'étape 2';
+    if (!pers.length) pers = [{m: T ? T.mois : null, d: 1}], sumD = 1;
+    var rate = tvaRate(), out = '', totT = 0, ok = 0, miss = [], loading = false;
     function d(a, b){ var x = pnum($(a).value), y = pnum($(b).value); return x !== null && y !== null ? y - x : null; }
     function days(id){ var n = pnum($(id).value); return n && n > 0 ? n : 365; }
+    function periodsCost(en, tot, hp, hc, dTot){
+      var c = 0, fx = 0, det = [];
+      for (var i = 0; i < pers.length; i++){
+        var w = pers[i].d / sumD, S = priceSet(pers[i].m, en);
+        if (S === 'load'){ loading = true; return null; }
+        if (!S){ miss.push((en === 'e' ? 'électricité' : 'gaz') + ' : contrat absent ' + deMois(pers[i].m)); return null; }
+        var kc = kwhCost(S, en, tot * w, hp !== null ? hp * w : null, hc !== null ? hc * w : null);
+        if (kc === null){ miss.push('prix ' + (en === 'e' ? 'électricité' : 'gaz')); return null; }
+        c += kc; fx += (S.f || 0) * dTot * w / 365;
+        if (pers.length > 1) det.push(moisLbl(pers[i].m) + ' ' + fmt(pers[i].d) + ' j');
+      }
+      return {c: c, fx: fx, det: det};
+    }
     if (showE){
-      var dE = days('rgEd'), hp = d('rgE1', 'rgE2'), hc = bi() ? d('rgN1', 'rgN2') : null, cE = null, kwhE = null, detail = '';
+      var dE = days('rgEd'), hp = d('rgE1', 'rgE2'), hc = bi() ? d('rgN1', 'rgN2') : null;
       if (hp !== null){
-        if (bi() && hc !== null){ var pj = compSumE('j'), pn = compSumE('n'); if (pj !== null && pn !== null){ cE = hp * pj / 100 + hc * pn / 100; kwhE = hp + hc; detail = fmt(hp) + ' kWh pleines + ' + fmt(hc) + ' kWh creuses'; } }
-        else if (P.e.prixMoyen !== null){ cE = hp * P.e.prixMoyen / 100; kwhE = hp; detail = fmt(hp) + ' kWh'; }
-        if (cE === null) miss.push('prix électricité');
-        else {
-          var fxE = (P.e.fixe || 0) * dE / 365, prE = (prosAn || 0) * dE / 365, tE = (cE + fxE + prE) * (1 + rate); totT += tE; ok++;
-          out += '<div class="line"><span>Électricité : ' + detail + ' sur ' + fmt(dE) + ' jours' + (hp < 0 || (hc !== null && hc < 0) ? ' <b style="color:#9a3b2b">(index de fin plus petit ?)</b>' : '') + '</span><span>' + fmt(tE) + ' € TVAC</span></div>';
-          out += '<div class="hint used">Consommation ' + fmt(cE * (1 + rate)) + ' € + frais fixes ' + fmt(fxE * (1 + rate)) + ' € (' + fmt(dE) + '/365 jours)' + (prE ? ' + prosumer ' + fmt(prE * (1 + rate)) + ' €' : '') + ' TVAC</div>';
+        var tot = hp + (hc || 0), perdu = 0, back = inp_pvClassic();
+        // Compteur qui tourne à l'envers (panneaux, compensation) : un index en baisse est normal ; le surplus est perdu.
+        if (back && tot < 0){ perdu = -tot; hp = 0; hc = hc !== null ? 0 : null; tot = 0; }
+        var R = periodsCost('e', tot, hp, hc, dE);
+        if (R){
+          var prE = (prosAn || 0) * dE / 365, tE = (R.c + R.fx + prE) * (1 + rate); totT += tE; ok++;
+          var det = hc !== null ? fmt(hp) + ' kWh pleines + ' + fmt(hc) + ' kWh creuses' : fmt(tot) + ' kWh';
+          out += '<div class="line"><span>Électricité : ' + det + ' sur ' + fmt(dE) + ' jours' + (!back && (hp < 0 || (hc !== null && hc < 0)) ? ' <b style="color:#9a3b2b">(index de fin plus petit ?)</b>' : '') + '</span><span>' + fmt(tE) + ' € TVAC</span></div>';
+          out += '<div class="hint used">Consommation ' + fmt(R.c * (1 + rate)) + ' € + frais fixes ' + fmt(R.fx * (1 + rate)) + ' € (' + fmt(dE) + '/365 jours)' + (prE ? ' + prosumer ' + fmt(prE * (1 + rate)) + ' €' : '') + ' TVAC' + (R.det.length ? ' · ' + R.det.join(', ') : '') + '</div>';
+          if (perdu) out += '<div class="hint" style="color:#9a5b00">Production supérieure à la consommation : ' + fmt(perdu) + ' kWh de surplus, non compensés (perdus pour le client).</div>';
+          else if (back && tot >= 0) out += '<div class="hint">Compteur qui tourne à l\'envers : index nets (consommation − production).</div>';
         }
       }
     }
     if (showG){
       var dG = days('rgGd'), g = d('rgG1', 'rgG2');
       if (g !== null){
-        var f = $('rgGu').value === 'm3' ? (pnum($('rgGf').value) || 10.8) : 1, kG = g * f;
-        if (P.g.prixMoyen === null) miss.push('prix gaz');
-        else {
-          var cG = kG * P.g.prixMoyen / 100, fxG = (P.g.fixe || 0) * dG / 365, tG = (cG + fxG) * (1 + rate); totT += tG; ok++;
+        var f = $('rgGu').value === 'm3' ? (pnum($('rgGf').value) || 10.8) : 1, kG = g * f, RG = periodsCost('g', kG, null, null, dG);
+        if (RG){
+          var tG = (RG.c + RG.fx) * (1 + rate); totT += tG; ok++;
           out += '<div class="line"><span>Gaz : ' + ($('rgGu').value === 'm3' ? fmt(g) + ' m³ × ' + String(f).replace('.', ',') + ' = ' : '') + fmt(kG) + ' kWh sur ' + fmt(dG) + ' jours' + (g < 0 ? ' <b style="color:#9a3b2b">(index de fin plus petit ?)</b>' : '') + '</span><span>' + fmt(tG) + ' € TVAC</span></div>';
-          out += '<div class="hint used">Consommation ' + fmt(cG * (1 + rate)) + ' € + frais fixes ' + fmt(fxG * (1 + rate)) + ' € (' + fmt(dG) + '/365 jours) TVAC</div>';
+          out += '<div class="hint used">Consommation ' + fmt(RG.c * (1 + rate)) + ' € + frais fixes ' + fmt(RG.fx * (1 + rate)) + ' € (' + fmt(dG) + '/365 jours) TVAC' + (RG.det.length ? ' · ' + RG.det.join(', ') : '') + '</div>';
         }
       }
     }
-    if (ok){
+    if (loading) out = '<div class="hint">Chargement des prix des autres mois…</div>' + out;
+    if (ok && !loading){
       var ac = pnum($('rgAc').value);
       out += '<div class="line"><span>Coût total de la période</span><span>' + fmt(totT) + ' € TVAC</span></div>';
       if (ac !== null){
@@ -1160,11 +1224,12 @@
         out += '<div class="line"><span>Acomptes versés</span><span>− ' + fmt(ac) + ' €</span></div>';
         out += '<div class="line acompte big"><span>' + (Math.abs(diff) < 0.5 ? 'Régularisation : rien à payer ni à rembourser' : diff > 0 ? 'Régularisation : à payer' : 'Régularisation : à rembourser') + '</span><span>' + fmt(Math.abs(diff)) + ' €</span></div>';
       } else out += '<div class="hint">Entrez le total des acomptes versés pour obtenir le montant de la régularisation.</div>';
-      out += '<div class="hint">Estimation : avec les prix et le contrat de l\'étape 2' + (T && T.mois ? ' (' + moisLbl(T.mois) + ')' : '') + ', frais fixes au prorata des jours. La facture réelle peut différer (changements de prix en cours de période, index estimés, primes).</div>';
+      out += '<div class="hint">Estimation : ' + (perRows().length ? 'prix de chaque période' : 'prix de l\'étape 2' + (T && T.mois ? ' (' + moisLbl(T.mois) + ')' : '')) + ', frais fixes au prorata des jours. La facture réelle peut différer (index estimés, primes, dates exactes des changements de prix).</div>';
     }
-    if (miss.length) out += '<div class="hint" style="color:#9a3b2b">Manque : ' + miss.join(', ') + ' (choisissez le contrat à l\'étape 2).</div>';
+    if (miss.length) out += '<div class="hint" style="color:#9a3b2b">Manque : ' + miss.join(', ') + '.</div>';
     $('regOut').innerHTML = out; $('regOut').hidden = !out; $('regEmpty').hidden = !!out;
   }
+  function inp_pvClassic(){ return val('pv') === '1' && val('comp') === '1' && val('pcpt') !== 'comm'; }
   document.getElementById('f').addEventListener('input', render);
   document.getElementById('f').addEventListener('change', render);
   document.getElementById('reset').addEventListener('click', function(){ document.getElementById('f').reset(); $('cpHint').textContent = CP_HINT; hideSug(); resetPrices(); onDebut(); render(); });
