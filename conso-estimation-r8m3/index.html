@@ -117,6 +117,8 @@
   .sug button:hover,.sug button:focus{background:#eef3fb}
   .cost .acpart span:last-child{font-weight:600}
   details.explain p{margin:6px 0;font-size:.92em;line-height:1.45}
+  .cost .line.apayer, .cost .line.apayer span{color:#b3261e}
+  .cost .line.arembourser, .cost .line.arembourser span{color:#1e7d32}
 </style>
 </head>
 <body>
@@ -1243,7 +1245,7 @@
       if (ac !== null){
         var diff = totT - ac;
         out += '<div class="line"><span>Acomptes versés</span><span>− ' + fmt(ac) + ' €</span></div>';
-        out += '<div class="line acompte big"><span>' + (Math.abs(diff) < 0.5 ? 'Régularisation : rien à payer ni à rembourser' : diff > 0 ? 'Régularisation : à payer' : 'Régularisation : à rembourser') + '</span><span>' + fmt(Math.abs(diff)) + ' €</span></div>';
+        out += '<div class="line acompte big ' + (Math.abs(diff) < 0.5 ? '' : diff > 0 ? 'apayer' : 'arembourser') + '"><span>' + (Math.abs(diff) < 0.5 ? 'Régularisation : rien à payer ni à rembourser' : diff > 0 ? 'Régularisation : à payer' : 'Régularisation : à rembourser') + '</span><span>' + fmt(Math.abs(diff)) + ' €</span></div>';
       } else out += '<div class="hint">Entrez le total des acomptes versés pour obtenir le montant de la régularisation.</div>';
       out += '<div class="hint">Estimation : ' + (perRows().length ? 'prix de chaque période' : 'prix de l\'étape 2' + (T && T.mois ? ' (' + moisLbl(T.mois) + ')' : '')) + ', frais fixes au prorata des jours. La facture réelle peut différer (index estimés, primes, dates exactes des changements de prix).</div>';
     }
