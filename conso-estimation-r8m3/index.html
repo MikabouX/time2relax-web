@@ -636,6 +636,15 @@
     });
     return out;
   }
+  // Prix moyen de l'électricité (c€/kWh HTVA, toutes composantes) pour un autre type de compteur.
+  function prixMode(mode){
+    function comp(f){ var t = 0, any = false; COMPS.forEach(function(c){ var V = VAL.e[c.k], v = V[f];
+      if ((f === 'j' || f === 'n') && (v === null || v === undefined)) v = V.k;
+      if (v !== null && v !== undefined){ t += +v; any = true; } }); return any ? t : null; }
+    if (mode === 'simple') return comp('k');
+    var pc = pnum($('pct').value); if (pc === null || pc > 100) pc = 50;
+    var j = comp('j'), n = comp('n'); return j !== null && n !== null ? j * (1 - pc / 100) + n * pc / 100 : null;
+  }
   function buildTable(en){
     var fs = fields(en), box = $(en === 'e' ? 'tabE' : 'tabG');
     var grd = grdOf($(en === 'e' ? 'grdE' : 'grdG').value);
@@ -1008,6 +1017,17 @@
       var acEH = Math.round(totEn.e / 12), acGH = Math.round(totEn.g / 12);
       var acompte = (okEn.e ? acE : 0) + (okEn.g ? acG : 0), acompteH = (okEn.e ? acEH : 0) + (okEn.g ? acGH : 0);
       var both = okEn.e && okEn.g;
+      var cmpHtml = '';
+      // Comparaison simple / bi-horaire pour la même consommation
+      if (okEn.e && P.e.prixMoyen !== null && !SOCIAL.e){
+        var cur = tri() ? 'tri' : bi() ? 'bi' : 'simple', alts = cur === 'simple' ? ['bi'] : cur === 'bi' ? ['simple'] : ['simple', 'bi'];
+        alts.forEach(function(m){
+          var pm = prixMode(m); if (pm === null) return;
+          var costAlt = (totEn.e + kE * (pm - P.e.prixMoyen) / 100) * (1 + rate), costCur = totEn.e * (1 + rate), d = costAlt - costCur, u2 = pro ? ' TVAC' : ' TVAC';
+          var lbl = m === 'bi' ? 'En bi-horaire (' + String(pnum($('pct').value) === null ? 50 : pnum($('pct').value)).replace('.', ',') + ' % la nuit)' : 'En compteur simple';
+          cmpHtml += '<div class="line"><span class="hint">' + lbl + ', électricité</span><span class="hint">' + fmt(costAlt) + ' €/an' + u2 + ' (' + (Math.abs(d) < 0.5 ? 'identique' : (d > 0 ? '+' : '−') + fmt(Math.abs(d)) + ' €/an') + ', acompte ' + fmt(Math.round(costAlt / 12)) + ' €)</span></div>';
+        });
+      }
       if (pro){
         html += '<div class="line"><span>Total HTVA</span><span>' + fmt(tot) + ' €/an</span></div>';
         html += '<div class="line"><span>TVA 21 % (professionnel)</span><span>' + fmt(tva) + ' €/an</span></div>';
@@ -1016,6 +1036,7 @@
         html += '<div class="line"><span>Total TVAC</span><span>' + fmt(ttc) + ' €/an</span></div>';
         html += '<div class="line"><span class="hint">dont TVA 6 % (particulier)</span><span class="hint">' + fmt(tva) + ' €/an</span></div>';
       }
+      html += cmpHtml;
       if (both){
         html += '<div class="line acpart"><span>Acompte électricité</span><span>' + fmt(acE) + ' € TVAC' + (pro ? ' <span class="hint">(' + fmt(acEH) + ' € HTVA)</span>' : '') + '</span></div>';
         html += '<div class="line acpart"><span>Acompte gaz</span><span>' + fmt(acG) + ' € TVAC' + (pro ? ' <span class="hint">(' + fmt(acGH) + ' € HTVA)</span>' : '') + '</span></div>';
