@@ -119,6 +119,9 @@
   details.explain p{margin:6px 0;font-size:.92em;line-height:1.45}
   .cost .line.apayer, .cost .line.apayer span{color:#b3261e}
   .cost .line.arembourser, .cost .line.arembourser span{color:#1e7d32}
+  .tvacalc{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;margin:0 0 14px;padding:10px 14px;border-radius:12px;background:#fff7e0;border:1px solid #f0d58a}
+  .tvacalc label{display:flex;align-items:center;gap:6px;font-size:14px}
+  .tvacalc input{width:110px;font:inherit;padding:5px 8px;border:1px solid #d9c27a;border-radius:8px;background:#fff}
 </style>
 </head>
 <body>
@@ -129,6 +132,14 @@
 
 <main>
   <div class="banner"><strong>Outil à titre indicatif.</strong> Les résultats sont des moyennes : la consommation réelle dépend de l'isolation, de la surface, des habitudes et des équipements, et seule la mesure du compteur fait foi.</div>
+
+  <div class="tvacalc" aria-label="Calculateur de TVA">
+    <strong>Calculateur TVA</strong>
+    <label>Hors TVA <input type="text" inputmode="decimal" id="tv0" autocomplete="off"></label>
+    <label>TVA 6 % <input type="text" inputmode="decimal" id="tv6" autocomplete="off"></label>
+    <label>TVA 21 % <input type="text" inputmode="decimal" id="tv21" autocomplete="off"></label>
+    <span class="hint">Tapez un montant dans une case : les deux autres se calculent.</span>
+  </div>
 
   <form id="f" class="steps" autocomplete="off">
   <section class="step" aria-label="Estimation de la consommation">
@@ -1281,6 +1292,17 @@
   ['rgPE', 'rgPEn', 'rgFE'].forEach(function(id){ $(id).addEventListener('input', function(e){ e.stopPropagation(); manualPrice('e'); }); });
   ['rgPG', 'rgFG'].forEach(function(id){ $(id).addEventListener('input', function(e){ e.stopPropagation(); manualPrice('g'); }); });
   function inp_pvClassic(){ return val('pv') === '1' && val('comp') === '1' && val('pcpt') !== 'comm'; }
+  // ---------- Calculateur TVA : hors TVA ↔ 6 % ↔ 21 % ----------
+  (function(){
+    var F = {tv0: 1, tv6: 1.06, tv21: 1.21};
+    function show(x){ return x === null ? '' : (Math.round(x * 100000) / 100000).toLocaleString('fr-BE', {maximumFractionDigits: 5}); }
+    Object.keys(F).forEach(function(id){
+      $(id).addEventListener('input', function(){
+        var v = pnum(this.value), h = v === null ? null : v / F[id];
+        Object.keys(F).forEach(function(o){ if (o !== id) $(o).value = h === null ? '' : show(h * F[o]); });
+      });
+    });
+  })();
   document.getElementById('f').addEventListener('input', render);
   document.getElementById('f').addEventListener('change', render);
   document.getElementById('reset').addEventListener('click', function(){ document.getElementById('f').reset(); $('cpHint').textContent = CP_HINT; hideSug(); resetPrices(); onDebut(); render(); });
