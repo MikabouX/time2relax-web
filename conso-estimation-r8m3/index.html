@@ -432,10 +432,10 @@
           <div class="row"><span class="clbl">Compteur</span><select id="rgCpt"><option value="simple">Simple (mono-horaire)</option><option value="bi">Bi-horaire</option><option value="tri">Tri-horaire / Flextime</option></select></div>
           <div class="row" id="rgCtrE"><span class="clbl">Contrat élec.</span><select id="rgSelE"></select>
             <span class="hint">ou prix</span> <input type="text" inputmode="decimal" class="px" id="rgPE" placeholder="c€/kWh" style="width:70px"> <span class="hint" id="rgPEbi" hidden>pleines</span> <input type="text" inputmode="decimal" class="px" id="rgPEn" placeholder="creuses" style="width:70px" hidden> + <input type="text" inputmode="decimal" class="px" id="rgFE" placeholder="€/an" style="width:60px"></div>
-          <div class="row" id="rgSigERow" hidden><span class="clbl">Signé en</span><select id="rgSigE"></select> <span class="hint">formule du contrat × paramètre de chaque mois</span></div>
+          <div class="row" id="rgSigERow" hidden><span class="clbl">Signé en</span><select id="rgSigE"></select> <span class="hint">prix ou formule de la carte de ce mois</span></div>
           <div class="row" id="rgCtrG"><span class="clbl">Contrat gaz</span><select id="rgSelG"></select>
             <span class="hint">ou prix</span> <input type="text" inputmode="decimal" class="px" id="rgPG" placeholder="c€/kWh" style="width:70px"> + <input type="text" inputmode="decimal" class="px" id="rgFG" placeholder="€/an" style="width:60px"></div>
-          <div class="row" id="rgSigGRow" hidden><span class="clbl">Signé en</span><select id="rgSigG"></select> <span class="hint">formule du contrat × paramètre de chaque mois</span></div>
+          <div class="row" id="rgSigGRow" hidden><span class="clbl">Signé en</span><select id="rgSigG"></select> <span class="hint">prix ou formule de la carte de ce mois</span></div>
           <div class="hint" style="margin:0 0 8px">Mêmes choix qu'à l'étape 2 (mis à jour des deux côtés). Prix tapé à la main : prix de l'énergie seul, comme sur la carte (TVAC particulier, HTVA professionnel) ; réseau, taxes et énergie verte viennent du code postal.</div>
         </div>
         <div id="regE">
@@ -1209,7 +1209,7 @@
   function monthPieces(en){ return socialPieces(en, true); }
   // Prix d'un mois avec la formule : a + b × paramètre du mois (c€/kWh HTVA) + réseau, taxes et énergie verte du mois (ou de l'étape 2).
   function formSet(piece, en, F){
-    var v = FQ.ix[F.param] && FQ.ix[F.param][piece.m]; if (v === undefined) return {miss: true};
+    var v = F.param === 'FIXE' ? 0 : FQ.ix[F.param] && FQ.ix[F.param][piece.m]; if (v === undefined) return {miss: true};
     var m = T && T.mois_dispo && T.mois_dispo.indexOf(piece.m) >= 0 ? piece.m : (T ? T.mois : null);
     var R = priceSet(m, en, true); if (R === 'load') return 'load'; if (!R) R = {};
     function p(a, b){ a = F[a]; b = F[b]; return a !== null && a !== undefined && b !== null && b !== undefined ? +a + +b * v : null; }
@@ -1301,7 +1301,7 @@
     var socE = showE && SOCIAL.e, socG = showG && SOCIAL.g, fmE = showE && !!formSel('e'), fmG = showG && !!formSel('g');
     if (fmE || fmG){
       var noF = [fmE && !monthPieces('e') ? 'électricité' : '', fmG && !monthPieces('g') ? 'gaz' : ''].filter(Boolean);
-      $('perHint').textContent = 'Contrat variable : formule du mois de signature × paramètre de chaque mois' + (noF.length ? ' (entrez les dates de début et de fin : ' + noF.join(', ') + ')' : '');
+      $('perHint').textContent = 'Prix du contrat selon son mois de signature (fixe, ou formule × paramètre de chaque mois)' + (noF.length ? ' (entrez les dates de début et de fin : ' + noF.join(', ') + ')' : '');
     }
     if (socE || socG){
       var noD = [socE && !socialPieces('e') ? 'électricité' : '', socG && !socialPieces('g') ? 'gaz' : ''].filter(Boolean);
@@ -1326,7 +1326,7 @@
         }
         if (nomiss.length){ miss.push('paramètre ' + FF.param + ' inconnu pour ' + nomiss.join(', ')); return null; }
         var sg = String(FF.mois).slice(0, 10), fin = mp[mp.length - 1].m, lim = new Date(Date.UTC(+sg.slice(0, 4), +sg.slice(5, 7) - 1 + 12, 1)).toISOString().slice(0, 10);
-        det.push('formule ' + deMois(sg) + ' × ' + FF.param + ' de ' + mp.length + ' mois' + (fin >= lim && !/_00_/.test(FF.doc || '') ? ' (au-delà de 12 mois, contrat renouvelé : approximation)' : ''));
+        det.push((FF.param === 'FIXE' ? 'prix fixe ' + deMois(sg) + ' sur ' + mp.length + ' mois' : 'formule ' + deMois(sg) + ' × ' + FF.param + ' de ' + mp.length + ' mois') + (fin >= lim && !/_C_I_00_/.test(FF.doc || '') ? ' (au-delà de 12 mois, prix renouvelé : approximation)' : ''));
         return {c: c, fx: fx, det: det};
       }
       var sp = SOCIAL[en] ? socialPieces(en) : null;
