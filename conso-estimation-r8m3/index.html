@@ -1326,7 +1326,7 @@
         }
         if (nomiss.length){ miss.push('paramètre ' + FF.param + ' inconnu pour ' + nomiss.join(', ')); return null; }
         var sg = String(FF.mois).slice(0, 10), fin = mp[mp.length - 1].m, lim = new Date(Date.UTC(+sg.slice(0, 4), +sg.slice(5, 7) - 1 + 12, 1)).toISOString().slice(0, 10);
-        det.push('formule ' + deMois(sg) + ' × ' + FF.param + ' de ' + mp.length + ' mois' + (fin >= lim ? ' (au-delà de 12 mois, contrat renouvelé : approximation)' : ''));
+        det.push('formule ' + deMois(sg) + ' × ' + FF.param + ' de ' + mp.length + ' mois' + (fin >= lim && !/_00_/.test(FF.doc || '') ? ' (au-delà de 12 mois, contrat renouvelé : approximation)' : ''));
         return {c: c, fx: fx, det: det};
       }
       var sp = SOCIAL[en] ? socialPieces(en) : null;
