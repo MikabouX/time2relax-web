@@ -37,6 +37,8 @@
   .cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;align-items:start}
   @media (max-width:820px){.cols{grid-template-columns:1fr}}
   .card.result{position:sticky;top:12px}
+  .card.result h3{display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .zcopy{font-size:12px;padding:3px 10px;font-weight:600;flex:0 0 auto}
   .card h3{margin:0 0 12px;font-size:15.5px}
   .actions.bar{justify-content:center;position:sticky;bottom:0;z-index:15;padding:8px;margin:0 -8px;background:rgba(245,246,244,.94);backdrop-filter:blur(4px);border-top:1px solid var(--line)}
   .actions.bar button{font-size:14.5px;padding:9px 16px}
@@ -180,7 +182,7 @@
     <label>Hors TVA <input type="text" inputmode="decimal" id="tv0" autocomplete="off"></label>
     <label>TVA 6 % <input type="text" inputmode="decimal" id="tv6" autocomplete="off"></label>
     <label>TVA 21 % <input type="text" inputmode="decimal" id="tv21" autocomplete="off"></label>
-    <span class="hint">Tapez un montant dans une case : les deux autres se calculent.</span>
+    <span class="hint">Tapez un montant dans une case : les deux autres se calculent.</span> <button type="button" class="zcopy sec" data-z="tva">Copier</button>
   </div>
 
   <form id="f" class="steps" autocomplete="off">
@@ -325,7 +327,7 @@
 
       </div>
       <div class="card result" aria-live="polite">
-        <h3>Consommation estimée</h3>
+        <h3>Consommation estimée <button type="button" class="zcopy sec" data-z="conso">Copier</button></h3>
     <div class="totals">
       <div class="tot e" id="boxE"><div class="lbl">Électricité</div><div class="val" id="totE">–</div><div class="unit" id="totEsub">kWh / an</div></div>
       <div class="tot g" id="boxG"><div class="lbl">Gaz naturel</div><div class="val" id="totG">–</div><div class="unit" id="totGsub">kWh / an</div></div>
@@ -411,7 +413,7 @@
       </fieldset>
       </div>
       <div class="card result" aria-live="polite">
-        <h3>Coût et acompte</h3>
+        <h3>Coût et acompte <button type="button" class="zcopy sec" data-z="cost">Copier</button></h3>
     <div class="cost" id="cost" hidden></div>
         <div class="row" style="margin-top:8px"><span class="clbl">Acompte souhaité</span><input type="text" inputmode="decimal" class="px" id="acSouh" maxlength="8"> <span>€ / mois (demande du client)</span></div>
         <p class="hint" id="costEmpty">Choisissez le contrat et le gestionnaire, ou tapez les prix, pour obtenir l'acompte.</p>
@@ -452,14 +454,14 @@
           <div class="row" id="rgGfRow"><span class="clbl">Conversion</span><input type="text" inputmode="decimal" class="px" id="rgGf" value="10,8" style="width:60px"> <span>kWh par m³ (voir la facture ; environ 10 à 11,5)</span></div>
         </div>
         <div id="perBox" style="margin-top:10px">
-          <div class="row"><span class="clbl">Prix</span><span class="hint" id="perHint">une seule période : prix de l'étape 2</span> <button type="button" id="perAdd" class="sec">+ Ajouter une période de prix</button></div>
-          <div id="perList"></div>
+          <div class="row"><span class="clbl">Prix</span><span class="hint" id="perHint">prix de l'étape 2</span></div>
+          <div id="perList" hidden></div>
         </div>
         <div class="row" style="margin-top:10px"><span class="clbl">Acomptes versés</span><input type="text" inputmode="decimal" class="px" id="rgAc" style="width:90px"> <span>€ TVAC au total sur la période</span></div>
       </fieldset>
       </div>
       <div class="card result" aria-live="polite">
-        <h3>Régularisation attendue</h3>
+        <h3>Régularisation attendue <button type="button" class="zcopy sec" data-z="regul">Copier</button></h3>
         <div class="cost" id="regOut" hidden></div>
         <p class="hint" id="regEmpty">Entrez le code postal, le contrat (ou les prix) et les index de début et de fin pour estimer la facture de régularisation.</p>
       </div>
@@ -1291,7 +1293,7 @@
   }
   function perRows(){ return Array.prototype.map.call(document.querySelectorAll('#perList .per'), function(r){ return {m: r.querySelector('.perM').value, d: pnum(r.querySelector('.perD').value) || 0}; }).filter(function(p){ return p.d > 0; }); }
   function perOptions(sel){ var v = sel.value; sel.innerHTML = ((T && T.mois_dispo) || []).map(function(m){ return '<option value="' + m + '">' + moisLbl(m) + '</option>'; }).join(''); if (v) sel.value = v; if (!sel.value && T) sel.value = T.mois; }
-  $('perAdd').addEventListener('click', function(){
+  if ($('perAdd')) $('perAdd').addEventListener('click', function(){
     var n = document.querySelectorAll('#perList .per').length;
     $('perList').insertAdjacentHTML('beforeend', '<div class="row per"><span class="clbl">Période ' + (n + 1) + '</span><select class="perM"></select> <input type="number" class="perD" min="1" max="800" style="width:70px" value="' + (n ? '' : (pnum($('rgEd').value) || 365)) + '"> <span>jours</span> <button type="button" class="perDel sec" title="Retirer">×</button></div>');
     perOptions($('perList').lastElementChild.querySelector('.perM')); render();
@@ -1310,7 +1312,7 @@
     $('rgGfRow').hidden = $('rgGu').value !== 'm3';
     document.querySelectorAll('#perList .perM').forEach(perOptions);
     var pers = perRows(), sumD = pers.reduce(function(t, p){ return t + p.d; }, 0);
-    $('perHint').textContent = pers.length ? 'consommation et frais fixes répartis au prorata des jours (' + fmt(sumD) + ' jours au total)' : 'une seule période : prix de l\'étape 2';
+    $('perHint').textContent = pers.length ? 'consommation et frais fixes répartis au prorata des jours (' + fmt(sumD) + ' jours au total)' : 'prix de l\'étape 2 (choisissez « Signé en » pour un contrat dont le prix change, ou ajoutez des segments)';
     var socE = showE && SOCIAL.e, socG = showG && SOCIAL.g, fmE = showE && !!formSel('e'), fmG = showG && !!formSel('g');
     if (fmE || fmG){
       var noF = [fmE && !monthPieces('e') ? 'électricité' : '', fmG && !monthPieces('g') ? 'gaz' : ''].filter(Boolean);
@@ -1496,6 +1498,43 @@
     function done(ok){ btn.textContent = ok ? 'Copié ✓' : 'Copie impossible'; setTimeout(function(){ btn.textContent = 'Copier le résultat'; }, 1500); }
     if (navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(lastText).then(function(){ done(true); }, function(){ done(false); }); }
     else { done(false); }
+  });
+  // ---------- Copier le contenu d'une zone, en bref ----------
+  function zoneText(z){
+    function clean(t){ return String(t || '').replace(/\s+/g, ' ').trim(); }
+    function lines(el){ return Array.prototype.map.call(el.querySelectorAll('.line'), function(l){ var sp = l.querySelectorAll('span'); return sp.length > 1 ? clean(sp[0].textContent) + ' : ' + clean(sp[sp.length - 1].textContent) : clean(l.textContent); }); }
+    var out = [];
+    if (z === 'tva'){ var a = $('tv0').value, b = $('tv6').value, c = $('tv21').value; if (!a && !b && !c) return ''; out.push('HTVA ' + a + ' € · TVAC 6 % ' + b + ' € · TVAC 21 % ' + c + ' €'); }
+    if (z === 'conso'){
+      out.push('Consommation estimée');
+      if (!$('boxE').hidden) out.push('Électricité : ' + clean($('totE').textContent) + ' ' + clean($('totEsub').textContent));
+      if (!$('boxG').hidden) out.push('Gaz : ' + clean($('totG').textContent) + ' ' + clean($('totGsub').textContent));
+      if (!$('solar').hidden) out.push(clean($('solar').textContent));
+      Array.prototype.forEach.call($('detail').querySelectorAll('tr'), function(tr){ var t = Array.prototype.map.call(tr.children, function(td){ return clean(td.textContent); }).filter(function(x){ return x && x !== '–'; }); if (t.length > 1) out.push('- ' + t[0] + ' : ' + t.slice(1).join(' / ')); });
+    }
+    if (z === 'cost'){
+      if ($('cost').hidden) return '';
+      var ce = contractName('e'), cg = contractName('g');
+      out.push('Coût et acompte' + (ce || cg ? ' (' + [ce ? 'élec. ' + ce : '', cg ? 'gaz ' + cg : ''].filter(Boolean).join(', ') + ', ' + (SEG() === 'P' ? 'professionnel HTVA' : 'particulier TVAC') + ')' : ''));
+      out = out.concat(lines($('cost')));
+      if (pnum($('acSouh').value) !== null) out.push('Acompte souhaité : ' + $('acSouh').value + ' €/mois');
+    }
+    if (z === 'regul'){
+      if ($('regOut').hidden) return '';
+      out.push('Régularisation estimée');
+      Array.prototype.forEach.call($('regOut').querySelectorAll('table.segt tr'), function(tr, i){ if (!i) return; var t = Array.prototype.map.call(tr.children, function(td){ return clean(td.textContent); }); out.push('- ' + t[0] + ' ' + t[1] + ', ' + t[2] + ', ' + t[3] + ' kWh : ' + t[4] + ' €'); });
+      CURSEG.forEach(function(sg){ out.push('- ' + (sg.en === 'e' ? 'Électricité' : 'Gaz') + ' ' + sg.per + ', ' + sg.contrat + ', ' + fmt(sg.kwh) + ' kWh : ' + fmt(sg.cost) + ' €'); });
+      out = out.concat(lines($('regOut')).filter(function(l){ return /^(Coût total|Acomptes|Régularisation)/.test(l); }));
+    }
+    return out.join('\n');
+  }
+  document.addEventListener('click', function(e){
+    var b = e.target.closest && e.target.closest('.zcopy'); if (!b) return;
+    var t = zoneText(b.dataset.z);
+    function done(ok){ b.textContent = ok ? 'Copié ✓' : (t ? 'Copie impossible' : 'Rien à copier'); setTimeout(function(){ b.textContent = 'Copier'; }, 1500); }
+    if (!t){ done(false); return; }
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(function(){ done(true); }, function(){ done(false); });
+    else done(false);
   });
   window.__compute = compute;
   fillLists();
