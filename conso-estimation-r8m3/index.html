@@ -1218,7 +1218,20 @@
     function add(x, f){ var r = R[f] !== null && R[f] !== undefined ? R[f] : (R.k || 0); return x === null ? null : x + r; }
     return {k: add(k, 'k'), j: add(j, 'j'), n: add(n, 'n'), a: add(t1 !== null ? t1 : j, 'a'), b: add(t2 !== null ? t2 : n, 'b'), c: add(t3 !== null ? t3 : n, 'c'), f: (R.f || 0) + (+F.fixe_an || 0)};
   }
-  // Découpe la période (dates de début et de fin) par trimestre civil (ou par mois) : [{q, m, d}]. null sans dates.
+  // Profils de consommation Synergrid (RLP0N 2025 et 2026) : part de la consommation annuelle de chaque mois.
+  // Électricité par région (V Flandre, W Wallonie, B Bruxelles), gaz pour toute la Belgique.
+  var PROFIL = {"2025":{"e":{"V":[0.11911,0.10098,0.09608,0.07512,0.06608,0.06056,0.06095,0.06288,0.06555,0.08146,0.09733,0.1139],"W":[0.11468,0.09891,0.097,0.07769,0.06828,0.06146,0.06286,0.06431,0.06612,0.08166,0.09562,0.1114],"B":[0.1064,0.09406,0.09384,0.079,0.07469,0.06946,0.06626,0.06586,0.07202,0.08412,0.09249,0.10181]},"g":[0.18206,0.15654,0.12988,0.07228,0.0379,0.01741,0.01447,0.01486,0.0241,0.06431,0.12034,0.16584]},"2026":{"e":{"V":[0.1199,0.10109,0.09395,0.07358,0.06475,0.05918,0.05972,0.06293,0.06667,0.0829,0.09925,0.11608],"W":[0.11749,0.09963,0.0953,0.07573,0.06566,0.05859,0.06039,0.06348,0.06671,0.0833,0.09866,0.11503],"B":[0.10493,0.09243,0.09246,0.07849,0.07464,0.06996,0.06662,0.06756,0.07335,0.08487,0.09283,0.10188]},"g":[0.18079,0.15538,0.12917,0.07221,0.0382,0.01865,0.0156,0.01616,0.02477,0.06398,0.11959,0.16549]}};
+  // Poids d'un morceau de période [s, e[ (horodatages UTC) : somme des parts mensuelles au prorata des jours du mois.
+  function profW(en, s0, e0){
+    var R = {Wallonie: 'W', Flandre: 'V', Bruxelles: 'B'}[regionOf(en)] || 'W', w = 0, cur = s0;
+    while (cur < e0){
+      var d = new Date(cur), y = d.getUTCFullYear(), m = d.getUTCMonth(), nx = Math.min(Date.UTC(y, m + 1, 1), e0), dim = (Date.UTC(y, m + 1, 1) - Date.UTC(y, m, 1)) / 86400000;
+      var P = PROFIL[y] || PROFIL[y < 2025 ? 2025 : 2026], sh = en === 'e' ? P.e[R][m] : P.g[m];
+      w += sh * ((nx - cur) / 86400000) / dim; cur = nx;
+    }
+    return w;
+  }
+  // Découpe la période (dates de début et de fin) par trimestre civil (ou par mois) : [{q, m, d, s, e}]. null sans dates.
   function socialPieces(en, mensuel){
     var a = $('rg' + (en === 'e' ? 'E' : 'G') + 's').value, b = $('rg' + (en === 'e' ? 'E' : 'G') + 'e').value;
     if (!a || !b) return null;
@@ -1226,7 +1239,7 @@
     if (!(end > cur)) return null;
     while (cur < end){
       var dt = new Date(cur), y = dt.getUTCFullYear(), qm = mensuel ? dt.getUTCMonth() : Math.floor(dt.getUTCMonth() / 3) * 3, nx = Math.min(Date.UTC(y, qm + (mensuel ? 1 : 3), 1), end);
-      out.push({q: y + '-' + String(qm + 1).padStart(2, '0') + '-01', m: y + '-' + String(dt.getUTCMonth() + 1).padStart(2, '0') + '-01', d: Math.round((nx - cur) / 86400000)});
+      out.push({q: y + '-' + String(qm + 1).padStart(2, '0') + '-01', m: y + '-' + String(dt.getUTCMonth() + 1).padStart(2, '0') + '-01', d: Math.round((nx - cur) / 86400000), s: cur, e: nx});
       cur = nx;
     }
     return out;
@@ -1315,14 +1328,14 @@
       var c = 0, fx = 0, det = [];
       var FF = !SOCIAL[en] ? formSel(en) : null, mp = FF ? monthPieces(en) : null;
       if (FF && mp){   // contrat variable : formule du mois de signature × paramètre de chaque mois
-        var md = mp.reduce(function(t, p){ return t + p.d; }, 0), nomiss = [];
+        var md = mp.reduce(function(t, p){ return t + p.d; }, 0), mw = mp.map(function(p){ return profW(en, p.s, p.e); }), mwt = mw.reduce(function(t, x){ return t + x; }, 0), nomiss = [];
         for (var q = 0; q < mp.length; q++){
-          var wm = mp[q].d / md, SF = formSet(mp[q], en, FF);
+          var wm = mwt > 0 ? mw[q] / mwt : mp[q].d / md, SF = formSet(mp[q], en, FF);
           if (SF === 'load'){ loading = true; return null; }
           if (SF.miss){ nomiss.push(moisLbl(mp[q].m)); continue; }
           var kcm = kwhCost(SF, en, tot * wm, hp !== null ? hp * wm : null, hc !== null ? hc * wm : null, en === 'e' && hc === null);
           if (kcm === null){ miss.push('prix ' + (en === 'e' ? 'électricité' : 'gaz')); return null; }
-          c += kcm; fx += (SF.f || 0) * dTot * wm / 365;
+          c += kcm; fx += (SF.f || 0) * dTot * (mp[q].d / md) / 365;   // frais fixes : au prorata des jours
         }
         if (nomiss.length){ miss.push('paramètre ' + FF.param + ' inconnu pour ' + nomiss.join(', ')); return null; }
         var sg = String(FF.mois).slice(0, 10), fin = mp[mp.length - 1].m, lim = new Date(Date.UTC(+sg.slice(0, 4), +sg.slice(5, 7) - 1 + 12, 1)).toISOString().slice(0, 10);
@@ -1331,14 +1344,14 @@
       }
       var sp = SOCIAL[en] ? socialPieces(en) : null;
       if (sp){   // tarif social : un prix CREG par trimestre, découpage automatique
-        var sd = sp.reduce(function(t, p){ return t + p.d; }, 0);
+        var sd = sp.reduce(function(t, p){ return t + p.d; }, 0), sw = sp.map(function(p){ return profW(en, p.s, p.e); }), swt = sw.reduce(function(t, x){ return t + x; }, 0);
         for (var k = 0; k < sp.length; k++){
-          var ws = sp[k].d / sd, SS = socialSet(sp[k], en);
+          var ws = swt > 0 ? sw[k] / swt : sp[k].d / sd, SS = socialSet(sp[k], en);
           if (SS === 'load'){ loading = true; return null; }
           if (!SS){ miss.push('tarif social du ' + trimLbl(sp[k].q) + ' (pas encore encodé)'); return null; }
           var kcs = kwhCost(SS, en, tot * ws, hp !== null ? hp * ws : null, hc !== null ? hc * ws : null, en === 'e' && hc === null);
           if (kcs === null){ miss.push('prix ' + (en === 'e' ? 'électricité' : 'gaz')); return null; }
-          c += kcs; fx += (SS.f || 0) * dTot * ws / 365;
+          c += kcs; fx += (SS.f || 0) * dTot * (sp[k].d / sd) / 365;
           det.push(trimLbl(sp[k].q) + ' ' + fmt(sp[k].d) + ' j');
         }
         return {c: c, fx: fx, det: det, soc: true};
@@ -1402,7 +1415,8 @@
         out += '<div class="line"><span>Acomptes versés</span><span>− ' + fmt(ac) + ' €</span></div>';
         out += '<div class="line acompte big ' + (Math.abs(diff) < 0.5 ? '' : diff > 0 ? 'apayer' : 'arembourser') + '"><span>' + (Math.abs(diff) < 0.5 ? 'Régularisation : rien à payer ni à rembourser' : diff > 0 ? 'Régularisation : à payer' : 'Régularisation : à rembourser') + '</span><span>' + fmt(Math.abs(diff)) + ' €</span></div>';
       } else out += '<div class="hint">Entrez le total des acomptes versés pour obtenir le montant de la régularisation.</div>';
-      out += '<div class="hint">Estimation : ' + ((fmE && monthPieces('e')) || (fmG && monthPieces('g')) ? 'formule du contrat et paramètre de chaque mois ; réseau et taxes du mois quand ils sont encodés, sinon de l\'étape 2' + (perRows().length ? ' ; prix de chaque période pour l\'autre énergie' : '') : (socE && socialPieces('e')) || (socG && socialPieces('g')) ? 'tarif social CREG de chaque trimestre' + (perRows().length ? ' et prix de chaque période' : '') : perRows().length ? 'prix de chaque période' : 'prix de l\'étape 2' + (T && T.mois ? ' (' + moisLbl(T.mois) + ')' : '')) + ', frais fixes au prorata des jours. La facture réelle peut différer (index estimés, primes, dates exactes des changements de prix).</div>';
+      out += '<div class="hint">Estimation : ' + ((fmE && monthPieces('e')) || (fmG && monthPieces('g')) ? 'formule du contrat et paramètre de chaque mois ; réseau et taxes du mois quand ils sont encodés, sinon de l\'étape 2' + (perRows().length ? ' ; prix de chaque période pour l\'autre énergie' : '') : (socE && socialPieces('e')) || (socG && socialPieces('g')) ? 'tarif social CREG de chaque trimestre' + (perRows().length ? ' et prix de chaque période' : '') : perRows().length ? 'prix de chaque période' : 'prix de l\'étape 2' + (T && T.mois ? ' (' + moisLbl(T.mois) + ')' : '')) + ', frais fixes au prorata des jours. La facture réelle peut différer (index estimés, primes, dates exactes des changements de prix).</div>' +
+        '<div class="hint">Quand le prix change en cours de période (contrat variable, tarif social), la consommation est répartie entre les mois selon les profils de consommation de Synergrid (RLP 2025-2026), comme le font les gestionnaires de réseau pour un compteur relevé une fois par an : davantage en hiver, surtout pour le gaz (janvier ≈ 18 % de l\'année, juillet ≈ 1,5 %). Les frais fixes restent au prorata des jours.</div>';
     }
     if (miss.length) out += '<div class="hint" style="color:#9a3b2b">Manque : ' + miss.join(', ') + '.</div>';
     if (out !== REGHTML){ $('regOut').innerHTML = out; REGHTML = out; }   // pas de reconstruction inutile (sinon un clic qui suit un « change » se perd)
