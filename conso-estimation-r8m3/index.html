@@ -1308,7 +1308,7 @@
       $('perHint').textContent = 'Tarif social : prix CREG de chaque trimestre, découpage automatique' + (noD.length ? ' (entrez les dates de début et de fin : ' + noD.join(', ') + ')' : '') + (socE && socG ? '' : pers.length ? ' ; périodes ci-dessous pour l\'autre énergie' : '');
     }
     if (!pers.length) pers = [{m: T ? T.mois : null, d: 1}], sumD = 1;
-    var rate = tvaRate(), out = '', totT = 0, ok = 0, miss = [], loading = false;
+    var rate = tvaRate(), out = '', totT = 0, ok = 0, miss = [], loading = false, cur = [];
     function d(a, b){ var x = pnum($(a).value), y = pnum($(b).value); return x !== null && y !== null ? y - x : null; }
     function days(id){ var n = pnum($(id).value); return n && n > 0 ? n : 365; }
     function periodsCost(en, tot, hp, hc, dTot){
@@ -1363,6 +1363,7 @@
         var R = periodsCost('e', tot, hp, hc, dE);
         if (R){
           var prE = (prosAn || 0) * dE / 365, tE = (R.c + R.fx + prE) * (1 + rate); totT += tE; ok++;
+          cur.push({en: 'e', per: perLbl('E', dE), contrat: segContrat('e'), kwh: tot, cost: tE});
           var det = hc !== null ? fmt(hp) + ' kWh pleines + ' + fmt(hc) + ' kWh creuses' + (bi() || tri() ? '' : ' (additionnés, compteur simple)') : fmt(tot) + ' kWh (index unique)';
           out += '<div class="line"><span>Électricité : ' + det + ' sur ' + fmt(dE) + ' jours' + (!back && (hp < 0 || (hc !== null && hc < 0)) ? ' <b style="color:#9a3b2b">(index de fin plus petit ?)</b>' : '') + '</span><span>' + fmt(tE) + ' € TVAC</span></div>';
           out += '<div class="hint used">Consommation ' + fmt(R.c * (1 + rate)) + ' € + frais fixes ' + fmt(R.fx * (1 + rate)) + ' € (' + fmt(dE) + '/365 jours)' + (prE ? ' + prosumer ' + fmt(prE * (1 + rate)) + ' €' : '') + ' TVAC' + (R.det.length ? ' · ' + R.det.join(', ') : '') + '</div>';
@@ -1377,15 +1378,25 @@
         var f = $('rgGu').value === 'm3' ? (pnum($('rgGf').value) || 10.8) : 1, kG = g * f, RG = periodsCost('g', kG, null, null, dG);
         if (RG){
           var tG = (RG.c + RG.fx) * (1 + rate); totT += tG; ok++;
+          cur.push({en: 'g', per: perLbl('G', dG), contrat: segContrat('g'), kwh: kG, cost: tG});
           out += '<div class="line"><span>Gaz : ' + ($('rgGu').value === 'm3' ? fmt(g) + ' m³ × ' + String(f).replace('.', ',') + ' = ' : '') + fmt(kG) + ' kWh sur ' + fmt(dG) + ' jours' + (g < 0 ? ' <b style="color:#9a3b2b">(index de fin plus petit ?)</b>' : '') + '</span><span>' + fmt(tG) + ' € TVAC</span></div>';
           out += '<div class="hint used">Consommation ' + fmt(RG.c * (1 + rate)) + ' € + frais fixes ' + fmt(RG.fx * (1 + rate)) + ' € (' + fmt(dG) + '/365 jours) TVAC' + (RG.det.length ? ' · ' + RG.det.join(', ') : '') + '</div>';
         }
       }
     }
     if (loading) out = '<div class="hint">Chargement des prix des autres mois…</div>' + out;
-    if (ok && !loading){
+    CURSEG = ok && !loading ? cur : [];
+    var segTot = SEGS.reduce(function(t, sg){ return t + sg.cost; }, 0);
+    if (SEGS.length){
+      var th = '<div class="hint used"><b>Segments ajoutés</b></div><div class="tblwrap"><table class="comp segt"><tr><th>Énergie</th><th>Période</th><th>Contrat</th><th>kWh</th><th>€ TVAC</th><th></th></tr>' +
+        SEGS.map(function(sg, i){ return '<tr><td>' + (sg.en === 'e' ? 'Électricité' : 'Gaz') + '</td><td>' + esc(sg.per) + '</td><td>' + esc(sg.contrat) + '</td><td>' + fmt(sg.kwh) + '</td><td>' + fmt(sg.cost) + '</td><td><button type="button" class="sec segDel" data-i="' + i + '" title="Retirer ce segment">×</button></td></tr>'; }).join('') + '</table></div>';
+      out = th + (out ? '<div class="hint used" style="margin-top:8px"><b>Segment en cours</b></div>' + out : '');
+    }
+    if (ok && !loading) out += '<div class="row" style="margin:6px 0"><button type="button" id="segAdd" class="sec">+ Ajouter ce segment</button> <span class="hint">puis encodez la période suivante (autre contrat, autres prix…)</span></div>';
+    if ((ok && !loading) || SEGS.length){
+      totT += segTot;
       var ac = pnum($('rgAc').value);
-      out += '<div class="line"><span>Coût total de la période</span><span>' + fmt(totT) + ' € TVAC</span></div>';
+      out += '<div class="line"><span>Coût total de la période' + (SEGS.length ? ' (' + (SEGS.length + (ok && !loading ? 1 : 0)) + ' segments)' : '') + '</span><span>' + fmt(totT) + ' € TVAC</span></div>';
       if (ac !== null){
         var diff = totT - ac;
         out += '<div class="line"><span>Acomptes versés</span><span>− ' + fmt(ac) + ' €</span></div>';
@@ -1394,8 +1405,27 @@
       out += '<div class="hint">Estimation : ' + ((fmE && monthPieces('e')) || (fmG && monthPieces('g')) ? 'formule du contrat et paramètre de chaque mois ; réseau et taxes du mois quand ils sont encodés, sinon de l\'étape 2' + (perRows().length ? ' ; prix de chaque période pour l\'autre énergie' : '') : (socE && socialPieces('e')) || (socG && socialPieces('g')) ? 'tarif social CREG de chaque trimestre' + (perRows().length ? ' et prix de chaque période' : '') : perRows().length ? 'prix de chaque période' : 'prix de l\'étape 2' + (T && T.mois ? ' (' + moisLbl(T.mois) + ')' : '')) + ', frais fixes au prorata des jours. La facture réelle peut différer (index estimés, primes, dates exactes des changements de prix).</div>';
     }
     if (miss.length) out += '<div class="hint" style="color:#9a3b2b">Manque : ' + miss.join(', ') + '.</div>';
-    $('regOut').innerHTML = out; $('regOut').hidden = !out; $('regEmpty').hidden = !!out;
+    if (out !== REGHTML){ $('regOut').innerHTML = out; REGHTML = out; }   // pas de reconstruction inutile (sinon un clic qui suit un « change » se perd)
+    $('regOut').hidden = !out; $('regEmpty').hidden = !!out;
   }
+  // ---------- Segments : une période facturée avec plusieurs contrats ou prix ----------
+  var SEGS = [], CURSEG = [], REGHTML = null;
+  function perLbl(X, dd){ var a = $('rg' + X + 's').value, b = $('rg' + X + 'e').value; function f(x){ var p = x.split('-'); return p[2] + '/' + p[1] + '/' + p[0]; } return a && b ? f(a) + ' → ' + f(b) + ' (' + fmt(dd) + ' j)' : fmt(dd) + ' jours'; }
+  function segContrat(en){
+    var k = pnum($(en === 'e' ? 'rgPE' : 'rgPG').value), F = formSel(en), n = contractName(en);
+    if (k !== null) return 'prix ' + String(k).replace('.', ',') + ' c€';
+    return (n || 'contrat ?') + (F ? ' (signé ' + moisLbl(String(F.mois).slice(0, 10)) + ')' : SOCIAL[en] ? ' (CREG par trimestre)' : '');
+  }
+  $('regOut').addEventListener('click', function(e){
+    if (e.target.id === 'segAdd'){
+      CURSEG.forEach(function(sg){ SEGS.push(sg); });
+      ['E', 'G'].forEach(function(X){ var fin = $('rg' + X + 'e').value; $('rg' + X + 's').value = fin; $('rg' + X + 'e').value = ''; $('rg' + X + 'd').readOnly = false; $('rg' + X + 'd').value = ''; });
+      [['rgE1', 'rgE2'], ['rgN1', 'rgN2'], ['rgG1', 'rgG2']].forEach(function(x){ $(x[0]).value = $(x[1]).value; $(x[1]).value = ''; });   // l'index de fin devient l'index de début
+      ['rgPE', 'rgPEn', 'rgFE', 'rgPG', 'rgFG'].forEach(function(id){ $(id).value = ''; });
+      $('rgSigE').value = ''; $('rgSigG').value = ''; $('perList').innerHTML = '';
+      render(); $('regSet').scrollIntoView({behavior: 'smooth', block: 'start'});
+    } else if (e.target.classList.contains('segDel')){ SEGS.splice(+e.target.dataset.i, 1); render(); }
+  });
   function regSync(showE, showG){
     var act = document.activeElement;
     $('rgSeg').value = SEG(); $('rgCpt').value = tri() ? 'tri' : bi() ? 'bi' : 'simple';
@@ -1446,7 +1476,7 @@
   })();
   document.getElementById('f').addEventListener('input', render);
   document.getElementById('f').addEventListener('change', render);
-  document.getElementById('reset').addEventListener('click', function(){ document.getElementById('f').reset(); $('cpHint').textContent = CP_HINT; hideSug(); resetPrices(); onDebut(); render(); });
+  document.getElementById('reset').addEventListener('click', function(){ document.getElementById('f').reset(); $('cpHint').textContent = CP_HINT; hideSug(); resetPrices(); SEGS = []; $('perList').innerHTML = ''; onDebut(); render(); });
   document.getElementById('copy').addEventListener('click', function(){
     var btn = this;
     function done(ok){ btn.textContent = ok ? 'Copié ✓' : 'Copie impossible'; setTimeout(function(){ btn.textContent = 'Copier le résultat'; }, 1500); }
