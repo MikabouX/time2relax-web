@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="../icon.svg" type="image/svg+xml">
+<link rel="icon" href="../icon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="../icon-180.png">
+<title>Prix ENGIE du mois – détail par code postal</title>
+<style>
+  :root{
+    --bg:#f5f6f4; --card:#ffffff; --ink:#1d2a24; --muted:#5d6b64; --line:#dde3df;
+    --accent:#1f7a5a; --accent-soft:#e3f2ec; --elec:#c98a00; --gas:#2e6fb7; --warn:#fff6dc; --warn-line:#e6c766;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink);font-size:15px;line-height:1.45}
+  header{background:var(--accent);color:#fff;padding:18px 20px}
+  header h1{margin:0;font-size:20px;font-weight:650}
+  header p{margin:4px 0 0;opacity:.9;font-size:13px}
+  header a{color:#fff}
+  main{max-width:1240px;margin:0 auto;padding:18px 16px 40px;display:grid;gap:18px;min-width:0}
+  main > *{min-width:0}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px}
+  .row{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;margin:6px 0}
+  .lbl{font-weight:600;min-width:140px}
+  input[type=text],input[type=number],select{font:inherit;padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:#fff;max-width:100%}
+  input[type=text]{flex:1 1 220px;min-width:0}
+  .hint{color:var(--muted);font-size:13px}
+  .seg label{margin-right:12px;white-space:nowrap}
+  .sugwrap{position:relative;flex:1 1 260px;min-width:0;display:flex}
+  #sug{position:absolute;top:100%;left:0;right:0;z-index:5;background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.08);max-height:260px;overflow:auto}
+  #sug button{display:block;width:100%;text-align:left;border:0;background:none;padding:7px 10px;font:inherit;cursor:pointer}
+  #sug button:hover{background:var(--accent-soft)}
+  [hidden]{display:none !important}
+  h2{margin:0 0 4px;font-size:18px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+  h2 .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:8px}
+  .e h2 .dot{background:var(--elec)} .g h2 .dot{background:var(--gas)}
+  .tblwrap{overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%}
+  table{border-collapse:collapse;width:100%;font-size:14px}
+  th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+  th:first-child,td:first-child{text-align:left;white-space:normal}
+  thead th{font-size:12.5px;color:var(--muted);font-weight:600;background:#f8faf9}
+  tr.tot td{font-weight:700;border-top:2px solid var(--ink)}
+  tr.sub td{color:var(--muted);font-size:13px}
+  td.best{background:var(--accent-soft);font-weight:700}
+  details.ct{border:1px solid var(--line);border-radius:10px;margin:10px 0;background:#fcfdfc}
+  details.ct > summary{cursor:pointer;padding:10px 12px;font-weight:600;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+  details.ct > summary .hint{font-weight:400}
+  details.ct .in{padding:0 12px 12px}
+  .sec-t{margin:12px 0 4px;font-weight:650;font-size:14px;color:var(--accent)}
+  .note{background:var(--warn);border:1px solid var(--warn-line);border-radius:8px;padding:8px 12px;font-size:13.5px}
+  .btn{font:inherit;font-size:13px;font-weight:600;padding:5px 12px;border-radius:8px;border:1px solid var(--accent);background:#fff;color:var(--accent);cursor:pointer}
+  .btn:hover{background:var(--accent-soft)}
+  a{color:var(--accent)}
+  footer{color:var(--muted);font-size:12.5px;text-align:center}
+  @media (max-width:600px){
+    main{padding:12px 8px 30px;gap:12px}
+    .card{padding:12px}
+    .lbl{min-width:0;flex:1 0 100%}
+    th,td{padding:5px 6px;font-size:13px}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Prix ENGIE du mois – détail complet</h1>
+  <p>Tous les contrats de la liste, scindés comme sur les fiches de prix · <a href="../">← Estimation de consommation</a></p>
+</header>
+<main>
+  <section class="card">
+    <div class="row"><span class="lbl">Code postal ou ville</span>
+      <div class="sugwrap"><input type="text" id="cp" placeholder="Ex. 5000 ou Namur" autocomplete="off"><div id="sug" hidden></div></div>
+    </div>
+    <div class="row"><span class="lbl"></span><span class="hint" id="cpHint">Tapez un code postal (4 chiffres) ou le début du nom de la localité.</span></div>
+    <div class="row" id="grdRowE" hidden><span class="lbl">Réseau électricité</span><select id="grdE"></select></div>
+    <div class="row" id="grdRowG" hidden><span class="lbl">Réseau gaz</span><select id="grdG"></select></div>
+    <div class="row seg"><span class="lbl">Client</span>
+      <label><input type="radio" name="seg" value="R" checked> Particulier (prix TVAC 6 %)</label>
+      <label><input type="radio" name="seg" value="P"> Professionnel (prix HTVA)</label>
+    </div>
+    <div class="row"><span class="lbl">Mois des prix</span><select id="mois"></select> <span class="hint">mois de signature du contrat</span></div>
+    <div class="row"><span class="lbl">Consommation de référence</span>
+      <input type="number" id="refE" value="3500" min="0" step="100" style="width:100px"> <span class="hint">kWh élec.</span>
+      <input type="number" id="refG" value="17000" min="0" step="500" style="width:100px"> <span class="hint">kWh gaz</span>
+      <span class="hint">pour comparer le coût annuel</span>
+    </div>
+  </section>
+  <section class="card e" id="secE" hidden></section>
+  <section class="card g" id="secG" hidden></section>
+  <footer>Prix tirés des fiches ENGIE encodées dans l'outil. Les montants « réseau » regroupent distribution et transport ; « taxes et suppléments » regroupe cotisations, accises et redevances (détail sur la fiche PDF). Outil indicatif : la fiche ENGIE fait foi.</footer>
+</main>
+<script>
+(function(){
+  "use strict";
+  var SB_URL = 'https://gxftbzbvbveocwpdavtt.supabase.co', SB_KEY = 'sb_publishable_9fKWGXevueh6hHJpGQvmhg_EFOd_-dR';
+  function $(id){ return document.getElementById(id); }
+  function rpc(fn, body){ return fetch(SB_URL + '/rest/v1/rpc/' + fn, {method: 'POST', headers: {'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY, 'Content-Type': 'application/json'}, body: JSON.stringify(body || {})}).then(function(r){ if (!r.ok) throw new Error(r.status); return r.json(); }); }
+  function esc(t){ return String(t == null ? '' : t).replace(/[&<>"]/g, function(c){ return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]; }); }
+  function fr(x, d){ return x === null || x === undefined || isNaN(x) ? '–' : (+x).toLocaleString('fr-BE', {minimumFractionDigits: d, maximumFractionDigits: d}); }
+  function moisLbl(iso){ var m = String(iso).slice(0, 7).split('-'); return ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'][+m[1] - 1] + ' ' + m[0]; }
+  function num(v){ return v === null || v === undefined ? null : +v; }
+
+  var T = null, FQ = {f: [], ix: {}}, CPD = null;
+  function SEG(){ return document.querySelector('input[name="seg"]:checked').value; }
+  function DF(){ return SEG() === 'P' ? 1 : 1.06; }
+  function grdOf(code){ return T ? T.grd.filter(function(g){ return g.code === code; })[0] || null : null; }
+  function rowOf(type, en, cle, reg, seg){ return T.prix.filter(function(p){ return p.type === type && p.energie === en && p.cle === cle && p.region === reg && p.segment === seg; })[0] || null; }
+
+  // Valeur d'une tranche avec repli : tri-horaire → jour/nuit → simple.
+  var FB = {k: ['prix_kwh'], j: ['prix_jour', 'prix_kwh'], n: ['prix_nuit', 'prix_kwh'], a: ['prix_t1', 'prix_jour', 'prix_kwh'], b: ['prix_t2', 'prix_nuit', 'prix_kwh'], c: ['prix_t3', 'prix_nuit', 'prix_kwh']};
+  function tv(r, t){ if (!r) return null; for (var i = 0; i < FB[t].length; i++){ var x = r[FB[t][i]]; if (x !== null && x !== undefined) return +x; } return null; }
+
+  // Composantes d'un contrat (HTVA) : énergie, énergie verte, réseau, taxes.
+  function comps(en, cle, reg, grd, seg){
+    var E = rowOf('energie', en, cle, reg, seg); if (!E) return null;
+    var soc = cle === 'Tarif social' || /_SOCIAL_/.test(E.doc || '');
+    var vt = null;
+    if (en === 'e' && !soc){ vt = E.vert_kwh !== null && E.vert_kwh !== undefined ? +E.vert_kwh : null;
+      if (vt === null){ var any = T.prix.filter(function(p){ return p.type === 'energie' && p.energie === 'e' && p.segment === seg && p.region === reg && p.vert_kwh !== null && p.vert_kwh !== undefined; })[0]; vt = any ? +any.vert_kwh : null; } }
+    var R = soc ? {prix_kwh: 0, fixe_an: 0} : (grd ? rowOf('reseau', en, grd, reg, '*') : null);
+    var X = rowOf('taxes', en, soc ? 'Tarif social' : reg, reg, seg);
+    var tri = en === 'e' && !!((E.prix_t1 !== null && E.prix_t1 !== undefined) || (R && R.prix_t1 !== null && R.prix_t1 !== undefined));
+    var bi = en === 'e', T_ = en === 'e' ? (tri ? ['k', 'j', 'n', 'a', 'b', 'c'] : ['k', 'j', 'n']) : ['k'];
+    var o = {E: E, R: R, X: X, soc: soc, cols: T_, en: {}, vt: {}, re: {}, tx: {}, tot: {}, fix: {}};
+    T_.forEach(function(t){
+      var e = tv(E, t), r = R ? tv(R, t) : null, x = X ? (tv(X, t) !== null ? tv(X, t) : 0) : null;
+      o.en[t] = e; o.vt[t] = vt; o.re[t] = r; o.tx[t] = x;
+      o.tot[t] = e === null || r === null || x === null ? null : e + r + x + (vt || 0);
+    });
+    o.fix.en = num(E.fixe_an); o.fix.re = R ? num(R.fixe_an) : null; o.fix.tx = X ? num(X.fixe_an) || 0 : null;
+    o.fix.tot = o.fix.en === null || o.fix.re === null || o.fix.tx === null ? null : o.fix.en + o.fix.re + o.fix.tx;
+    o.pros = !soc && R && R.prosumer_kwe !== null && R.prosumer_kwe !== undefined ? +R.prosumer_kwe : null;
+    return o;
+  }
+  var COL_LBL = {k: 'Simple', j: 'Jour', n: 'Nuit', a: 'Pleines', b: 'Creuses', c: 'Super-creuses'};
+  function docUrl(d){
+    if (!d || !/^[EG]_[A-Z_]+_[RP]_(GREEN|GREY)_C_[IF]_\d\d_[VBW]_F$/.test(d)) return null;
+    var now = new Date(), p = T.mois.split('-'), off = (+p[0] - now.getFullYear()) * 12 + (+p[1] - 1 - now.getMonth());
+    var seg = d.split('_').filter(function(x){ return x === 'R' || x === 'P'; })[0];
+    return 'https://www.engie.be/api/engie/be/ms/pricing/v1/public/pricesAndConditionsPDF?document=' + d + '&monthOffset=' + off + '&segment=' + seg + '&language=F';
+  }
+  function formule(en, cle){
+    var m = String(T.mois).slice(0, 10), F = FQ.f.filter(function(f){ return f.cle === cle && f.energie === en && f.segment === SEG() && String(f.mois).slice(0, 10) === m; })[0];
+    if (!F || F.param === 'FIXE') return F ? 'Prix fixe, garanti 1 an.' : '';
+    var v = FQ.ix[F.param] && FQ.ix[F.param][m];
+    return 'Prix variable indexé chaque mois : simple = ' + fr(+F.k_a, 4) + ' + ' + fr(+F.k_b, 4) + ' × ' + F.param + ' (c€/kWh hors TVA, ' + F.param + ' en €/MWh' + (v !== undefined ? ' ; ' + moisLbl(m) + ' : ' + fr(v, 2) + ' €/MWh' : '') + ').';
+  }
+
+  function contracts(en, reg, seg){
+    var seen = {}, out = [];
+    T.prix.forEach(function(p){ if (p.type === 'energie' && p.energie === en && p.segment === seg && p.region === reg && p.cle !== 'Contrat test' && !seen[p.cle]){ seen[p.cle] = 1; out.push(p.cle); } });
+    return out.sort(function(a, b){ return a.localeCompare(b, 'fr'); });
+  }
+
+  function section(en){
+    var box = $(en === 'e' ? 'secE' : 'secG'), grd = $(en === 'e' ? 'grdE' : 'grdG').value, G = grdOf(grd);
+    if (!T || !G){ box.hidden = true; box.innerHTML = ''; return ''; }
+    var reg = G.region, seg = SEG(), df = DF(), list = contracts(en, reg, seg), ref = +$(en === 'e' ? 'refE' : 'refG').value || 0;
+    var lblE = en === 'e' ? 'Électricité' : 'Gaz', unit = seg === 'P' ? 'HTVA' : 'TVAC';
+    var rows = list.map(function(c){ return {c: c, o: comps(en, c, reg, grd, seg)}; }).filter(function(x){ return x.o; });
+    if (!rows.length){ box.hidden = false; box.innerHTML = '<h2><span><span class="dot"></span>' + lblE + '</span></h2><p class="hint">Aucun contrat encodé pour ' + esc(reg) + ' en ' + moisLbl(T.mois) + '.</p>'; return ''; }
+    var cols = en === 'e' ? (rows.some(function(x){ return x.o.cols.length > 3; }) ? ['k', 'j', 'n', 'a', 'b', 'c'] : ['k', 'j', 'n']) : ['k'];
+    // Tableau de comparaison (tout compris)
+    var costs = rows.map(function(x){ var t = x.o.tot.k, f = x.o.fix.tot; return t === null || f === null ? null : (ref * t / 100 + f) * df; });
+    var best = Math.min.apply(null, costs.filter(function(v, i){ return v !== null && !rows[i].o.soc && rows[i].c !== 'Maison vide' && rows[i].c !== 'Bâtiment vide'; }));   // le tarif social et la maison vide ne sont pas des offres au choix
+    var h = '<h2><span><span class="dot"></span>' + lblE + ' – ' + esc(G.nom) + ' (' + esc(reg) + ')</span><button type="button" class="btn" data-copy="' + en + '">Copier</button></h2>' +
+      '<p class="hint">Gestionnaire de réseau : <b>' + esc(G.nom) + '</b> · prix ' + unit + ' de ' + moisLbl(T.mois) + ' · tout compris (énergie' + (en === 'e' ? ', énergie verte' : '') + ', réseau, taxes)</p>' +
+      '<div class="tblwrap"><table><thead><tr><th>Contrat</th>' + cols.map(function(t){ return '<th>' + COL_LBL[t] + '<br>c€/kWh</th>'; }).join('') + '<th>Fixe<br>€/an</th><th>Coût annuel<br>' + fr(ref, 0) + ' kWh</th></tr></thead><tbody>' +
+      rows.map(function(x, i){ return '<tr><td>' + esc(x.c) + '</td>' + cols.map(function(t){ return '<td>' + fr(x.o.tot[t] === undefined ? null : x.o.tot[t] * df, 3) + '</td>'; }).join('') + '<td>' + fr(x.o.fix.tot === null ? null : x.o.fix.tot * df, 2) + '</td><td' + (costs[i] === best ? ' class="best"' : '') + '>' + fr(costs[i], 0) + ' €</td></tr>'; }).join('') +
+      '</tbody></table></div><p class="hint">Coût annuel calculé au prix simple ; en vert, le moins cher des contrats au choix (hors tarif social et maison vide). Cliquez sur un contrat ci-dessous pour le détail.</p>';
+    // Détail par contrat, scindé comme sur les fiches
+    rows.forEach(function(x){
+      var o = x.o, cs = o.cols, url = docUrl(o.E.doc), fm = formule(en, x.c);
+      function line(lbl, obj, fixe, cls, dec){ return '<tr' + (cls ? ' class="' + cls + '"' : '') + '><td>' + lbl + '</td>' + cs.map(function(t){ var v = obj[t]; return '<td>' + (v === null || v === undefined ? '–' : fr(v * df, dec || 3)) + '</td>'; }).join('') + '<td>' + (fixe === null || fixe === undefined ? '–' : fr(fixe * df, 2)) + '</td></tr>'; }
+      var lines = line('Énergie (ENGIE)', o.en, o.fix.en) +
+        (en === 'e' && !o.soc ? line('Coût énergie verte', o.vt, null) : '') +
+        (o.soc ? '<tr class="sub"><td>Réseau</td>' + cs.map(function(){ return '<td>compris</td>'; }).join('') + '<td>compris</td></tr>' : line('Réseau ' + esc(G.nom) + ' (distribution + transport)', o.re, o.fix.re, '', 2)) +
+        line('Taxes et suppléments' + (o.soc ? ' (accise réduite)' : ''), o.tx, o.fix.tx, '', 4) +
+        line('Total', o.tot, o.fix.tot, 'tot');
+      h += '<details class="ct"><summary>' + esc(x.c) + ' <span class="hint">simple ' + fr(o.tot.k === null ? null : o.tot.k * df, 3) + ' c€/kWh · fixe ' + fr(o.fix.tot === null ? null : o.fix.tot * df, 2) + ' €/an ' + unit + '</span></summary><div class="in">' +
+        '<div class="tblwrap"><table><thead><tr><th>' + unit + '</th>' + cs.map(function(t){ return '<th>' + COL_LBL[t] + '<br>c€/kWh</th>'; }).join('') + '<th>Fixe<br>€/an</th></tr></thead><tbody>' + lines + '</tbody></table></div>' +
+        (o.pros !== null && reg === 'Wallonie' && en === 'e' ? '<p class="hint">Tarif prosumer ' + esc(G.nom) + ' (compteur qui tourne à l\'envers) : ' + fr(o.pros * df, 2) + ' €/kWe/an.</p>' : '') +
+        (o.soc ? '<p class="note">Tarif social : prix fixé par la CREG chaque trimestre, réseau compris, sans redevance fixe ni tarif prosumer.</p>' : '') +
+        (fm ? '<p class="hint">' + esc(fm) + '</p>' : '') +
+        (url ? '<p><a href="' + url + '" target="_blank" rel="noopener">Fiche ENGIE (PDF)</a></p>' : '') +
+        '</div></details>';
+    });
+    box.innerHTML = h; box.hidden = false;
+    // Texte compact pour le bouton Copier
+    return lblE + ' – ' + G.nom + ' (' + reg + '), prix ' + unit + ' ' + moisLbl(T.mois) + ' :\n' + rows.map(function(x, i){
+      return '- ' + x.c + ' : ' + cols.map(function(t){ return COL_LBL[t].toLowerCase() + ' ' + fr(x.o.tot[t] === undefined ? null : x.o.tot[t] * df, 3); }).join(' / ') + ' c€/kWh, fixe ' + fr(x.o.fix.tot === null ? null : x.o.fix.tot * df, 2) + ' €/an' + (costs[i] !== null ? ', ≈ ' + fr(costs[i], 0) + ' €/an pour ' + fr(ref, 0) + ' kWh' : '');
+    }).join('\n');
+  }
+  var TXT = {e: '', g: ''};
+  function render(){ TXT.e = section('e'); TXT.g = section('g'); }
+
+  document.addEventListener('click', function(e){
+    var b = e.target.closest && e.target.closest('[data-copy]'); if (!b) return;
+    var t = TXT[b.dataset.copy];
+    function done(ok){ b.textContent = ok ? 'Copié ✓' : 'Copie impossible'; setTimeout(function(){ b.textContent = 'Copier'; }, 1500); }
+    if (t && navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(function(){ done(true); }, function(){ done(false); }); else done(false);
+  });
+
+  // ---------- Code postal / localité ----------
+  var sugT = null, sugSeq = 0, cpSeq = 0;
+  function hideSug(){ $('sug').hidden = true; $('sug').innerHTML = ''; }
+  function fillGrd(en, list){
+    var sel = $(en === 'e' ? 'grdE' : 'grdG'), row = $(en === 'e' ? 'grdRowE' : 'grdRowG');
+    var all = T.grd.filter(function(g){ return en === 'e' ? g.elec : g.gaz; }), opts = list ? all.filter(function(g){ return list.indexOf(g.code) >= 0; }) : all;
+    sel.innerHTML = (opts.length > 1 ? '<option value="">Choisir…</option>' : '') + opts.map(function(g){ return '<option value="' + esc(g.code) + '">' + esc(g.nom) + ' (' + esc(g.region) + ')</option>'; }).join('');
+    if (opts.length === 1) sel.value = opts[0].code;
+    if (!opts.length) sel.innerHTML = '';
+    row.hidden = !CPD || !opts.length;
+  }
+  function lookup(code, nom){
+    var my = ++cpSeq; $('cpHint').textContent = 'Recherche…';
+    rpc('conso_cp_get', {p_code: +code}).then(function(d){
+      if (my !== cpSeq) return; CPD = d;
+      if (!d.connu){ $('cpHint').textContent = 'Code postal inconnu : choisissez le gestionnaire à la main.'; fillGrd('e', null); fillGrd('g', null); $('grdRowE').hidden = false; $('grdRowG').hidden = false; render(); return; }
+      fillGrd('e', d.e); fillGrd('g', d.g);
+      var msg = [];
+      ['e', 'g'].forEach(function(en){ var l = d[en] || [], n = l.map(function(c){ var g = grdOf(c); return g ? g.nom : c; });
+        msg.push((en === 'e' ? 'Électricité : ' : 'Gaz : ') + (n.length ? n.join(' ou ') + (n.length > 1 ? ' (selon l\'adresse, à choisir)' : '') : 'pas de réseau de gaz connu')); });
+      $('cpHint').textContent = (nom ? code + ' ' + nom + ' · ' : '') + msg.join(' · ');
+      render();
+    }).catch(function(){ if (my === cpSeq) $('cpHint').textContent = 'Recherche impossible pour le moment.'; });
+  }
+  $('cp').addEventListener('input', function(){
+    var t = this.value.trim(); clearTimeout(sugT);
+    if (/^\d{4}$/.test(t)){ hideSug(); lookup(t, null); return; }
+    if (/^\d{4}\s+\D/.test(t)){ hideSug(); return; }
+    if (t.length < 2 || /^\d{1,3}$/.test(t)){ hideSug(); return; }
+    var my = ++sugSeq;
+    sugT = setTimeout(function(){
+      rpc('conso_cp_search', {p_q: t}).then(function(l){
+        if (my !== sugSeq) return;
+        $('sug').innerHTML = l && l.length ? l.slice(0, 12).map(function(x){ return '<button type="button" data-code="' + x.code + '" data-nom="' + esc(x.nom) + '">' + x.code + ' ' + esc(x.nom) + (x.commune && x.commune !== x.nom ? ' <span class="hint">(' + esc(x.commune) + ')</span>' : '') + '</button>'; }).join('') : '<span class="hint" style="display:block;padding:7px 10px">Aucune localité trouvée</span>';
+        $('sug').hidden = false;
+      }).catch(hideSug);
+    }, 200);
+  });
+  $('sug').addEventListener('mousedown', function(e){ e.preventDefault(); });
+  $('sug').addEventListener('click', function(e){ var b = e.target.closest('button[data-code]'); if (!b) return; $('cp').value = b.dataset.code + ' ' + b.dataset.nom; hideSug(); lookup(b.dataset.code, b.dataset.nom); });
+  $('cp').addEventListener('keydown', function(e){ if (e.key === 'Enter'){ var b = $('sug').querySelector('button[data-code]'); e.preventDefault(); if (b && !$('sug').hidden) b.click(); } if (e.key === 'Escape') hideSug(); });
+  $('cp').addEventListener('blur', function(){ setTimeout(hideSug, 150); });
+  ['grdE', 'grdG', 'refE', 'refG'].forEach(function(id){ $(id).addEventListener('input', render); });
+  document.querySelectorAll('input[name="seg"]').forEach(function(r){ r.addEventListener('change', render); });
+
+  function loadMonth(m){
+    return rpc('conso_prix_get', {p_mois: m}).then(function(d){
+      T = d;
+      $('mois').innerHTML = (d.mois_dispo || []).map(function(x){ return '<option value="' + x + '">' + moisLbl(x) + '</option>'; }).join('');
+      $('mois').value = d.mois;
+      if (!$('grdE').options.length){ fillGrd('e', null); fillGrd('g', null); }
+      render();
+    });
+  }
+  $('mois').addEventListener('change', function(){ loadMonth(this.value); });
+  Promise.all([loadMonth(null), rpc('conso_formule_get', {}).then(function(d){ var ix = {}; (d.indices || []).forEach(function(i){ (ix[i.param] = ix[i.param] || {})[String(i.mois).slice(0, 10)] = +i.valeur; }); FQ = {f: d.formules || [], ix: ix}; }).catch(function(){})])
+    .then(render).catch(function(){ $('cpHint').textContent = 'Impossible de charger les prix pour le moment.'; });
+})();
+</script>
+<script src="../../visit.js" data-page="conso-prix"></script>
+</body>
+</html>
