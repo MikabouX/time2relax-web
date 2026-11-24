@@ -112,6 +112,11 @@
       <p class="hint" style="margin:6px 0 0">Les cartes arrivent dans votre dossier Téléchargements (Chrome demande la première fois d'autoriser les téléchargements multiples). Demandez ensuite à Claude de les lire. Pour un mois passé, les cartes viennent des archives d'ENGIE : essayez d'abord un lien seul.</p>
       <div id="cardLinks" class="hint" style="margin-top:6px"></div>
     </details>
+    <details class="sec" id="avBox">
+      <summary><strong>Avis des collègues</strong> <span class="hint" id="avCount"></span></summary>
+      <p class="hint" style="margin:6px 0">Un avis qui reçoit une réponse est affiché (anonymement) sur la page des avis. Vider la réponse le retire.</p>
+      <div id="avList"></div>
+    </details>
     <details class="sec" id="tsBox">
       <summary><strong>Tarif social CREG par trimestre</strong> <span class="hint">(jamais effacé ; sert aux régularisations au tarif social)</span></summary>
       <p class="hint" style="margin:6px 0">Prix « hors TVA » des fiches de la CREG (<a href="https://www.creg.be/fr/consommateurs/prix-et-tarifs/tarif-social/tarif-social-pour-lenergie-quest-ce-que-cest-et-qui-y-a" target="_blank" rel="noopener">page du tarif social</a>), en c€/kWh, réseau compris. La cotisation, l'accise et la redevance de raccordement restent dans la ligne « Tarif social » des taxes du mois. Nouveau trimestre publié vers la fin du trimestre précédent.</p>
@@ -179,10 +184,30 @@
       $('loginCard').hidden = true; $('app').hidden = false; $('logout').hidden = false; $('who').textContent = S.email;
       var d = new Date(); $('mois').value = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
       loadVisits();
-      loadTs();
+      loadTs(); loadAvis();
       return load().then(loadProps);
     });
   }
+  // ---------- Avis et réponses ----------
+  function escA(t){ return String(t == null ? '' : t).replace(/[&<>"]/g, function(ch){ return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[ch]; }); }
+  function loadAvis(){
+    return rpc('conso_avis_list', {}).then(function(l){
+      l = l || []; var sans = l.filter(function(a){ return !a.reponse; }).length;
+      $('avCount').textContent = '(' + l.length + ' avis' + (sans ? ', ' + sans + ' sans réponse' : '') + ')';
+      $('avList').innerHTML = l.map(function(a){
+        return '<div class="av" data-id="' + a.id + '" style="border-top:1px solid #dde3df;padding:10px 0"><b>' + '★★★★★'.slice(0, a.note) + '</b> <span class="hint">' + String(a.created_at).slice(0, 10) + '</span>' +
+          (a.commentaire ? '<div style="white-space:pre-line;margin:4px 0">' + escA(a.commentaire) + '</div>' : '') +
+          '<textarea rows="2" style="width:100%;font:inherit" placeholder="Réponse (affichée sur la page des avis)">' + escA(a.reponse || '') + '</textarea>' +
+          '<div class="row"><button type="button" class="avSave">Enregistrer la réponse</button> <span class="msg"></span></div></div>';
+      }).join('') || '<p class="hint">Aucun avis.</p>';
+    }).catch(function(e){ $('avList').textContent = e.message; });
+  }
+  $('avList').addEventListener('click', function(e){
+    if (!e.target.classList.contains('avSave')) return;
+    var box = e.target.closest('.av'), m = box.querySelector('.msg');
+    m.textContent = 'Enregistrement…';
+    rpc('conso_avis_repondre', {p_id: +box.dataset.id, p_reponse: box.querySelector('textarea').value}).then(function(){ m.textContent = 'Enregistré ✓'; loadAvis(); }).catch(function(err){ m.textContent = err.message; });
+  });
   // ---------- Tarif social CREG par trimestre ----------
   var TS_F = [['e_mono', 'Élec simple'], ['e_jour', 'Jour'], ['e_nuit', 'Nuit'], ['e_excl', 'Excl. nuit'], ['g', 'Gaz']];
   function qLbl(q){ var p = String(q).split('-'); return 'T' + ((+p[1] + 2) / 3) + ' ' + p[0]; }

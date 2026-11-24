@@ -341,7 +341,7 @@
     <details>
       <summary>Hypothèses et sources</summary>
       <ul>
-        <li>Base : grille de consommations moyennes par nombre de personnes et type de logement (grille de formation), deux valeurs lissées pour qu'un ménage plus grand ne consomme jamais moins. Valeurs cohérentes avec l'étude ULB pour la CREG (2026) et les moyennes du gouvernement flamand.</li>
+        <li>Base : grille de consommations moyennes par nombre de personnes et type de logement (grille de formation), deux valeurs lissées pour qu'un ménage plus grand ne consomme jamais moins. Valeurs cohérentes avec l'étude ULB pour la CREG (2026) et les moyennes du gouvernement flamand. Électricité revue à la baisse pour les maisons le 24/11/2026 (repères récents : environ 1 650 kWh pour une personne, 3 500 kWh pour quatre).</li>
         <li>La base gaz comprend le chauffage et l'eau chaude au gaz. Eau chaude au gaz : 800 kWh par personne et par an (Homegrade).</li>
         <li>Boiler électrique : 850 kWh par personne et par an (Homegrade).</li>
         <li>Chauffage électrique : 0,9 kWh d'électricité par kWh de gaz remplacé (rendement de la chaudière). Pompe à chaleur : 3 fois moins (COP saisonnier de 3, ecoconso).</li>
@@ -485,12 +485,14 @@
 (function(){
   "use strict";
   // Grille [personnes 1..5][appartement, 2F, 3F, 4F] en kWh/an
+  // Électricité revue le 24/11/2026 (avis : estimations un peu hautes) : le type de logement pèse peu sur l'électricité,
+  // repères récents ≈ 1 650 kWh pour 1 personne, ≈ 3 500 kWh pour 4 personnes.
   var ELEC = [
-    [1900, 2200, 2500, 3300],
-    [2400, 3100, 3500, 4300],
-    [2800, 3500, 4000, 4900],
-    [2850, 3700, 4100, 5100],
-    [2900, 3800, 4500, 6000]
+    [1700, 1900, 2000, 2300],
+    [2300, 2600, 2800, 3200],
+    [2700, 3000, 3300, 3700],
+    [3100, 3400, 3700, 4100],
+    [3300, 3700, 4000, 4500]
   ];
   var GAS = [
     [ 6900, 11800, 13700, 17000],

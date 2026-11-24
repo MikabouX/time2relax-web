@@ -33,6 +33,15 @@
   a{color:var(--accent)}
   .back{display:inline-block;margin-top:16px;font-size:14px}
   footer{color:var(--muted);font-size:12px;text-align:center;margin-top:18px}
+  .rev{margin-top:16px}
+  .rev h2{font-size:17px;margin:0 0 10px}
+  .av{border-top:1px solid var(--line);padding:12px 0}
+  .av:first-of-type{border-top:0}
+  .av .st{color:var(--star);letter-spacing:1px}
+  .av .d{color:var(--muted);font-size:12.5px;margin-left:6px}
+  .av p{margin:6px 0;white-space:pre-line}
+  .av .rep{background:var(--accent-soft);border-radius:8px;padding:8px 12px;margin-top:6px;white-space:pre-line}
+  .av .rep b{color:var(--accent)}
 </style>
 </head>
 <body>
@@ -59,8 +68,9 @@
     <button class="send" id="send" disabled>Envoyer mon avis</button>
     <div class="msg" id="msg" role="status"></div>
   </div>
+  <div class="card rev" id="revCard" hidden><h2>Vos avis et nos réponses</h2><div id="revList"></div></div>
   <a class="back" href="../">← Retour à l'estimation</a>
-  <footer>Seuls la note, le commentaire et la date sont enregistrés (hébergeur : Supabase). Aucun nom ni cookie : la page ne demande pas qui vous êtes.</footer>
+  <footer>Seuls la note, le commentaire et la date sont enregistrés (hébergeur : Supabase). Aucun nom ni cookie : la page ne demande pas qui vous êtes. Les avis qui reçoivent une réponse sont affichés sur cette page.</footer>
 </main>
 <script>
 (function(){
@@ -79,6 +89,18 @@
   });
   document.getElementById('stars').addEventListener('mouseleave', function(){ paint(note); });
   c.addEventListener('input', function(){ document.getElementById('count').textContent = c.value.length; });
+
+  function esc(t){ return String(t == null ? '' : t).replace(/[&<>"]/g, function(ch){ return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[ch]; }); }
+  function dfr(d){ var p = String(d).slice(0, 10).split('-'); return p[2] + '/' + p[1] + '/' + p[0]; }
+  fetch(URL + '/rest/v1/rpc/conso_avis_public', {method: 'POST', headers: {'apikey': KEY, 'Authorization': 'Bearer ' + KEY, 'Content-Type': 'application/json'}, body: '{}'})
+    .then(function(r){ return r.ok ? r.json() : []; }).then(function(l){
+      if (!l || !l.length) return;
+      document.getElementById('revList').innerHTML = l.map(function(a){
+        return '<div class="av"><span class="st" aria-label="' + a.note + ' sur 5">' + '★★★★★'.slice(0, a.note) + '<span style="color:var(--line)">' + '★★★★★'.slice(a.note) + '</span></span><span class="d">' + dfr(a.date) + '</span>' +
+          (a.commentaire ? '<p>' + esc(a.commentaire) + '</p>' : '') + '<div class="rep"><b>Réponse</b> (' + dfr(a.reponse_at) + ') : ' + esc(a.reponse) + '</div></div>';
+      }).join('');
+      document.getElementById('revCard').hidden = false;
+    }).catch(function(){});
 
   send.addEventListener('click', function(){
     if (!note) return;

@@ -283,3 +283,26 @@ returns jsonb language sql stable security definer set search_path = public as $
 $$;
 revoke all on function public.conso_formule_get() from public;
 grant execute on function public.conso_formule_get() to anon, authenticated;
+
+-- ===== Réponses aux avis (migration conso_avis_reponses, 24 novembre 2026) =====
+alter table public.conso_avis add column if not exists reponse text check (char_length(reponse) <= 2000);
+alter table public.conso_avis add column if not exists reponse_at timestamptz;
+-- conso_avis_list() renvoie aussi reponse et reponse_at.
+create or replace function public.conso_avis_repondre(p_id bigint, p_reponse text)
+returns boolean language plpgsql security definer set search_path to 'public' as $function$
+begin
+  if not public.t2r_is_admin() then raise exception 'réservé aux administrateurs'; end if;
+  update public.conso_avis set reponse = left(nullif(btrim(p_reponse), ''), 2000),
+         reponse_at = case when nullif(btrim(p_reponse), '') is null then null else now() end
+   where id = p_id;
+  return found;
+end $function$;
+create or replace function public.conso_avis_public()
+returns jsonb language sql stable security definer set search_path to 'public' as $function$
+  select coalesce(jsonb_agg(jsonb_build_object('date', created_at::date, 'note', note, 'commentaire', commentaire, 'reponse', reponse, 'reponse_at', reponse_at::date) order by created_at desc), '[]'::jsonb)
+  from (select * from public.conso_avis where reponse is not null order by created_at desc limit 50) a;
+$function$;
+revoke all on function public.conso_avis_repondre(bigint, text) from public, anon;
+grant execute on function public.conso_avis_repondre(bigint, text) to authenticated;
+revoke all on function public.conso_avis_public() from public;
+grant execute on function public.conso_avis_public() to anon, authenticated;
