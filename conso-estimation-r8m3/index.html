@@ -804,6 +804,7 @@
     if (!d || !/^[EG]_[A-Z_]+_[RP]_(GREEN|GREY)_C_[IF]_\d\d_[VBW]_F$/.test(d)){ a.hidden = true; a.removeAttribute('href'); return; }
     var now = new Date(), off = 0;
     if (T && T.mois){ var p = T.mois.split('-'); off = (+p[0] - now.getFullYear()) * 12 + (+p[1] - 1 - now.getMonth()); }
+    if (off !== 0){ a.hidden = true; a.removeAttribute('href'); return; }   // mois passés : pas de lien vers les archives ENGIE
     var seg = d.split('_').filter(function(x){ return x === 'R' || x === 'P'; })[0];
     a.href = 'https://www.engie.be/api/engie/be/ms/pricing/v1/public/pricesAndConditionsPDF?document=' + d + '&monthOffset=' + off + '&segment=' + seg + '&language=F';
     a.title = 'Carte tarifaire ENGIE ' + (T && T.mois ? T.mois.slice(0, 7) : '') + ' (' + d + ')';

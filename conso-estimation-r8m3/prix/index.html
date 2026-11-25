@@ -173,6 +173,7 @@
   function docUrl(d){
     if (!d || !/^[EG]_[A-Z_]+_[RP]_(GREEN|GREY)_C_[IF]_\d\d_[VBW]_F$/.test(d)) return null;
     var now = new Date(), p = T.mois.split('-'), off = (+p[0] - now.getFullYear()) * 12 + (+p[1] - 1 - now.getMonth());
+    if (off !== 0) return null;   // mois passés : pas de lien possible vers les archives ENGIE
     var seg = d.split('_').filter(function(x){ return x === 'R' || x === 'P'; })[0];
     return 'https://www.engie.be/api/engie/be/ms/pricing/v1/public/pricesAndConditionsPDF?document=' + d + '&monthOffset=' + off + '&segment=' + seg + '&language=F';
   }
@@ -417,6 +418,7 @@
   function docUrl2(d, m){
     if (!d || !/^[EG]_[A-Z_]+_[RP]_(GREEN|GREY)_C_[IF]_\d\d_[VBW]_F$/.test(d)) return null;
     var now = new Date(), p = m.split('-'), off = (+p[0] - now.getFullYear()) * 12 + (+p[1] - 1 - now.getMonth());
+    if (off !== 0) return null;   // mois passés : pas de lien possible vers les archives ENGIE
     return 'https://www.engie.be/api/engie/be/ms/pricing/v1/public/pricesAndConditionsPDF?document=' + d + '&monthOffset=' + off + '&segment=' + (/_P_/.test(d) ? 'P' : 'R') + '&language=F';
   }
   function section(en){ return SEG() === 'R' ? sectionR(en) : sectionAgg(en); }
