@@ -306,3 +306,17 @@ revoke all on function public.conso_avis_repondre(bigint, text) from public, ano
 grant execute on function public.conso_avis_repondre(bigint, text) to authenticated;
 revoke all on function public.conso_avis_public() from public;
 grant execute on function public.conso_avis_public() to anon, authenticated;
+
+-- 2026-11-25 · conso_detail_cartes : détail des fiches Easy particuliers (réseau distribution/transport, suppléments), valeurs TVAC des fiches.
+-- Un enregistrement vaut jusqu'au suivant pour le même segment / énergie / région. data = {l: mise en page, t: tableaux par gestionnaire, p: suppléments [titre, libellé, valeur], v: énergie verte, s: fiche source}.
+create table if not exists public.conso_detail (
+  mois date not null, segment text not null, energie text not null, region text not null,
+  data jsonb not null, updated_at timestamptz not null default now(),
+  primary key (mois, segment, energie, region));
+alter table public.conso_detail enable row level security;
+create or replace function public.conso_detail_get()
+ returns jsonb language sql stable security definer set search_path to 'public' as $$
+  select coalesce(jsonb_agg(jsonb_build_object('mois', mois, 'segment', segment, 'energie', energie, 'region', region, 'data', data) order by mois), '[]'::jsonb) from conso_detail;
+$$;
+revoke all on function public.conso_detail_get() from public;
+grant execute on function public.conso_detail_get() to anon, authenticated;
