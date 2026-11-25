@@ -1602,16 +1602,32 @@
     if (act !== $('hubG')) $('hubG').value = knG !== null ? String(knG) : '';
     $('hubE').placeholder = fmt(effE).replace(/\s/g, ''); $('hubG').placeholder = fmt(effG).replace(/\s/g, '');
     $('hubE').readOnly = twoIdx; $('hubE').title = twoIdx ? 'Heures pleines + creuses (étape Estimation)' : '';
-    $('hubE').closest('label').hidden = !showE; $('hubG').closest('label').hidden = !showG;
+    // Énergie non demandée : 0 dans la case (les deux cases restent visibles pour pouvoir la remettre).
+    if (!showE && act !== $('hubE')) $('hubE').value = '0';
+    if (!showG && act !== $('hubG')) $('hubG').value = '0';
     HUB = {e: showE ? Math.round(effE) : null, g: showG ? Math.round(effG) : null};
     $('hubHint').textContent = (knE !== null || knG !== null) ? 'Consommation connue : elle remplace l\'estimation.' : 'Vide : l\'estimation (en gris) est utilisée.';
     framePost();
   }
-  $('hubE').addEventListener('input', function(){ $('knE').value = this.value.replace(/\D/g, ''); $('knEN').value = ''; });
-  $('hubG').addEventListener('input', function(){ $('knG').value = this.value.replace(/\D/g, ''); });
+  // Une consommation tapée dans une case et l'autre case vide : l'autre énergie vaut 0 (pas affichée).
+  // 0 dans une case : cette énergie n'est pas calculée ; une valeur > 0 la remet.
+  function hubIn(en){
+    var me = $(en === 'e' ? 'hubE' : 'hubG'), other = $(en === 'e' ? 'hubG' : 'hubE');
+    var v = me.value.replace(/\D/g, ''), cur = val('en');
+    if (v !== '' && other.value.trim() === '') other.value = '0';
+    if (v === '' && other.value.trim() === '0'){ other.value = ''; document.querySelector('input[name="en"][value="both"]').checked = true; cur = 'both'; }
+    var e0 = $('hubE').value.trim() === '0', g0 = $('hubG').value.trim() === '0';
+    var want = e0 && !g0 ? 'g' : g0 && !e0 ? 'e' : (cur === (en === 'e' ? 'g' : 'e') && +v > 0 ? 'both' : cur);
+    if (want !== cur) document.querySelector('input[name="en"][value="' + want + '"]').checked = true;
+    var vE = $('hubE').value.replace(/\D/g, ''), vG = $('hubG').value.replace(/\D/g, '');
+    if (en === 'e' || vE === '0') { $('knE').value = vE === '0' ? '' : vE; $('knEN').value = ''; }
+    if (en === 'g' || vG === '0') $('knG').value = vG === '0' ? '' : vG;
+  }
+  $('hubE').addEventListener('input', function(){ hubIn('e'); });
+  $('hubG').addEventListener('input', function(){ hubIn('g'); });
   function framePost(){
     var fr = $('prixFrame'); if (!fr || !fr.contentWindow) return;
-    try { fr.contentWindow.postMessage({t2rPrix: 1, cp: cpCode(), grdE: $('grdE').value, grdG: $('grdG').value, refE: HUB.e, refG: HUB.g, seg: SEG(), hint: $('cpHint').textContent}, '*'); } catch (e){}
+    try { fr.contentWindow.postMessage({t2rPrix: 1, cp: cpCode(), grdE: $('grdE').value, grdG: $('grdG').value, refE: HUB.e, refG: HUB.g, en: val('en'), seg: SEG(), hint: $('cpHint').textContent}, '*'); } catch (e){}
   }
   $('prixFrame').addEventListener('load', framePost);
   window.addEventListener('message', function(ev){

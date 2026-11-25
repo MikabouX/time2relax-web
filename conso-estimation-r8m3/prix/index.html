@@ -394,13 +394,14 @@
   }
   function section(en){ return SEG() === 'R' ? sectionR(en) : sectionAgg(en); }
   // ---------- Intégration dans le simulateur (?embed=1) ----------
-  var EMB = document.documentElement.className === 'embed';
+  var EMB = document.documentElement.className === 'embed', EN = 'both';
   function up(o){ if (EMB && window.parent !== window){ o.t2rPrixUp = 1; try { window.parent.postMessage(o, '*'); } catch (e){} } }
   function upH(){ up({h: document.documentElement.scrollHeight}); }
   if (EMB){
     window.addEventListener('message', function(ev){
       var d = ev.data; if (!d || !d.t2rPrix || ev.source !== window.parent) return;
       var r = document.querySelector('input[name="seg"][value="' + (d.seg === 'P' ? 'P' : 'R') + '"]'), segCh = !r.checked; r.checked = true;
+      EN = d.en || 'both';
       if (d.refE !== null && d.refE !== undefined) $('refE').value = d.refE;
       if (d.refG !== null && d.refG !== undefined) $('refG').value = d.refG;
       if (GRD.length){
@@ -419,7 +420,7 @@
   }
 
   var TXT = {e: '', g: ''};
-  function render(){ TXT.e = section('e'); TXT.g = section('g'); upH(); }
+  function render(){ TXT.e = section('e'); TXT.g = section('g'); if (EN === 'e') $('secG').hidden = true; if (EN === 'g') $('secE').hidden = true; upH(); }
 
   document.addEventListener('click', function(e){
     var b = e.target.closest && e.target.closest('[data-copy]'); if (!b) return;
