@@ -104,14 +104,12 @@
 
     <details class="sec" id="cards">
       <summary><strong>Cartes tarifaires ENGIE du mois</strong> <span class="hint">(liens directs, à ouvrir ou télécharger puis à m'envoyer)</span></summary>
-      <div class="row" style="margin-top:8px"><span class="hint">Cartes du mois :</span> <select id="cardMonth"></select> <span class="hint" id="cardMonthHint"></span></div>
       <div class="row" style="margin-top:8px">
         <button type="button" id="dlAll">Tout télécharger (<span id="dlCount">0</span> cartes)</button> <button type="button" id="dlAutres" class="sec">Autres tarifs seulement</button>
         <span class="msg" id="dlMsg"></span>
       </div>
-      <p class="hint" style="margin:6px 0 0">Les cartes arrivent dans votre dossier Téléchargements (Chrome demande la première fois d'autoriser les téléchargements multiples). Demandez ensuite à Claude de les lire. Pour un mois passé, les cartes viennent des archives d'ENGIE : essayez d'abord un lien seul.</p>
+      <p class="hint" style="margin:6px 0 0">Les cartes arrivent dans votre dossier Téléchargements (Chrome demande la première fois d'autoriser les téléchargements multiples). Demandez ensuite à Claude de les lire.</p>
       <div id="cardLinks" class="hint" style="margin-top:6px"></div>
-      <div id="manque" style="margin-top:10px" hidden></div>
     </details>
     <details class="sec" id="avBox">
       <summary><strong>Avis des collègues</strong> <span class="hint" id="avCount"></span></summary>
@@ -389,24 +387,10 @@
     ['Easy variable', 'EASY_{S}_GREEN_C_I_{D}', true, '', '', '', 'EASY_INDEXED'], ['Easy fixe', 'EASY_{S}_GREEN_C_F_{D}', true, '', '', '', 'EASY_FIXED'], ['Flow variable', 'FLOW_{S}_GREEN_C_I_{F}', true, '', '', '', 'FLOW'],
     ['Direct Online variable', 'DIRECT_ONLINE_{S}_{DG}_C_I_{D}', true, '', '', '', 'DIRECT'], ['Dynamic', 'DYNAMIC_{S}_GREY_C_I_{D}', false, '', '', '', 'DYNAMIC'],
     ['Empower variable/Flextime', 'EMPOWER_{S}_GREEN_C_I_00', true, '', '', '', 'EMPOWER_INDEXED_OR_FLEXTIME'], ['Empower fixe', 'EMPOWER_{S}_GREEN_C_F_00', true, '', '', '', 'EMPOWER_FIXED'],
-    // « Nos autres tarifs » : [nom, code, gaz, segments, régions, nom pro, code archive] (vide = tous)
+    // « Nos autres tarifs » : [nom, code, gaz, segments, régions, nom pro, code ENGIE] (vide = tous)
     ['Basic Online variable', 'BASIC_ONLINE_{S}_GREY_C_I_24', true, 'R', 'VW', '', 'BASIC', 1],
     ['Maison vide', 'EMPTYHOUSE_{S}_GREY_C_I_36', true, 'RP', 'VBW', 'Bâtiment vide', 'EMPTY_HOUSE', 1],
     ['Tarif social', 'SOCIAL_{S}_GREY_C_F_00', true, 'R', 'VBW', '', 'SOCIAL_TARIFF', 1]];
-  // Archives ENGIE (mois passés) : même document, paramètres explicites (relevés sur la page « anciennes fiches de prix »).
-  var ARCH_REG = {V: 'FLANDERS', B: 'BRUSSELS', W: 'WALLONIA'};
-  function archUrl(code, en, s, r, ym){ return 'https://www.engie.be/api/engie/be/ms/pricing/public/v1/prices-and-conditions-document?language=FR&segment=' + (s === 'P' ? 'PROFESSIONAL' : 'RESIDENTIAL') + '&division=' + (en === 'E' ? 'ELECTRICITY' : 'GAS') + '&politicalRegion=' + ARCH_REG[r] + '&product=' + code + '&month=' + ym + (en === 'E' ? '&direction=OFFTAKE' : ''); }
-  (function(){
-    var sel = $('cardMonth'), d = new Date(), noms = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
-    for (var i = 0; i < 18; i++){ var x = new Date(d.getFullYear(), d.getMonth() - i, 1), ym = x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0');
-      sel.insertAdjacentHTML('beforeend', '<option value="' + (i ? ym : '') + '">' + noms[x.getMonth()] + ' ' + x.getFullYear() + (i ? ' (archives)' : ' (mois en cours)') + '</option>'); }
-    sel.addEventListener('change', function(){
-      var past = !!this.value;
-      $('dlAll').hidden = $('dlAutres').hidden = past;
-      if (past){ $('cardLinks').innerHTML = '<p>Les cartes des mois passés sont dans les archives d\'ENGIE, protégées par une vérification anti-robot : pas de téléchargement groupé possible. Téléchargez-les une par une sur <a href="https://www.engie.be/fr/energie/electricite-gaz/prix-conditions/archive-fiches-de-prix/" target="_blank" rel="noopener">la page des anciennes fiches (particuliers)</a> ou <a href="https://www.engie.be/fr/professionals/energie/electricite-gaz/prix-conditions/archive-fiches-de-prix/" target="_blank" rel="noopener">professionnels</a>, en choisissant le mois du contrat.</p>'; $('cardMonthHint').textContent = ''; return; }
-      drawCards(); $('dlCount').textContent = $('cardLinks').querySelectorAll('a').length; $('dlAutres').textContent = 'Autres tarifs seulement (' + $('cardLinks').querySelectorAll('a.autre').length + ')'; $('cardMonthHint').textContent = '';
-    });
-  })();
   function cardUrl(doc, s){ return 'https://www.engie.be/api/engie/be/ms/pricing/v1/public/pricesAndConditionsPDF?document=' + doc + '&monthOffset=0&segment=' + s + '&language=F'; }
   function drawCards(){
     var html = '', regs = [['V', 'Flandre'], ['B', 'Bruxelles'], ['W', 'Wallonie']];
@@ -414,13 +398,13 @@
       html += '<p style="margin:8px 0 2px"><strong>' + sg[1] + '</strong></p><table><tr><th>Contrat</th>' + regs.map(function(r){ return '<th>' + r[1] + '</th>'; }).join('') + '</tr>';
       PRODUITS.forEach(function(pr){
         if (pr[3] && pr[3].indexOf(sg[0]) < 0) return;
-        var autre = pr[7] ? ' class="autre"' : '', ym = $('cardMonth').value;
+        var autre = pr[7] ? ' class="autre"' : '';
         html += '<tr><td>' + (sg[0] === 'P' && pr[5] ? pr[5] : pr[0] + (sg[0] === 'P' ? ' Pro' : '')) + '</td>' + regs.map(function(r){
           if (pr[4] && pr[4].indexOf(r[0]) < 0) return '<td class="hint">–</td>';
           var d = sg[0] === 'R' && r[0] === 'B' ? '36' : '12', f = sg[0] === 'R' && r[0] === 'B' ? '48' : '24';
           var base = pr[1].replace('{S}', sg[0]).replace('{D}', d).replace('{F}', f).replace('{DG}', sg[0] === 'R' ? 'GREEN' : 'GREY') + '_' + r[0] + '_F';
           var e = 'E_' + base, g = 'G_' + base.replace('_GREEN_', '_GREY_');
-          var ue = ym ? archUrl(pr[6], 'E', sg[0], r[0], ym) : cardUrl(e, sg[0]), ug = ym ? archUrl(pr[6], 'G', sg[0], r[0], ym) : cardUrl(g, sg[0]);
+          var ue = cardUrl(e, sg[0]), ug = cardUrl(g, sg[0]);
           return '<td><a' + autre + ' href="' + esc(ue) + '" title="' + e + '" target="_blank" rel="noopener">Élec</a>' + (pr[2] ? ' · <a' + autre + ' href="' + esc(ug) + '" title="' + g + '" target="_blank" rel="noopener">Gaz</a>' : '') + '</td>';
         }).join('') + '</tr>';
       });
@@ -439,34 +423,12 @@
     (function next(){
       if (i >= urls.length){ msg('dlMsg', urls.length + ' téléchargements lancés. Vérifiez le dossier Téléchargements.', 'ok'); btn.disabled = false; return; }
       var a = document.createElement('a'); a.href = urls[i]; a.rel = 'noopener'; a.style.display = 'none';
-      if ($('cardMonth').value) a.target = 'cartes-engie';  // archives : un seul onglet réutilisé si ENGIE affiche le PDF au lieu de le télécharger
       document.body.appendChild(a); a.click(); a.remove();
       i++; msg('dlMsg', 'Téléchargement ' + i + ' / ' + urls.length + '…');
       setTimeout(next, 900);
     })();
   }
 
-  // ---------- Fiches pros manquantes pour le simulateur (le moins de téléchargements possible) ----------
-  // Une seule région suffit : prix de l'énergie identiques partout, réseau = particuliers hors TVA. Sans Dynamic ni Bâtiment vide.
-  var PRO_MIN = [['Easy variable', 'EASY_INDEXED', 'EASY_P_GREEN_C_I_12'], ['Easy fixe', 'EASY_FIXED', 'EASY_P_GREEN_C_F_12'], ['Flow', 'FLOW', 'FLOW_P_GREEN_C_I_24'],
-    ['Direct Online', 'DIRECT', 'DIRECT_ONLINE_P_GREY_C_I_12'], ['Empower variable', 'EMPOWER_INDEXED_OR_FLEXTIME', 'EMPOWER_P_GREEN_C_I_00'], ['Empower fixe', 'EMPOWER_FIXED', 'EMPOWER_P_GREEN_C_F_00']];
-  var PRO_DEPUIS = '2026-03';   // limite choisie par Michaël
-  function drawManque(){
-    rpc('conso_formule_get', {}).then(function(d){
-      var have = {}; (d.formules || []).forEach(function(f){ if (f.segment === 'P') have[String(f.mois).slice(0, 7)] = 1; });
-      var now = new Date(), cur = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0'), mois = [], x = new Date(+PRO_DEPUIS.slice(0, 4), +PRO_DEPUIS.slice(5) - 1, 1);
-      while (true){ var ym = x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0'); if (ym >= cur) break; if (!have[ym]) mois.push(ym); x.setMonth(x.getMonth() + 1); }
-      var box = $('manque'); if (!mois.length){ box.hidden = true; return; }
-      var noms = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
-      var ARCH = 'https://www.engie.be/fr/professionals/energie/electricite-gaz/prix-conditions/archive-fiches-de-prix/';
-      box.innerHTML = '<p style="margin:0 0 4px"><strong>Fiches pros manquantes pour le simulateur</strong> <span class="hint">(' + (mois.length * 12) + ' fiches, Flandre seulement)</span></p>' +
-        '<p class="hint" style="margin:0 0 4px">ENGIE n\'accepte pas de lien direct vers ses archives (vérification anti-robot à chaque fiche) : sur <a href="' + ARCH + '" target="_blank" rel="noopener">la page des anciennes fiches professionnelles</a>, choisir Flandre, puis pour chaque mois ci-dessous les 6 contrats, électricité et gaz. Rangez ensuite les PDF dans « a trier ».</p>' +
-        '<table><tr><th>Mois</th><th>Contrats (électricité + gaz)</th></tr>' +
-        mois.map(function(ym){ return '<tr><td>' + noms[+ym.slice(5) - 1] + ' ' + ym.slice(0, 4) + '</td><td>' + PRO_MIN.map(function(p){ return p[0]; }).join(' · ') + '</td></tr>'; }).join('') + '</table>';
-      box.hidden = false;
-    }).catch(function(){});
-  }
-  drawManque();
 
   window.addEventListener('beforeunload', function(e){ if (dirty){ e.preventDefault(); e.returnValue = ''; } });
 
