@@ -458,21 +458,12 @@
       while (true){ var ym = x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0'); if (ym >= cur) break; if (!have[ym]) mois.push(ym); x.setMonth(x.getMonth() + 1); }
       var box = $('manque'); if (!mois.length){ box.hidden = true; return; }
       var noms = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
-      box.innerHTML = '<p style="margin:0 0 4px"><strong>Fiches pros manquantes pour le simulateur</strong> <span class="hint">(Flandre seulement, ' + (mois.length * 12) + ' fiches)</span></p><table><tr><th>Mois</th>' + PRO_MIN.map(function(p){ return '<th>' + p[0] + '</th>'; }).join('') + '</tr>' +
-        mois.map(function(ym){ return '<tr><td>' + noms[+ym.slice(5) - 1] + ' ' + ym.slice(0, 4) + '</td>' + PRO_MIN.map(function(p){
-          return '<td><a class="pm" href="' + esc(archUrl(p[1], 'E', 'P', 'V', ym)) + '" title="E_' + p[2] + '_V_F_' + ym.replace('-', '') + '" target="cartes-engie" rel="noopener">Élec</a> · <a class="pm" href="' + esc(archUrl(p[1], 'G', 'P', 'V', ym)) + '" title="G_' + p[2].replace('_GREEN_', '_GREY_') + '_V_F_' + ym.replace('-', '') + '" target="cartes-engie" rel="noopener">Gaz</a></td>'; }).join('') + '</tr>'; }).join('') + '</table>' +
-        '<div class="row" style="margin-top:6px"><button type="button" id="dlManque">Télécharger les ' + (mois.length * 12) + ' fiches, lentement</button> <span class="msg" id="dlManqueMsg"></span></div>' +
-        '<p class="hint" style="margin:4px 0 0">Une fiche toutes les 6 secondes pour ne pas être bloqué par ENGIE. Si une fiche échoue, cliquez sur son lien. Rangez ensuite les PDF dans « a trier ».</p>';
+      var ARCH = 'https://www.engie.be/fr/professionals/energie/electricite-gaz/prix-conditions/archive-fiches-de-prix/';
+      box.innerHTML = '<p style="margin:0 0 4px"><strong>Fiches pros manquantes pour le simulateur</strong> <span class="hint">(' + (mois.length * 12) + ' fiches, Flandre seulement)</span></p>' +
+        '<p class="hint" style="margin:0 0 4px">ENGIE n\'accepte pas de lien direct vers ses archives (vérification anti-robot à chaque fiche) : sur <a href="' + ARCH + '" target="_blank" rel="noopener">la page des anciennes fiches professionnelles</a>, choisir Flandre, puis pour chaque mois ci-dessous les 6 contrats, électricité et gaz. Rangez ensuite les PDF dans « a trier ».</p>' +
+        '<table><tr><th>Mois</th><th>Contrats (électricité + gaz)</th></tr>' +
+        mois.map(function(ym){ return '<tr><td>' + noms[+ym.slice(5) - 1] + ' ' + ym.slice(0, 4) + '</td><td>' + PRO_MIN.map(function(p){ return p[0]; }).join(' · ') + '</td></tr>'; }).join('') + '</table>';
       box.hidden = false;
-      $('dlManque').addEventListener('click', function(){
-        var btn = this, links = box.querySelectorAll('a.pm'), i = 0; btn.disabled = true;
-        (function next(){
-          if (i >= links.length){ msg('dlManqueMsg', links.length + ' téléchargements lancés.', 'ok'); btn.disabled = false; return; }
-          var a = document.createElement('a'); a.href = links[i].href; a.target = 'cartes-engie'; a.rel = 'noopener'; a.style.display = 'none';
-          document.body.appendChild(a); a.click(); a.remove(); i++;
-          msg('dlManqueMsg', 'Fiche ' + i + ' / ' + links.length + '…'); setTimeout(next, 6000);
-        })();
-      });
     }).catch(function(){});
   }
   drawManque();
