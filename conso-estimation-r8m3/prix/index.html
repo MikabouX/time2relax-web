@@ -106,7 +106,7 @@
     <div class="row"><span class="lbl">Compteur</span>
       <label><input type="radio" name="cpt" value="simple" checked> Mono-horaire</label>
       <label><input type="radio" name="cpt" value="bi"> Bi-horaire</label>
-      <label><input type="radio" name="cpt" value="tri" id="tri"> Impact (tri-horaire, Wallonie)</label>
+      <label><input type="radio" name="cpt" value="tri" id="tri"> Impact (tri-horaire)</label> <span class="hint" id="triHint"></span>
       <label><input type="checkbox" id="excl"> + exclusif nuit</label>
     </div>
     <div class="row"><span class="lbl">Contrat signé en</span><select id="mois"></select></div>
@@ -251,7 +251,7 @@
     o.src = 'carte'; o.k = num(P.prix_kwh); o.j = num(P.prix_jour); o.n = num(P.prix_nuit); o.a = num(P.prix_t1); o.b = num(P.prix_t2); o.c = num(P.prix_t3); o.x = null; o.fixe = num(P.fixe_an); o.doc = P.doc || o.doc; o.vert = num(P.vert_kwh);
     return o;
   }
-  function bandVal(o, t){ var fb = {k: ['k'], j: ['j', 'k'], n: ['n', 'k'], a: ['a', 'j', 'k'], b: ['b', 'n', 'k'], c: ['c', 'n', 'k'], x: ['x']}[t]; for (var i = 0; i < fb.length; i++) if (o[fb[i]] !== null && o[fb[i]] !== undefined) return o[fb[i]]; return null; }
+  function bandVal(o, t){ var fb = {k: ['k'], j: ['j', 'k'], n: ['n', 'k'], a: ['a', 'j', 'k'], b: ['b', 'j', 'k'], c: ['c', 'n', 'k'], x: ['x']}[t]; for (var i = 0; i < fb.length; i++) if (o[fb[i]] !== null && o[fb[i]] !== undefined) return o[fb[i]]; return null; }
   function detOf(en, reg, m){ var r = null; DET.forEach(function(d){ if (d.segment === SEG() && d.energie === en && d.region === reg && iso(d.mois) <= m) r = d; }); return r; }
   function grdRow(tab, code){ return (tab || []).filter(function(r){ return r[0] === code; })[0] || null; }
   function tranches(lbl){
@@ -543,6 +543,7 @@
     $('copyAll').hidden = !txts.length;
     $('vHint').hidden = !!txts.length;
     var gE = grdOf($('grdE').value); $('tri').disabled = !gE || gE.region !== 'Wallonie';
+    $('triHint').textContent = !$('tri').disabled ? '' : !gE ? '(Impact : entrez d\'abord un code postal wallon)' : '(Impact n\'existe qu\'en Wallonie)';
     if ($('tri').disabled && CPT() === 'tri'){ document.querySelector('input[name="cpt"][value="simple"]').checked = true; }
   }
 
