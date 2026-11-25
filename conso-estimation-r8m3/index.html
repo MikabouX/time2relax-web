@@ -424,7 +424,7 @@
   </section>
 
   <section class="step prixdet" data-zone="prix" aria-label="Détail des prix">
-    <div class="stephead"><span class="num">2</span><div><h2>Les détails de prix</h2><p>Tous les contrats pour ce code postal, scindés comme sur les fiches. Cliquez sur un contrat pour obtenir le coût et l'acompte.</p></div></div>
+    <div class="stephead"><span class="num">2</span><div><h2>Les détails de prix</h2><p>Client, compteur, mois de signature et contrat → prix détaillés comme sur la fiche. Coût annuel et acompte juste en dessous.</p></div></div>
     <iframe id="prixFrame" src="prix/?embed=1" title="Détail des prix" loading="lazy"></iframe>
   </section>
   <section class="step prix" data-zone="prix" aria-label="Prix et acompte">
@@ -1627,13 +1627,21 @@
   $('hubG').addEventListener('input', function(){ hubIn('g'); });
   function framePost(){
     var fr = $('prixFrame'); if (!fr || !fr.contentWindow) return;
-    try { fr.contentWindow.postMessage({t2rPrix: 1, cp: cpCode(), grdE: $('grdE').value, grdG: $('grdG').value, refE: HUB.e, refG: HUB.g, en: val('en'), seg: SEG(), hint: $('cpHint').textContent}, '*'); } catch (e){}
+    try { fr.contentWindow.postMessage({t2rPrix: 1, cp: cpCode(), grdE: $('grdE').value, grdG: $('grdG').value, refE: HUB.e, refG: HUB.g, en: val('en'), cpt: document.querySelector('input[name="cpt"]:checked').value, seg: SEG(), hint: $('cpHint').textContent}, '*'); } catch (e){}
   }
   $('prixFrame').addEventListener('load', framePost);
   window.addEventListener('message', function(ev){
     var d = ev.data; if (!d || !d.t2rPrixUp || ev.source !== $('prixFrame').contentWindow) return;
     if (d.h) $('prixFrame').style.height = Math.max(420, d.h) + 'px';
     if (d.ready) framePost();
+    if (d.set){   // choix faits dans « Les détails de prix » : client, compteur, contrats
+      var S = d.set, rs = document.querySelector('input[name="seg"][value="' + S.seg + '"]');
+      if (rs && !rs.checked){ rs.checked = true; rs.dispatchEvent(new Event('change', {bubbles: true})); }
+      var rc = document.querySelector('input[name="cpt"][value="' + S.cpt + '"]');
+      if (rc && !rc.checked){ rc.checked = true; rc.dispatchEvent(new Event('change', {bubbles: true})); }
+      [['e', S.ctE], ['g', S.ctG]].forEach(function(x){ if (x[1]) d.pick = null, pickCt(x[0], x[1], S.mois); });
+      return;
+    }
     if (d.pick){   // contrat choisi dans le tableau des prix → coût et acompte, et contrat de la régularisation
       var sel = $(d.pick.en === 'e' ? 'selE' : 'selG');
       if (Array.prototype.some.call(sel.options, function(o){ return o.value === d.pick.cle; })){
@@ -1644,6 +1652,13 @@
       }
     }
   });
+  function pickCt(en, cle, mois){
+    var sel = $(en === 'e' ? 'selE' : 'selG');
+    if (sel.value === cle || !Array.prototype.some.call(sel.options, function(o){ return o.value === cle; })) return;
+    if (en === 'g' && $('same').checked && $('selE').value !== cle){ $('same').checked = false; $('same').dispatchEvent(new Event('change', {bubbles: true})); }
+    sel.value = cle; sel.dispatchEvent(new Event('change', {bubbles: true}));
+    setTimeout(function(){ var sg = $(en === 'e' ? 'rgSigE' : 'rgSigG'); if (mois && Array.prototype.some.call(sg.options, function(o){ return o.value === mois; })){ sg.value = mois; render(); } }, 0);
+  }
   function showZone(z){
     if (['est', 'prix', 'reg'].indexOf(z) < 0) z = 'est';
     document.querySelectorAll('.step[data-zone]').forEach(function(el){ el.hidden = el.dataset.zone !== z; });
