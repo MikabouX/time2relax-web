@@ -453,7 +453,7 @@
           <div class="row lst"><span class="clbl">Gestionnaire</span><select id="grdE"></select><span class="hint" id="regE"></span></div>
           <div class="row"><span class="clbl">Contrat</span><select id="selE" class="lst"></select><input type="text" id="cE" maxlength="80" placeholder="Nom du contrat"><a id="docE" class="doclink" target="_blank" rel="noopener" hidden>Carte ENGIE électricité (PDF)</a><span id="socE" class="hint" hidden>Tarif social : prix revu chaque trimestre par la CREG (ici, celui du trimestre en cours).</span></div>
           <div class="row"><span class="clbl">Compteur</span>
-            <div class="opts"><label><input type="radio" name="cpt" value="simple" checked>Simple</label><label><input type="radio" name="cpt" value="bi">Bi-horaire</label><label><input type="radio" name="cpt" value="tri">Tri-horaire / Flextime</label></div>
+            <div class="opts"><label><input type="radio" name="cpt" value="simple" checked>Simple</label><label><input type="radio" name="cpt" value="bi">Bi-horaire</label><label><input type="radio" name="cpt" value="tri">Impact / Flextime (tri-horaire)</label></div>
           </div>
           <div class="row" id="rowTri" hidden><span class="clbl">Répartition</span><input type="text" inputmode="decimal" class="px" id="t1p" value="40" style="width:44px"> % pleines <input type="text" inputmode="decimal" class="px" id="t2p" value="40" style="width:44px"> % creuses <input type="text" inputmode="decimal" class="px" id="t3p" value="20" style="width:44px"> % super-creuses <span class="hint">(compteur communicant ; réseau wallon : tarif Impact PIC / MEDIUM / ECO)</span></div>
           <div class="row" id="rowPct" hidden><span class="clbl">Part de nuit</span><input type="text" inputmode="decimal" class="px" id="pct" value="50"> % de la consommation</div>
@@ -499,7 +499,7 @@
           <div class="row"><span class="clbl">Client</span><select id="rgSeg"><option value="R">Particulier</option><option value="P">Professionnel</option></select>
             <input type="hidden" id="rgCp"></div>
           <div class="hint" id="rgCpHint" style="margin:-2px 0 6px"></div>
-          <div class="row"><span class="clbl">Compteur</span><select id="rgCpt"><option value="simple">Simple (mono-horaire)</option><option value="bi">Bi-horaire</option><option value="tri">Tri-horaire / Flextime</option></select></div>
+          <div class="row"><span class="clbl">Compteur</span><select id="rgCpt"><option value="simple">Simple (mono-horaire)</option><option value="bi">Bi-horaire</option><option value="tri">Impact / Flextime (tri-horaire)</option></select></div>
           <div class="row" id="rgCtrE"><span class="clbl">Contrat élec.</span><select id="rgSelE"></select>
             <span class="hint">ou prix</span> <input type="text" inputmode="decimal" class="px" id="rgPE" placeholder="c€/kWh" style="width:70px"> <span class="hint" id="rgPEbi" hidden>pleines</span> <input type="text" inputmode="decimal" class="px" id="rgPEn" placeholder="creuses" style="width:70px" hidden> + <input type="text" inputmode="decimal" class="px" id="rgFE" placeholder="€/an" style="width:60px"></div>
           <div class="row" id="rgSigERow" hidden><span class="clbl">Signé en</span><select id="rgSigE"></select> <span class="hint">prix ou formule de la carte de ce mois</span></div>
