@@ -111,6 +111,7 @@
       </div>
       <p class="hint" style="margin:6px 0 0">Les cartes arrivent dans votre dossier Téléchargements (Chrome demande la première fois d'autoriser les téléchargements multiples). Demandez ensuite à Claude de les lire. Pour un mois passé, les cartes viennent des archives d'ENGIE : essayez d'abord un lien seul.</p>
       <div id="cardLinks" class="hint" style="margin-top:6px"></div>
+      <div id="manque" style="margin-top:10px" hidden></div>
     </details>
     <details class="sec" id="avBox">
       <summary><strong>Avis des collègues</strong> <span class="hint" id="avCount"></span></summary>
@@ -444,6 +445,37 @@
       setTimeout(next, 900);
     })();
   }
+
+  // ---------- Fiches pros manquantes pour le simulateur (le moins de téléchargements possible) ----------
+  // Une seule région suffit : prix de l'énergie identiques partout, réseau = particuliers hors TVA. Sans Dynamic ni Bâtiment vide.
+  var PRO_MIN = [['Easy variable', 'EASY_INDEXED', 'EASY_P_GREEN_C_I_12'], ['Easy fixe', 'EASY_FIXED', 'EASY_P_GREEN_C_F_12'], ['Flow', 'FLOW', 'FLOW_P_GREEN_C_I_24'],
+    ['Direct Online', 'DIRECT', 'DIRECT_ONLINE_P_GREY_C_I_12'], ['Empower variable', 'EMPOWER_INDEXED_OR_FLEXTIME', 'EMPOWER_P_GREEN_C_I_00'], ['Empower fixe', 'EMPOWER_FIXED', 'EMPOWER_P_GREEN_C_F_00']];
+  var PRO_DEPUIS = '2026-03';   // limite choisie par Michaël
+  function drawManque(){
+    rpc('conso_formule_get', {}).then(function(d){
+      var have = {}; (d.formules || []).forEach(function(f){ if (f.segment === 'P') have[String(f.mois).slice(0, 7)] = 1; });
+      var now = new Date(), cur = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0'), mois = [], x = new Date(+PRO_DEPUIS.slice(0, 4), +PRO_DEPUIS.slice(5) - 1, 1);
+      while (true){ var ym = x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0'); if (ym >= cur) break; if (!have[ym]) mois.push(ym); x.setMonth(x.getMonth() + 1); }
+      var box = $('manque'); if (!mois.length){ box.hidden = true; return; }
+      var noms = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+      box.innerHTML = '<p style="margin:0 0 4px"><strong>Fiches pros manquantes pour le simulateur</strong> <span class="hint">(Flandre seulement, ' + (mois.length * 12) + ' fiches)</span></p><table><tr><th>Mois</th>' + PRO_MIN.map(function(p){ return '<th>' + p[0] + '</th>'; }).join('') + '</tr>' +
+        mois.map(function(ym){ return '<tr><td>' + noms[+ym.slice(5) - 1] + ' ' + ym.slice(0, 4) + '</td>' + PRO_MIN.map(function(p){
+          return '<td><a class="pm" href="' + esc(archUrl(p[1], 'E', 'P', 'V', ym)) + '" title="E_' + p[2] + '_V_F_' + ym.replace('-', '') + '" target="cartes-engie" rel="noopener">Élec</a> · <a class="pm" href="' + esc(archUrl(p[1], 'G', 'P', 'V', ym)) + '" title="G_' + p[2].replace('_GREEN_', '_GREY_') + '_V_F_' + ym.replace('-', '') + '" target="cartes-engie" rel="noopener">Gaz</a></td>'; }).join('') + '</tr>'; }).join('') + '</table>' +
+        '<div class="row" style="margin-top:6px"><button type="button" id="dlManque">Télécharger les ' + (mois.length * 12) + ' fiches, lentement</button> <span class="msg" id="dlManqueMsg"></span></div>' +
+        '<p class="hint" style="margin:4px 0 0">Une fiche toutes les 6 secondes pour ne pas être bloqué par ENGIE. Si une fiche échoue, cliquez sur son lien. Rangez ensuite les PDF dans « a trier ».</p>';
+      box.hidden = false;
+      $('dlManque').addEventListener('click', function(){
+        var btn = this, links = box.querySelectorAll('a.pm'), i = 0; btn.disabled = true;
+        (function next(){
+          if (i >= links.length){ msg('dlManqueMsg', links.length + ' téléchargements lancés.', 'ok'); btn.disabled = false; return; }
+          var a = document.createElement('a'); a.href = links[i].href; a.target = 'cartes-engie'; a.rel = 'noopener'; a.style.display = 'none';
+          document.body.appendChild(a); a.click(); a.remove(); i++;
+          msg('dlManqueMsg', 'Fiche ' + i + ' / ' + links.length + '…'); setTimeout(next, 6000);
+        })();
+      });
+    }).catch(function(){});
+  }
+  drawManque();
 
   window.addEventListener('beforeunload', function(e){ if (dirty){ e.preventDefault(); e.returnValue = ''; } });
 
