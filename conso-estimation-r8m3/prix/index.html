@@ -109,6 +109,7 @@
       <label><input type="radio" name="cpt" value="tri" id="tri"> Impact (tri-horaire)</label> <span class="hint" id="triHint"></span>
       <label><input type="checkbox" id="excl"> + exclusif nuit</label>
     </div>
+    <div class="row" id="capRow" hidden><span class="lbl">Tarif capacitaire</span><input type="text" inputmode="decimal" id="capKw" placeholder="2,5" style="width:70px"> <span class="hint">kW : moyenne des pointes mensuelles (sur la facture ou l'app Fluvius) ; minimum 2,5 kW</span></div>
     <div class="row"><span class="lbl">Contrat signé en</span><select id="mois"></select></div>
     <div class="row" hidden><span class="lbl"><span class="dot de"></span>Électricité</span><select id="ctE"></select></div>
     <div class="row" hidden><span class="lbl"><span class="dot dg"></span>Gaz</span><select id="ctG"></select> <label><input type="checkbox" id="sameG" checked> même contrat</label></div>
@@ -269,7 +270,8 @@
     if (L === 'eV'){
       var dg = grdRow(d.t[0], code), an = grdRow(d.t[1], code); if (!dg) return null; v = dg[2];
       f.dist = {k: v[1], j: v[1], n: v[1], x: v[2]}; f.trans = 0; f.transNote = 'compris dans la distribution';
-      fx('Tarif capacitaire ' + fr(v[0], 4) + ' €/kW/an × 2,5 kW (minimum)', v[0] * 2.5, true);
+      var kw = capKw();
+      fx('Tarif capacitaire ' + fr(v[0], 4) + ' €/kW/an × ' + fr(kw, 1) + ' kW' + (kw === 2.5 ? ' (minimum)' : ''), v[0] * kw, true);
       fx('Gestion des données (relevé mensuel/annuel)', v[4], true); fx('Gestion des données (quart-horaire)', v[3], false);
       if (an){ var a = an[2]; f.extra = 'Compteur classique (analogique) : terme fixe ' + fr(a[0], 2) + ' €/an, simple ' + fr(a[1], 3) + ' c€/kWh, exclusif nuit ' + fr(a[2], 3) + ' c€/kWh, gestion des données ' + fr(a[3], 2) + ' €/an, tarif prosumer ' + fr(a[4], 2) + ' €/kWe/an.'; }
     } else {
@@ -320,6 +322,8 @@
     if (/Fonds Energie/i.test(l)) return 'Cotisation régionale flamande, nulle pour une résidence avec domicile.';
     return '';
   }
+  // Pointe mensuelle moyenne (Flandre, compteur digital) : facturée au minimum sur 2,5 kW.
+  function capKw(){ var v = parseFloat(String(($('capKw') || {}).value || '').replace(',', '.')); return isFinite(v) && v > 2.5 ? v : 2.5; }
   function kwhSupp(f){ return f.kwh.reduce(function(s, g){ return s + g.val; }, 0); }
   function fixTot(f, all){ return f.fixes.reduce(function(s, x){ return s + (x.inT && (all || !x.aff) ? x.v : 0); }, 0); }
   function suppFix(f){ return f.fixes.reduce(function(s, x){ return s + (x.inT && x.aff ? x.v : 0); }, 0); }
@@ -544,7 +548,8 @@
     TXT.all = txts.join('\n\n');
     $('copyAll').hidden = !txts.length;
     $('vHint').hidden = !!txts.length;
-    var gE = grdOf($('grdE').value); $('tri').disabled = !gE || gE.region !== 'Wallonie';
+    var gE = grdOf($('grdE').value); $('capRow').hidden = !gE || gE.region !== 'Flandre' || EN === 'g';
+    $('tri').disabled = !gE || gE.region !== 'Wallonie';
     $('triHint').textContent = !$('tri').disabled ? '' : !gE ? '(Impact : entrez d\'abord un code postal wallon)' : '(Impact n\'existe qu\'en Wallonie)';
     if ($('tri').disabled && CPT() === 'tri'){ document.querySelector('input[name="cpt"][value="simple"]').checked = true; }
   }
@@ -619,6 +624,7 @@
   // Choix faits ici → simulateur (coût et acompte, régularisation)
   function upSet(){ up({set: {seg: SEG(), cpt: CPT(), ctE: $('ctE').value, ctG: $('ctG').value, same: $('sameG').checked, mois: $('mois').value}}); }
   document.querySelectorAll('input[name="cpt"]').forEach(function(r){ r.addEventListener('change', function(){ render(); upSet(); }); });
+  $('capKw').addEventListener('input', render);
   ['excl', 'ctE', 'ctG', 'sameG'].forEach(function(id){ $(id).addEventListener('change', function(){ render(); upSet(); }); });
   document.querySelectorAll('input[name="seg"]').forEach(function(r){ r.addEventListener('change', function(){ buildMonths(); show(); upSet(); }); });
   Promise.all([loadMonth(null),
