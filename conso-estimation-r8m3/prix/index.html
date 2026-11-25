@@ -228,7 +228,7 @@
   // Réseau + suppléments d'une fiche, pour un gestionnaire et une consommation de référence. Tout en TVAC.
   function fiche(en, D, code, ref){
     var d = D.data, L = d.l, f = {dist: {}, trans: null, fixes: [], pros: null, extra: '', kwh: [], groups: [], bandes: null, vert: num(d.v)};
-    function fx(lbl, v, inT, aff){ f.fixes.push({lbl: lbl, v: v, inT: inT, aff: aff}); }
+    function fx(lbl, v, inT, aff){ f.fixes.push({lbl: lbl, v: v, inT: inT, aff: aff, d: fixDesc(lbl)}); }
     var r, v;
     if (L === 'eV'){
       var dg = grdRow(d.t[0], code), an = grdRow(d.t[1], code); if (!dg) return null; v = dg[2];
@@ -268,9 +268,21 @@
       } else { val = L2.reduce(function(s, x){ x.used = true; return s + x.v; }, 0); }
       var grp = {h: h, name: name, unit: unit, lines: L2, val: val, how: how};
       f.groups.push(grp);
-      if (unit === 'kwh'){ if (how) f.kwh.push(grp); else L2.forEach(function(x){ f.kwh.push({name: x.lbl, val: x.v, how: ''}); }); } else fx(name + (how ? ' (' + how + ')' : ''), unit === 'mois' ? val * 12 : val, true, true);
+      if (unit === 'kwh'){ if (how || /accise/i.test(h)) f.kwh.push(grp); else L2.forEach(function(x){ f.kwh.push({name: x.lbl, val: x.v, how: ''}); }); } else fx(name + (how ? ' (' + how + ')' : ''), unit === 'mois' ? val * 12 : val, true, true);
     });
     return f;
+  }
+  // Ce que couvre chaque montant fixe annuel (explication courte affichée sous la ligne).
+  function fixDesc(l){
+    if (/^Terme fixe distribution/.test(l)) return 'Part fixe du tarif du gestionnaire de réseau, due même sans consommation : raccordement, compteur et relevés' + (/tranche/.test(l) ? ' ; montant selon la tranche de consommation annuelle' : '') + '.';
+    if (/^Comptage \(relevé annuel\)/.test(l)) return 'Location et relevé du compteur, relevé une fois par an.';
+    if (/^Comptage \(relevé mensuel\)/.test(l)) return 'Location et relevé du compteur, relevé chaque mois (gros consommateurs).';
+    if (/^Terme de puissance/.test(l)) return 'Selon la puissance du raccordement (taille du disjoncteur).';
+    if (/^Tarif capacitaire/.test(l)) return 'Selon la pointe de puissance prélevée chaque mois (moyenne sur 12 mois), facturée au minimum sur 2,5 kW.';
+    if (/^Gestion des données/.test(l)) return 'Traitement des données de comptage du compteur par le gestionnaire de réseau.';
+    if (/Obligations de Service Public|OSP/.test(l)) return 'Contribution régionale aux obligations de service public (aides sociales, éclairage public…), selon la puissance du compteur.';
+    if (/Fonds Energie/i.test(l)) return 'Cotisation régionale flamande, nulle pour une résidence avec domicile.';
+    return '';
   }
   function kwhSupp(f){ return f.kwh.reduce(function(s, g){ return s + g.val; }, 0); }
   function fixTot(f, all){ return f.fixes.reduce(function(s, x){ return s + (x.inT && (all || !x.aff) ? x.v : 0); }, 0); }
@@ -329,7 +341,7 @@
       '</tbody></table></div>';
     if (F.bandes) R += '<div class="tblwrap"><table><thead><tr><th>Tranches de consommation (distribution)</th><th>Fixe €/an</th><th>Proportionnel c€/kWh</th></tr></thead><tbody>' +
       F.bandes.map(function(b, i){ return '<tr' + (i === F.bi ? ' class="pick"' : '') + '><td>' + b.lbl + (i === F.bi ? ' ← retenue' : '') + '</td><td>' + fr(b.fixe, 2) + '</td><td>' + fr(b.prop, 3) + '</td></tr>'; }).join('') + '</tbody></table></div>';
-    R += '<div class="tblwrap"><table><tbody>' + F.fixes.filter(function(x){ return !x.aff; }).map(function(x){ return '<tr' + (x.inT ? '' : ' class="sub"') + '><td>' + esc(x.lbl) + (x.inT ? '' : ' (non compté)') + '</td><td>' + fr(x.v, 2) + ' €/an</td></tr>'; }).join('') +
+    R += '<div class="tblwrap"><table><tbody>' + F.fixes.filter(function(x){ return !x.aff; }).map(function(x){ return '<tr' + (x.inT ? '' : ' class="sub"') + '><td>' + esc(x.lbl) + (x.inT ? '' : ' (non compté)') + (x.d ? '<br><span class="hint">' + esc(x.d) + '</span>' : '') + '</td><td>' + fr(x.v, 2) + ' €/an</td></tr>'; }).join('') +
       (F.pros !== null ? '<tr><td>Tarif prosumer (compteur qui tourne à l\'envers)</td><td>' + fr(F.pros, 2) + ' €/kWe/an</td></tr>' : '') + '</tbody></table></div>';
     if (F.extra) R += '<p class="hint">' + esc(F.extra) + '</p>';
     if (vert !== null) R += '<p class="sec-t">Coût énergie verte et cogénération</p><p>' + fr(vert, 3) + ' c€/kWh</p>';
@@ -348,12 +360,15 @@
       var fm = E.F && E.src === 'formule' ? (E.F.param === 'FIXE' ? 'Prix fixe signé en ' + moisLbl(m) + ', garanti pendant toute la durée du contrat.' :
         'Prix variable : ' + cols.filter(function(t){ return E.F[{k: 'k', j: 'j', n: 'n', x: 'x', a: 't1', b: 't2', c: 't3'}[t] + '_a'] !== null && E.F[{k: 'k', j: 'j', n: 'n', x: 'x', a: 't1', b: 't2', c: 't3'}[t] + '_a'] !== undefined; }).map(function(t){ var p = {k: 'k', j: 'j', n: 'n', x: 'x', a: 't1', b: 't2', c: 't3'}[t]; return BL[t].toLowerCase() + ' ' + fr(+E.F[p + '_a'], 4) + ' + ' + fr(+E.F[p + '_b'], 4) + ' × ' + E.F.param; }).join(' ; ') +
         ' (c€/kWh HTVA, indice en €/MWh' + (E.idx !== undefined ? ', ' + E.F.param + ' ' + moisLbl(m) + ' = ' + fr(E.idx, 2) : ', indice de ' + moisLbl(m) + ' pas encore publié') + ').') : 'Prix de la fiche de ' + moisLbl(m) + (E.F ? ' (indice ' + E.F.param + ' du mois pas encore encodé)' : '') + '.';
-      var tb = line('Énergie (ENGIE)', function(t){ return o.en[t]; }, o.fixE) +
+      function fline(lbl, v, d){ return '<tr><td>' + lbl + (d ? '<br><span class="hint">' + esc(d) + '</span>' : '') + '</td>' + cols.map(function(){ return '<td></td>'; }).join('') + '<td>' + fr(v, 2) + '</td></tr>'; }
+      var tb = line('Énergie (ENGIE)', function(t){ return o.en[t]; }, null) +
+        (o.fixE !== null ? fline('Redevance fixe ENGIE', o.fixE, 'Abonnement du fournisseur pour ce contrat, indépendant de la consommation.') : '') +
         (en === 'e' ? line('Énergie verte et cogénération', o.vt, null) : '') +
-        line('Distribution ' + esc(G.nom), function(t){ return F.dist[t] !== undefined ? F.dist[t] : F.dist.k; }, fixTot(F, false), '', en === 'e' && reg === 'Flandre' ? 5 : 3) +
-        line('Transport', F.transNote ? null : trans, null) +
+        line('Distribution ' + esc(G.nom), function(t){ return F.dist[t] !== undefined ? F.dist[t] : F.dist.k; }, null, '', en === 'e' && reg === 'Flandre' ? 5 : 3) +
+        F.fixes.filter(function(x){ return x.inT && !x.aff; }).map(function(x){ return fline(esc(x.lbl) + ' <span class="hint">(' + esc(G.nom) + ')</span>', x.v, x.d); }).join('') +
+        (F.transNote ? '<tr><td>Transport</td>' + cols.map(function(){ return '<td class="hint">compris</td>'; }).join('') + '<td></td></tr>' : line('Transport', trans, null)) +
         F.kwh.map(function(g){ return line(esc(g.name) + (g.how ? ' <span class="hint">(' + esc(g.how) + ')</span>' : ''), g.val, null, '', 5); }).join('') +
-        (suppFix(F) ? line('Suppléments fixes (OSP, fonds…)', null, suppFix(F)) : '') +
+        F.fixes.filter(function(x){ return x.inT && x.aff; }).map(function(x){ return fline(esc(x.lbl), x.v, x.d); }).join('') +
         line('Total', function(t){ return o.tot[t]; }, o.fix, 'tot');
       h += '<details class="ct"><summary>' + esc(o.c) + ' <span class="hint">simple ' + fr(o.tot.k, 3) + ' c€/kWh · fixe ' + fr(o.fix, 2) + ' €/an TVAC</span></summary><div class="in">' +
         '<div class="tblwrap"><table><thead><tr><th>TVAC</th>' + cols.map(function(t){ return '<th>' + BL[t] + '<br>c€/kWh</th>'; }).join('') + '<th>Fixe<br>€/an</th></tr></thead><tbody>' + tb + '</tbody></table></div>' +
