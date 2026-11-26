@@ -7,7 +7,7 @@
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="icon" href="icon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="icon-180.png">
-<title>Estimation de consommation – outil indicatif</title>
+<title>Simulateur énergie</title>
 <style>
   :root{
     --bg:#f5f6f4; --card:#ffffff; --ink:#1d2a24; --muted:#5d6b64; --line:#dde3df;
@@ -42,7 +42,9 @@
   .card h3{margin:0 0 12px;font-size:15.5px}
   .actions.bar{justify-content:center;position:sticky;bottom:0;z-index:15;padding:8px;margin:0 -8px;background:rgba(245,246,244,.94);backdrop-filter:blur(4px);border-top:1px solid var(--line)}
   .actions.bar button{font-size:14.5px;padding:9px 16px}
-  .banner{background:var(--warn);border:1px solid var(--warn-line);border-radius:10px;padding:10px 14px;font-size:13.5px}
+  .banner{background:#fff;border:1px solid var(--line);border-radius:10px;padding:8px 14px;font-size:13.5px;text-align:center}
+  .banner a{color:var(--accent);text-decoration:none}
+  .banner a:hover{text-decoration:underline}
   .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
   .card h2{margin:0 0 12px;font-size:16px}
   fieldset{border:0;margin:0 0 14px;padding:0;min-width:0;min-inline-size:0}
@@ -204,7 +206,7 @@
 </header>
 
 <main>
-  <div class="banner"><strong>Outil à titre indicatif.</strong> Les résultats sont des moyennes : la consommation réelle dépend de l'isolation, de la surface, des habitudes et des équipements, et seule la mesure du compteur fait foi.</div>
+  <div class="banner"><a href="https://time2relax.app/" target="_blank" rel="noopener"><strong>Time2Relax</strong> – suivi des pauses →</a></div>
 
   <div class="tools">
     <div class="tool tvacalc" aria-label="Calculateur de TVA">
