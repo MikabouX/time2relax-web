@@ -180,6 +180,9 @@
   .hubcp .cpbox{flex:1 1 220px}
   .hubcp .cpbox input{width:100%;font:inherit;padding:6px 9px;border:1px solid var(--line);border-radius:8px}
   .hubcp #cpHint{flex:1 0 100%}
+  .cptel{flex:1 0 100%;font-size:12.5px;line-height:1.5;color:var(--ink)}
+  .cptel a{color:var(--accent);text-decoration:none;white-space:nowrap;font-variant-numeric:tabular-nums}
+  .cptel b{font-weight:650}
   .hubkwh label{display:flex;align-items:center;gap:6px;font-size:14px}
   .hubkwh input{width:72px}
   .dot{display:inline-block;width:9px;height:9px;border-radius:50%}
@@ -230,6 +233,7 @@
       <strong>Code postal → gestionnaire de réseau</strong>
       <span class="cpbox"><input type="text" id="cp" maxlength="60" autocomplete="off" placeholder="Code postal ou localité"><span class="sug" id="cpSug" role="listbox" hidden></span></span>
       <span class="hint" id="cpHint">remplit le gestionnaire de réseau</span>
+      <div class="cptel" id="cpTel" hidden></div>
     </div>
     <div class="tool hubkwh">
       <strong>Consommation annuelle</strong>
@@ -1052,7 +1056,7 @@
     clearTimeout(sugT);
     if (/^\d{4}$/.test(t)){ hideSug(); lookupCp(t, null); return; }      // code postal tapé
     if (code && /\D/.test(t.slice(4))){ hideSug(); return; }               // « 5000 Namur » déjà choisi
-    if (t.length < 2 || /^\d{1,3}$/.test(t)){ hideSug(); if (!code){ ++cpSeq; h.textContent = CP_HINT; } return; }
+    if (t.length < 2 || /^\d{1,3}$/.test(t)){ hideSug(); if (!code){ ++cpSeq; h.textContent = CP_HINT; $('cpTel').hidden = true; } return; }
     var my = ++sugSeq;
     sugT = setTimeout(function(){
       rpcPub('conso_cp_search', {p_q: t}).then(function(list){ if (my === sugSeq && $('cp').value.trim() === t) showSug(list); }).catch(function(){ if (my === sugSeq) hideSug(); });
@@ -1070,6 +1074,28 @@
     if (c >= 4000 && c <= 4699) return 'Verviers';
     return '';
   }
+  // Téléphones des gestionnaires de réseau (vérifiés en novembre 2026 : sites des GRD, CallMePower, Selectra).
+  var GRD_TEL = {
+    ores:    {c: '078 15 78 01', e: ['Panne', '078 78 78 00'], g: ['Odeur de gaz', '0800 87 087']},
+    resa:    {c: '04 220 12 11', e: ['Panne', '04 263 18 80'], g: ['Odeur de gaz', '04 362 98 38']},
+    aieg:    {c: '085 27 49 00'},
+    aiesh:   {c: '060 45 91 60', e: ['Panne', '060 41 10 10']},
+    rew:     {c: '010 22 26 53'},
+    sibelga: {c: '02 549 41 00', e: ['Panne', '02 274 40 66'], g: ['Odeur de gaz', '0800 19 400']},
+    fluvius: {c: '078 35 35 34', e: ['Panne', '078 35 35 00'], g: ['Odeur de gaz', '0800 65 065']}
+  };
+  function telLink(n){ return '<a href="tel:+32' + n.replace(/\s/g, '').replace(/^0/, '') + '">' + n + '</a>'; }
+  function telShow(){
+    var out = [];
+    [['e', 'grdE', 'Électricité'], ['g', 'grdG', 'Gaz']].forEach(function(x){
+      var code = $(x[1]).value; if (!code) return;
+      var t = GRD_TEL[/^fl-/.test(code) ? 'fluvius' : code]; if (!t) return;
+      var g = grdOf(code), urg = t[x[0]];
+      out.push('<b>' + x[2] + '</b> · ' + esc(g ? g.nom : code) + ' : ' + telLink(t.c) + (urg ? ' · ' + urg[0] + ' 24 h/24 : ' + telLink(urg[1]) : ''));
+    });
+    $('cpTel').innerHTML = out.join('<br>'); $('cpTel').hidden = !out.length;
+  }
+  ['grdE', 'grdG'].forEach(function(id){ $(id).addEventListener('change', telShow); });
   function lookupCp(v, nom){
     var h = $('cpHint'), my = ++cpSeq; h.textContent = 'Recherche…';
     Promise.all([rpcPub('conso_cp_get', {p_code: +v}), nom ? Promise.resolve(null) : rpcPub('conso_cp_search', {p_q: v}).catch(function(){ return null; })])
@@ -1089,7 +1115,7 @@
         apply('e', d.e); apply('g', d.g);
         if (RELEVE_SIBELGA[+v]) msgs.push('Relevé Sibelga : ' + RELEVE_SIBELGA[+v]);
         h.textContent = msgs.join(' · ');
-        fillContracts('e'); fillContracts('g'); applyPrices('e'); applyPrices('g'); render();
+        fillContracts('e'); fillContracts('g'); applyPrices('e'); applyPrices('g'); render(); telShow();
       })
       .catch(function(){ if (my === cpSeq) h.textContent = 'Recherche impossible : choisissez le gestionnaire à la main.'; });
   }
@@ -1679,7 +1705,7 @@
   showZone(/^#(est|prix|reg)$/.test(location.hash) ? location.hash.slice(1) : (function(){ try { return localStorage.getItem('t2rZone'); } catch (e){ return null; } })());
   document.getElementById('f').addEventListener('input', render);
   document.getElementById('f').addEventListener('change', render);
-  document.getElementById('reset').addEventListener('click', function(){ document.getElementById('f').reset(); $('cpHint').textContent = CP_HINT; hideSug(); resetPrices(); SEGS = []; $('perList').innerHTML = ''; onDebut(); render(); });
+  document.getElementById('reset').addEventListener('click', function(){ document.getElementById('f').reset(); $('cpHint').textContent = CP_HINT; $('cpTel').hidden = true; hideSug(); resetPrices(); SEGS = []; $('perList').innerHTML = ''; onDebut(); render(); });
   document.getElementById('copy').addEventListener('click', function(){
     var btn = this;
     function done(ok){ btn.textContent = ok ? 'Copié ✓' : 'Copie impossible'; setTimeout(function(){ btn.textContent = 'Copier le résultat'; }, 1500); }
