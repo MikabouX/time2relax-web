@@ -651,7 +651,7 @@
         <div class="row"><span class="clbl">Contrat</span>
           <div class="opts akcts"><label><input type="radio" name="akCt" value="Easy fixe" checked>Easy fixe <span class="akrec"></span></label><label><input type="radio" name="akCt" value="Easy variable">Easy variable <span class="akrec"></span></label><label><input type="radio" name="akCt" value="Flow variable">Flow <span class="akrec"></span></label><label><input type="radio" name="akCt" value="Basic Online variable">Basic <span class="akrec"></span></label><label id="akSoc"><input type="radio" name="akCt" value="Tarif social">Tarif social <span class="akrec"></span></label></div>
         </div>
-        <div class="hint" id="akRecHint">Acompte minimum recommandé : pour la consommation de la barre du haut (connue ou estimée).
+        <div class="hint" id="akRecHint">Montant à côté de chaque contrat : acompte minimum, qui couvre seulement les frais fixes (abonnement, réseau, taxes) à 0 kWh.
         </div>
         <div class="hint">Gestionnaire de réseau : celui du code postal en haut de la page. Prix du mois en cours, compteur simple, sans panneaux solaires.</div>
       </fieldset>
@@ -1880,30 +1880,31 @@
       if (k.indexOf(null) >= 0) return null;
       return {prix: k.reduce(function(a, b){ return a + b; }, 0), fixe: (n(re, 'fixe_an') || 0) + (n(rs, 'fixe_an') || 0) + (n(tx, 'fixe_an') || 0)};
     }
-    // Acompte minimum recommandé de chaque contrat, pour la consommation de la barre du haut (arrondi à l'euro supérieur).
+    // Acompte minimum de chaque contrat : frais fixes seuls (abonnement, réseau, taxes), à consommation zéro, par énergie (arrondi à l'euro supérieur).
     var dfR = seg === 'P' ? 1 : 1 + tva, uR = seg === 'P' ? 'HTVA' : 'TVAC', recTxt = '', recHtml = '';
     function rec(c){
       if (!T) return null;
       var tot = 0, parts = [];
       for (var i = 0, ens = both ? ['e', 'g'] : [en0]; i < ens.length; i++){
-        var en = ens[i], g = grdOf($(en === 'e' ? 'grdE' : 'grdG').value), kwh = HUB[en];
-        if (!g || kwh === null || kwh === undefined) return null;
+        var en = ens[i], g = grdOf($(en === 'e' ? 'grdE' : 'grdG').value);
+        if (!g) return null;
         var q = pr(en, c, g); if (!q) return null;
-        var m = Math.ceil((kwh * q.prix / 100 + q.fixe) * dfR / 12); tot += m; parts.push({en: en, m: m, kwh: kwh});
+        var m = Math.ceil(Math.round(q.fixe * dfR * 100) / 100 / 12); tot += m; parts.push({en: en, m: m, an: q.fixe * dfR});
       }
       return {tot: tot, parts: parts};
     }
     document.querySelectorAll('input[name="akCt"]').forEach(function(r){
       var o = rec(r.value), sp = r.parentNode.querySelector('.akrec');
       sp.textContent = o ? '· ' + fmt(o.tot) + ' €' : '· –';
-      sp.title = o ? 'Acompte minimum recommandé ' + uR : 'Prix non disponible pour ce code postal';
+      sp.title = o ? 'Acompte minimum (frais fixes à 0 kWh) ' + uR : 'Prix non disponible pour ce code postal';
     });
     var R0 = rec(ct);
     if (R0){
-      recHtml = '<div class="line acompte"><span>Acompte minimum recommandé (' + esc(ct) + ')</span><span>' + fmt(R0.tot) + ' €/mois ' + uR + '</span></div>' +
-        '<div class="hint">' + R0.parts.map(function(x){ return (x.en === 'e' ? 'électricité ' : 'gaz ') + fmt(x.m) + ' € pour ' + fmt(x.kwh) + ' kWh/an'; }).join(' + ') + '</div>' +
-        (am !== null && am > 0 && am < R0.tot ? '<div class="hint" style="color:#9a3b2b;font-weight:600">L\'acompte souhaité (' + money(am) + ' €) est sous le minimum recommandé : risque de régularisation à payer.</div>' : '');
-      recTxt = 'Acompte minimum recommandé (' + ct + ') : ' + fmt(R0.tot) + ' €/mois ' + uR + ' (' + R0.parts.map(function(x){ return (x.en === 'e' ? 'électricité ' : 'gaz ') + fmt(x.m) + ' € pour ' + fmt(x.kwh) + ' kWh'; }).join(' + ') + ')';
+      var pp = function(x){ return (x.en === 'e' ? 'électricité ' : 'gaz ') + fmt(x.m) + ' €' + (x.m ? ' (' + fmt(x.an) + ' €/an)' : ' (aucun frais fixe)'); };
+      recHtml = '<div class="line acompte"><span>Acompte minimum (' + esc(ct) + ')</span><span>' + fmt(R0.tot) + ' €/mois ' + uR + '</span></div>' +
+        '<div class="hint">Frais fixes seuls, à 0 kWh (abonnement, réseau, taxes) : ' + R0.parts.map(pp).join(' + ') + '</div>' +
+        (am !== null && am > 0 && am < R0.tot ? '<div class="hint" style="color:#9a3b2b;font-weight:600">L\'acompte souhaité (' + money(am) + ' €) ne couvre pas les frais fixes.</div>' : '');
+      recTxt = 'Acompte minimum (' + ct + ', frais fixes à 0 kWh) : ' + fmt(R0.tot) + ' €/mois ' + uR + ' (' + R0.parts.map(pp).join(' + ') + ')';
     }
     $('akRecOut').innerHTML = recHtml; $('akRecOut').hidden = !recHtml;
     var miss = '';
