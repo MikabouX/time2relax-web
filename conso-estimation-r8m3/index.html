@@ -206,6 +206,9 @@
     .zbtn{font-size:13px}
     .hk input,.hubkwh input{width:62px}
   }
+  .vcard{border:1px solid #dfe7e1;border-radius:10px;padding:6px 10px;margin:6px 0}
+  .vtitle{font-weight:600;margin-bottom:2px}
+  .vres{font-weight:400;font-size:12px;opacity:.75;margin-left:6px}
   h1 .maj{font-size:11px;font-weight:400;opacity:.65;vertical-align:middle;margin-left:6px}
 </style>
 </head>
@@ -369,12 +372,32 @@
         </div>
         <div class="sub" id="evBox" hidden>
           <div class="row"><span class="clbl">Nombre</span><select id="evN"><option value="1">1 véhicule</option><option value="2">2 véhicules</option><option value="3">3 véhicules</option></select></div>
-          <div class="row"><span class="clbl">Charge à la maison</span><div class="opts"><label><input type="radio" name="evh" value="1" checked>Oui</label><label><input type="radio" name="evh" value="0">Non</label></div></div>
+          <div class="row"><span class="clbl">Recharge à la maison</span><div class="opts"><label><input type="radio" name="evh" value="1" checked>Oui</label><label><input type="radio" name="evh" value="0">Non</label></div></div>
           <div id="evHomeBox">
-          <div class="row veh" id="veh1"><span class="clbl">Véhicule 1</span><select id="ev1t"><option value="e">Électrique</option><option value="h">Hybride rechargeable</option></select> <input type="number" id="km" min="0" step="1000" value="15000" style="width:90px"> <span>km/an à domicile</span> <input type="text" inputmode="decimal" class="px" id="ev1c" value="18" style="width:50px"> <span>kWh/100 km</span></div>
-          <div class="row veh" id="veh2" hidden><span class="clbl">Véhicule 2</span><select id="ev2t"><option value="e">Électrique</option><option value="h">Hybride rechargeable</option></select> <input type="number" id="km2" min="0" step="1000" value="15000" style="width:90px"> <span>km/an à domicile</span> <input type="text" inputmode="decimal" class="px" id="ev2c" value="18" style="width:50px"> <span>kWh/100 km</span></div>
-          <div class="row veh" id="veh3" hidden><span class="clbl">Véhicule 3</span><select id="ev3t"><option value="e">Électrique</option><option value="h">Hybride rechargeable</option></select> <input type="number" id="km3" min="0" step="1000" value="15000" style="width:90px"> <span>km/an à domicile</span> <input type="text" inputmode="decimal" class="px" id="ev3c" value="18" style="width:50px"> <span>kWh/100 km</span></div>
-          <span class="hint">Consommation selon le modèle : citadine 14–16, berline 16–19, SUV ou grande voiture 20–25 kWh/100 km (recharge comprise). Hybride rechargeable : seulement les km roulés en électrique (souvent 6 000 à 10 000 par an), environ 20 kWh/100 km. Moyenne belge : environ 15 000 km par an.</span>
+          <div class="veh vcard" id="veh1">
+            <div class="vtitle">Véhicule 1 <span class="vres" id="ev1r"></span></div>
+            <div class="row"><span class="clbl">Type</span><select id="ev1t"><option value="e">100 % électrique</option><option value="h">Hybride rechargeable</option></select></div>
+            <div class="row"><span class="clbl">Km rechargés à la maison</span><input type="number" id="km" min="0" step="1000" value="15000" style="width:90px"> <span>km par an</span></div>
+            <div class="row"><span class="clbl">Consommation</span><select id="ev1p" class="evp" style="width:150px"><option value="15">Petite (≈ 15)</option><option value="18" selected>Moyenne (≈ 18)</option><option value="22">SUV, grande (≈ 22)</option><option value="">Autre : taper →</option></select> <input type="text" inputmode="decimal" class="px" id="ev1c" value="18" style="width:50px"> <span>kWh/100 km</span></div>
+          </div>
+          <div class="veh vcard" id="veh2" hidden>
+            <div class="vtitle">Véhicule 2 <span class="vres" id="ev2r"></span></div>
+            <div class="row"><span class="clbl">Type</span><select id="ev2t"><option value="e">100 % électrique</option><option value="h">Hybride rechargeable</option></select></div>
+            <div class="row"><span class="clbl">Km rechargés à la maison</span><input type="number" id="km2" min="0" step="1000" value="15000" style="width:90px"> <span>km par an</span></div>
+            <div class="row"><span class="clbl">Consommation</span><select id="ev2p" class="evp" style="width:150px"><option value="15">Petite (≈ 15)</option><option value="18" selected>Moyenne (≈ 18)</option><option value="22">SUV, grande (≈ 22)</option><option value="">Autre : taper →</option></select> <input type="text" inputmode="decimal" class="px" id="ev2c" value="18" style="width:50px"> <span>kWh/100 km</span></div>
+          </div>
+          <div class="veh vcard" id="veh3" hidden>
+            <div class="vtitle">Véhicule 3 <span class="vres" id="ev3r"></span></div>
+            <div class="row"><span class="clbl">Type</span><select id="ev3t"><option value="e">100 % électrique</option><option value="h">Hybride rechargeable</option></select></div>
+            <div class="row"><span class="clbl">Km rechargés à la maison</span><input type="number" id="km3" min="0" step="1000" value="15000" style="width:90px"> <span>km par an</span></div>
+            <div class="row"><span class="clbl">Consommation</span><select id="ev3p" class="evp" style="width:150px"><option value="15">Petite (≈ 15)</option><option value="18" selected>Moyenne (≈ 18)</option><option value="22">SUV, grande (≈ 22)</option><option value="">Autre : taper →</option></select> <input type="text" inputmode="decimal" class="px" id="ev3c" value="18" style="width:50px"> <span>kWh/100 km</span></div>
+          </div>
+          <details class="explain"><summary><strong>Comment remplir ?</strong></summary>
+            <p><strong>Km rechargés à la maison</strong> : seulement les km roulés avec l'électricité de la maison. Pas les recharges au travail ni sur borne publique (elles ne passent pas par le compteur du client). Moyenne belge : environ 15 000 km par an ; si le client recharge la moitié du temps ailleurs, mettez la moitié.</p>
+            <p><strong>Hybride rechargeable</strong> : seulement les km roulés en mode électrique (souvent 6 000 à 10 000 par an), environ 20 kWh/100 km.</p>
+            <p><strong>Consommation</strong> : si le client ne la connaît pas, choisissez la taille de la voiture (recharge comprise). Petite citadine ≈ 15, voiture moyenne ≈ 18, SUV ou grande voiture ≈ 22 kWh/100 km.</p>
+            <p><strong>Calcul</strong> : km × kWh/100 km ÷ 100. Exemple : 15 000 km × 18 kWh/100 km = 2 700 kWh par an, ajoutés à l'électricité du ménage.</p>
+          </details>
           </div>
         </div>
       </fieldset>
@@ -1177,6 +1200,7 @@
     $('climSet').hidden = !showE; $('climBox').hidden = !inp.clim; $('commSet').hidden = !showE;
     $('batSet').hidden = !(showE && inp.pv);
     for (var vi = 2; vi <= 3; vi++) $('veh' + vi).hidden = +$('evN').value < vi;
+    (inp.vehicles || []).forEach(function(v, i){ var r = $('ev' + (i + 1) + 'r'); if (r) r.textContent = v.km > 0 ? '≈ ' + fmt(Math.round(v.km * v.c / 100)) + ' kWh/an (' + fmt(v.km) + ' km × ' + String(v.c).replace('.', ',') + ' kWh/100 km)' : ''; });
     document.getElementById('pvBox').hidden = !inp.pv;
     // Zone 2 : mêmes réponses que l'estimation (panneaux, puissance, compensation).
     document.querySelector('input[name="pv2"][value="' + (inp.pv ? '1' : '0') + '"]').checked = true;
@@ -1740,6 +1764,13 @@
     if (z === 'prix') framePost();
   }
   document.querySelectorAll('.zbtn').forEach(function(b){ b.addEventListener('click', function(){ showZone(this.dataset.zone); }); });
+  // Véhicules : le choix de taille remplit les kWh/100 km ; « Autre » laisse taper. Hybride : 20 par défaut.
+  [1, 2, 3].forEach(function(i){
+    var p = $('ev' + i + 'p'), c = $('ev' + i + 'c'), t = $('ev' + i + 't');
+    p.addEventListener('change', function(){ if (this.value){ c.value = this.value; } else { c.focus(); c.select(); } });
+    c.addEventListener('input', function(){ var v = pnum(c.value), m = [].filter.call(p.options, function(o){ return o.value && +o.value === v; })[0]; p.value = m ? m.value : ''; });
+    t.addEventListener('change', function(){ var h = this.value === 'h'; p.style.display = h ? 'none' : ''; if (h){ c.value = '20'; p.value = ''; } else { c.value = '18'; p.value = '18'; } });
+  });
   // Zone 2 : panneaux solaires demandés aussi ici (renvoyés vers les champs de l'estimation, qui font le calcul).
   function setRadio(name, v){ var r = document.querySelector('input[name="' + name + '"][value="' + v + '"]'); if (r && !r.checked){ r.checked = true; r.dispatchEvent(new Event('change', {bubbles: true})); } }
   document.querySelectorAll('input[name="pv2"]').forEach(function(r){ r.addEventListener('change', function(e){ e.stopPropagation(); $('pv2Box').hidden = this.value !== '1'; setRadio('pv', this.value); }); });
