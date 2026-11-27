@@ -474,7 +474,34 @@
       vals.map(function(v){ return '<td>' + (typeof v === 'string' ? v : fr(v, o.dec || 3)) + '</td>'; }).join('') + '<td>' + (fixe === null || fixe === undefined ? '' : fr(fixe, 2)) + '</td></tr>';
   }
   var VARIE = '<span class="varie" title="Varie selon la consommation">⚠ varie selon la consommation</span>';
+  // Tarif social : prix CREG du trimestre, réseau et transport compris ; seule l'accise réduite s'ajoute.
+  // Pas de distribution, de transport, d'énergie verte, de redevance fixe ni de tarif prosumer.
+  function vigSocial(en, G, m, ref){
+    var o = T && iso(T.mois) === m ? comps(en, 'Tarif social', G.region, G.code, 'R') : null;
+    if (!o) return {html: '<p class="hint">Tarif social pas encore encodé pour ' + moisLbl(m) + '.</p>', txt: ''};
+    var TVA = 1.06, B = bandsFor(en, G.region).filter(function(t){ return t !== 'x'; }).map(function(t){ return t === 'a' ? 'j' : t === 'b' || t === 'c' ? 'n' : t; })
+      .filter(function(t, i, a){ return a.indexOf(t) === i; });
+    var v = function(k, t){ var x = o[k][t]; return x === null || x === undefined ? null : x * TVA; };
+    var en_ = B.map(function(t){ return v('en', t); }), tx = B.map(function(t){ return v('tx', t); }), tot = B.map(function(t){ return v('tot', t); });
+    var h = '<table class="vt"><thead><tr><th>TVAC</th>' + B.map(function(t){ return '<th>' + BL[t] + '<br><small>c€/kWh</small></th>'; }).join('') + '<th>Fixe<br><small>€/an</small></th></tr></thead><tbody>' +
+      vrow('Tarif social CREG <span class="vn">(réseau et transport compris)</span>', en_, null) +
+      vrow('Accise (réduite, tarif social)', tx, null, {dec: 4, cls: 'sm'}) +
+      vrow('<b>Total</b>', tot.map(function(x){ return x === null ? '–' : '<b>' + fr(x, 3) + '</b>'; }), null, {cls: 'tot'}).replace(/<td><\/td><\/tr>$/, '<td><b>' + fr(0, 2) + '</b></td></tr>') +
+      '</tbody></table>';
+    var cost = null, costLbl = '';
+    if (B[0] === 'k' && tot[0] !== null && ref){ cost = ref * tot[0] / 100; costLbl = fr(ref, 0) + ' kWh'; }
+    else if (B[0] === 'j' && B[1] === 'n' && tot[0] !== null && tot[1] !== null && REFJN[0] !== null && REFJN[0] !== undefined){
+      cost = (REFJN[0] * tot[0] + REFJN[1] * tot[1]) / 100; costLbl = fr(REFJN[0], 0) + ' kWh jour + ' + fr(REFJN[1], 0) + ' kWh nuit';
+    }
+    if (cost !== null) h += '<p class="vcost">≈ <b>' + fr(cost, 0) + ' €/an</b> pour ' + costLbl + '</p>';
+    h += '<p class="note">Tarif social : prix fixé par la CREG chaque trimestre, tout compris. Pas de coûts de réseau, d\'énergie verte, de redevance fixe ni de tarif prosumer.</p>';
+    var txt = (en === 'e' ? 'Électricité' : 'Gaz') + ' – Tarif social (CREG), ' + G.nom + ', TVAC :\n' +
+      B.map(function(t, i){ return '- ' + BL[t] + ' : ' + fr(tot[i], 3) + ' c€/kWh (tarif social ' + fr(en_[i], 3) + ' + accise ' + fr(tx[i], 4) + ')'; }).join('\n') +
+      '\n- Fixe : 0 €/an ; pas de coûts de réseau ni de tarif prosumer' + (cost !== null ? '\n- ≈ ' + fr(cost, 0) + ' €/an pour ' + costLbl : '');
+    return {html: h, txt: txt};
+  }
   function vigR(en, G, m, cle, ref){
+    if (cle === 'Tarif social' || (T && /_SOCIAL_/.test((rowOf('energie', en, cle, G.region, 'R') || {}).doc || ''))) return vigSocial(en, G, m, ref);
     var TVA = SEG() === 'R' ? 1.06 : 1, reg = G.region, D = detOf(en, reg, m), F = D ? fiche(en, D, G.code, ref) : null, E = energy(en, cle, m, reg);
     if (!F) return {html: '<p class="hint">Pas de fiche réseau encodée pour ' + esc(G.nom) + ' en ' + moisLbl(m) + '.</p>', txt: ''};
     if (!E) return {html: '<p class="hint">Pas de prix pour ce contrat en ' + moisLbl(m) + '.</p>', txt: ''};
