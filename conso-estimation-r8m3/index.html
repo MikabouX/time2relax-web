@@ -10,24 +10,24 @@
 <title>Simulateur énergie</title>
 <style>
   :root{
-    /* Couleurs des cartes tarifaires ENGIE : orange pour l'électricité, bleu pour le gaz ; bleu nuit pour le reste */
+    /* Couleurs relevées sur les cartes tarifaires ENGIE (novembre 2026) : icône électricité #f6852b, icône gaz #009fe3, bandeaux bleu → turquoise */
     --bg:#f6f7fa; --card:#ffffff; --ink:#1a2433; --muted:#5b6678; --line:#dfe4ec;
-    --accent:#17487a; --accent-soft:#e7eef7; --elec:#f08a00; --gas:#1a96d4; --warn:#fff6dc; --warn-line:#e6c766;
+    --accent:#0071b5; --accent-soft:#e5f2fa; --elec:#f6852b; --gas:#009fe3; --warn:#fff6dc; --warn-line:#e6c766;
     --edit:#7a4cc2; --edit-bg:#f4effc;
   }
   *{box-sizing:border-box}
   body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink);font-size:15px;line-height:1.45}
-  header{position:relative;background:linear-gradient(115deg,#123a63 0%,#17487a 55%,#1d5f98 100%);color:#fff;padding:18px 20px 22px}
-  header::after{content:"";position:absolute;left:0;right:0;bottom:0;height:5px;background:linear-gradient(90deg,var(--elec) 0%,#ffb03b 42%,#5cc0ec 58%,var(--gas) 100%)}
+  header{position:relative;background:linear-gradient(105deg,#00609e 0%,#0080b8 55%,#1f8a80 100%);color:#fff;padding:18px 20px 22px}
+  header::after{content:"";position:absolute;left:0;right:0;bottom:0;height:5px;background:linear-gradient(90deg,var(--elec) 0%,#ffb27a 42%,#62c6ee 58%,var(--gas) 100%)}
   header h1{margin:0;font-size:20px;font-weight:650}
   header p{margin:4px 0 0;opacity:.9;font-size:13px}
   main{max-width:1240px;margin:0 auto;padding:18px 16px 40px;display:grid;gap:18px;min-width:0}
   main > *, .steps > *, .cols > *{min-width:0}
   .steps{display:grid;gap:22px}
-  .step{border-radius:14px;padding:14px;background:#eef2f8;border:1px solid #d8e0ec}
-  .step.prix{background:linear-gradient(135deg,#fff5e8 0%,#f7f4f2 50%,#eaf6fc 100%);border-color:#e6dfd8}
-  .step.regul{background:#f3f1f8;border-color:#dedaea}
-  .step.regul .stephead .num{background:#5b4f8a}
+  .step{border-radius:14px;padding:14px;background:#edf5f9;border:1px solid #d3e5ee}
+  .step.prix{background:linear-gradient(135deg,#fef3ea 0%,#f6f5f4 50%,#e6f5fc 100%);border-color:#e3dfdb}
+  .step.regul{background:#ecf6f3;border-color:#cfe6df}
+  .step.regul .stephead .num{background:#23897d}
   #regSet legend{font-weight:600;margin-bottom:4px}
   #regSet [hidden]{display:none}
   .perDel{padding:2px 8px}
@@ -102,10 +102,10 @@
   .totals.one{grid-template-columns:1fr}
   .tot.e{border-top:4px solid var(--elec)} .tot.g{border-top:4px solid var(--gas)}
   /* Code couleur des cartes ENGIE : fond orange pâle pour l'électricité, bleu pâle pour le gaz */
-  :root{--elec-bg:#fff4e5;--elec-bd:#f6d3a4;--gas-bg:#e9f6fd;--gas-bd:#b8def3}
+  :root{--elec-bg:#fef3ea;--elec-bd:#f9cfae;--gas-bg:#e6f5fc;--gas-bd:#a9dcf3}
   .tot.e,#blkE,#regSet div#regE{background:var(--elec-bg);border-color:var(--elec-bd)}
   .tot.g,#blkG,#regSet #regG{background:var(--gas-bg);border-color:var(--gas-bd)}
-  #regSet div#regE,#regSet #regG{border:1px solid;border-radius:10px;padding:8px 12px}
+  #regSet div#regE,#regSet #regG{border-width:1px;border-style:solid;border-radius:10px;padding:8px 12px}
   .ctrs{margin-top:6px} .ctr{flex-wrap:wrap;gap:4px 6px;padding:5px 0;border-top:1px dashed rgba(0,0,0,.12)} .ctr input[type=date]{width:auto} .ctr .ctrK{width:70px}
   .ecols-eg td:nth-child(2),.ecols-eg th:nth-child(2),.ecols-e td:nth-child(2),.ecols-e th:nth-child(2){background:var(--elec-bg)}
   .ecols-eg td:nth-child(3),.ecols-eg th:nth-child(3),.ecols-g td:nth-child(2),.ecols-g th:nth-child(2){background:var(--gas-bg)}
