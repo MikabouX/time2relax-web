@@ -88,6 +88,18 @@
   .akrec{font-size:12px;color:var(--muted);font-weight:600}
   .akcts label:has(input:checked) .akrec{color:var(--accent)}
   #akRecOut{margin-bottom:14px}
+  /* Curseur de répartition de l'acompte : électricité (orange) à gauche, gaz (bleu) à droite */
+  .akmix{display:grid;gap:6px;padding:10px 12px;border-radius:10px;background:linear-gradient(90deg,var(--elec-bg),var(--gas-bg));border:1px solid #e3dfdb}
+  .akmix[hidden]{display:none}
+  .akmix .lbls{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13.5px;font-variant-numeric:tabular-nums}
+  .akmix .lbls b{font-size:15px}
+  .akmix .lbls i{display:block;font-style:normal;font-size:12.5px;font-weight:600;opacity:.85}
+  .akmix .le2{color:#b35710} .akmix .lg2{color:#0074a8;text-align:right}
+  .akmix .ctl{display:flex;align-items:center;gap:10px}
+  .akmix input[type=range]{flex:1;min-width:0;-webkit-appearance:none;appearance:none;height:10px;border-radius:6px;margin:8px 0;background:linear-gradient(90deg,var(--elec) 0,var(--elec) var(--p,50%),var(--gas) var(--p,50%),var(--gas) 100%);cursor:pointer}
+  .akmix input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:26px;height:26px;border-radius:50%;background:#fff;border:3px solid var(--accent);box-shadow:0 1px 4px rgba(0,0,0,.25)}
+  .akmix input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;background:#fff;border:3px solid var(--accent);box-shadow:0 1px 4px rgba(0,0,0,.25)}
+  .akmix button{font-size:12px;padding:3px 9px;flex:none}
   .cost .hint{margin-top:4px}
   .cost .used{margin:0 0 8px;padding-left:8px;border-left:2px solid var(--line)}
   .check{display:inline-flex;align-items:center;gap:6px;font-size:14px;cursor:pointer}
@@ -653,7 +665,11 @@
           <div class="opts"><label><input type="radio" name="akEn" value="both" checked>Électricité + gaz</label><label><input type="radio" name="akEn" value="e">Électricité</label><label><input type="radio" name="akEn" value="g">Gaz</label></div>
         </div>
         <div class="row"><span class="clbl">Acompte</span><input type="text" inputmode="decimal" class="px" id="akAm" maxlength="8"> <span id="akAmU">€ / mois TVAC</span></div>
-        <div class="hint" id="akSplit">Électricité + gaz : l'acompte est réparti 50 % électricité, 50 % gaz.</div>
+        <div class="akmix" id="akSplit">
+          <div class="lbls"><span class="le2">⚡ Électricité <b id="akMixE">50 %</b> <i id="akMixEe"></i></span><span class="lg2">Gaz <b id="akMixG">50 %</b> 🔥<i id="akMixGe"></i></span></div>
+          <div class="ctl"><input type="range" id="akMix" min="0" max="100" step="1" value="50" aria-label="Part de l'acompte pour l'électricité (le reste va au gaz)"><button type="button" id="akMixR" title="Revenir à 50 % / 50 %">50/50</button></div>
+          <div class="hint">Glissez vers la droite pour donner plus à l'électricité, vers la gauche pour le gaz : le total de l'acompte ne change pas.</div>
+        </div>
         <div class="row"><span class="clbl">Contrat</span>
           <div class="opts akcts"><label><input type="radio" name="akCt" value="Easy fixe" checked>Easy fixe <span class="akrec"></span></label><label><input type="radio" name="akCt" value="Easy variable">Easy variable <span class="akrec"></span></label><label><input type="radio" name="akCt" value="Flow variable">Flow <span class="akrec"></span></label><label><input type="radio" name="akCt" value="Basic Online variable">Basic <span class="akrec"></span></label><label id="akSoc"><input type="radio" name="akCt" value="Tarif social">Tarif social <span class="akrec"></span></label></div>
         </div>
@@ -1968,7 +1984,13 @@
     var seg = document.querySelector('input[name="akSeg"]:checked').value, en0 = document.querySelector('input[name="akEn"]:checked').value;
     var ct = document.querySelector('input[name="akCt"]:checked').value, am = pnum($('akAm').value), tva = seg === 'P' ? 0.21 : 0.06;
     var both = en0 === 'both', out = $('akOut'), html = '', txt = [];
+    // Répartition électricité / gaz choisie avec le curseur (50/50 par défaut).
+    var pE = +$('akMix').value, part = function(en){ return en === 'e' ? pE / 100 : (100 - pE) / 100; };
     $('akSplit').hidden = !both;
+    $('akMix').style.setProperty('--p', pE + '%');
+    $('akMixE').textContent = pE + ' %'; $('akMixG').textContent = (100 - pE) + ' %';
+    $('akMixEe').textContent = am !== null && am > 0 ? money(am * pE / 100) + ' €/mois' : '';
+    $('akMixGe').textContent = am !== null && am > 0 ? money(am * (100 - pE) / 100) + ' €/mois' : '';
     $('akSoc').style.display = seg === 'P' ? 'none' : '';
     if (seg === 'P' && ct === 'Tarif social'){ document.querySelector('input[name="akCt"][value="Easy fixe"]').checked = true; ct = 'Easy fixe'; } $('akAmU').textContent = '€ / mois ' + (seg === 'P' ? 'HTVA' : 'TVAC');
     function row(type, en, cle, reg){ var sg = type === 'reseau' ? '*' : seg; return (T ? T.prix : []).filter(function(p){ return p.segment === sg && p.type === type && p.energie === en && p.cle === cle && p.region === reg; })[0] || null; }
@@ -2024,7 +2046,7 @@
       var reg = g.region, q = pr(en, ct, g);
       if (!q){ html += '<div class="line"><span>' + lbl + '</span><span class="hint">prix ' + ct + ' non disponible (' + esc(reg) + ')</span></div>'; return; }
       var prix = q.prix, fixe = q.fixe;
-      var a = both ? am / 2 : am, anHT = seg === 'P' ? a * 12 : a * 12 / (1 + tva), kwh = (anHT - fixe) / (prix / 100), df = seg === 'P' ? 1 : 1 + tva, u = seg === 'P' ? 'HTVA' : 'TVAC';
+      var a = both ? am * part(en) : am, anHT = seg === 'P' ? a * 12 : a * 12 / (1 + tva), kwh = (anHT - fixe) / (prix / 100), df = seg === 'P' ? 1 : 1 + tva, u = seg === 'P' ? 'HTVA' : 'TVAC';
       html += '<div class="line"' + (html ? ' style="margin-top:12px"' : '') + '><span><b>' + lbl + '</b> : ' + money(a) + ' €/mois × 12</span><span>' + fmt(a * 12) + ' €/an ' + u + '</span></div>';
       html += '<div class="hint used">' + esc(ct) + ', ' + esc(g.nom) + ' : ' + num2(prix * df) + ' c€/kWh + ' + fmt(fixe * df) + ' €/an de frais fixes ' + u + '</div>';
       if (kwh <= 0){ html += '<div class="line acompte"><span>' + lbl + '</span><span>ne couvre pas les frais fixes</span></div>'; txt.push(lbl + ' : ' + money(a) + ' €/mois ne couvre pas les frais fixes (' + fmt(fixe * df) + ' €/an)'); return; }
@@ -2034,11 +2056,12 @@
     });
     $('akEmpty').textContent = miss || 'Entrez le code postal en haut et l\'acompte souhaité.';
     $('akEmpty').hidden = !!html; out.hidden = !html; out.innerHTML = html; colorLines('akOut');
-    AKTXT = (txt.length ? 'Acompte → kWh' + (both ? ' (50 % électricité, 50 % gaz)' : '') + '\n' + txt.join('\n') : '') + (recTxt ? (txt.length ? '\n' : '') + recTxt : '');
+    AKTXT = (txt.length ? 'Acompte → kWh' + (both ? ' (' + pE + ' % électricité, ' + (100 - pE) + ' % gaz)' : '') + '\n' + txt.join('\n') : '') + (recTxt ? (txt.length ? '\n' : '') + recTxt : '');
   }
   var AKTXT = '';
   $('akSet').addEventListener('input', function(e){ e.stopPropagation(); akCalc(); });
   $('akSet').addEventListener('change', function(e){ e.stopPropagation(); akCalc(); });
+  $('akMixR').addEventListener('click', function(){ $('akMix').value = 50; akCalc(); });
   // Lignes de résultat : fond selon l'énergie (« électricité » / « gaz » dans le libellé ; les notes suivent leur ligne).
   function colorLines(id){
     var el = $(id), cur = ''; if (!el) return;
