@@ -11,7 +11,7 @@
 <style>
   :root{
     --bg:#f5f6f4; --card:#ffffff; --ink:#1d2a24; --muted:#5d6b64; --line:#dde3df;
-    --accent:#1f7a5a; --accent-soft:#e3f2ec; --elec:#c98a00; --gas:#2e6fb7; --warn:#fff6dc; --warn-line:#e6c766;
+    --accent:#1f7a5a; --accent-soft:#e3f2ec; --elec:#2e6fb7; --gas:#d4a106; --warn:#fff6dc; --warn-line:#e6c766;
   }
   *{box-sizing:border-box}
   body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink);font-size:15px;line-height:1.45}
@@ -640,7 +640,7 @@
         <div class="row"><span class="clbl">Acompte</span><input type="text" inputmode="decimal" class="px" id="akAm" maxlength="8"> <span id="akAmU">€ / mois TVAC</span></div>
         <div class="hint" id="akSplit">Électricité + gaz : l'acompte est réparti 50 % électricité, 50 % gaz.</div>
         <div class="row"><span class="clbl">Contrat</span>
-          <div class="opts akcts"><label><input type="radio" name="akCt" value="Easy fixe" checked>Easy fixe <span class="akrec"></span></label><label><input type="radio" name="akCt" value="Easy variable">Easy variable <span class="akrec"></span></label><label><input type="radio" name="akCt" value="Flow variable">Flow <span class="akrec"></span></label><label><input type="radio" name="akCt" value="Basic Online variable">Basic <span class="akrec"></span></label></div>
+          <div class="opts akcts"><label><input type="radio" name="akCt" value="Easy fixe" checked>Easy fixe <span class="akrec"></span></label><label><input type="radio" name="akCt" value="Easy variable">Easy variable <span class="akrec"></span></label><label><input type="radio" name="akCt" value="Flow variable">Flow <span class="akrec"></span></label><label><input type="radio" name="akCt" value="Basic Online variable">Basic <span class="akrec"></span></label><label id="akSoc"><input type="radio" name="akCt" value="Tarif social">Tarif social <span class="akrec"></span></label></div>
         </div>
         <div class="hint" id="akRecHint">Acompte minimum recommandé : pour la consommation de la barre du haut (connue ou estimée).
         </div>
@@ -1851,11 +1851,19 @@
     var seg = document.querySelector('input[name="akSeg"]:checked').value, en0 = document.querySelector('input[name="akEn"]:checked').value;
     var ct = document.querySelector('input[name="akCt"]:checked').value, am = pnum($('akAm').value), tva = seg === 'P' ? 0.21 : 0.06;
     var both = en0 === 'both', out = $('akOut'), html = '', txt = [];
-    $('akSplit').hidden = !both; $('akAmU').textContent = '€ / mois ' + (seg === 'P' ? 'HTVA' : 'TVAC');
+    $('akSplit').hidden = !both;
+    $('akSoc').style.display = seg === 'P' ? 'none' : '';
+    if (seg === 'P' && ct === 'Tarif social'){ document.querySelector('input[name="akCt"][value="Easy fixe"]').checked = true; ct = 'Easy fixe'; } $('akAmU').textContent = '€ / mois ' + (seg === 'P' ? 'HTVA' : 'TVAC');
     function row(type, en, cle, reg){ var sg = type === 'reseau' ? '*' : seg; return (T ? T.prix : []).filter(function(p){ return p.segment === sg && p.type === type && p.energie === en && p.cle === cle && p.region === reg; })[0] || null; }
     function n(r, k){ return r && r[k] !== null && r[k] !== undefined ? +r[k] : null; }
     // Prix HTVA d'un contrat : c€/kWh (énergie + verte + réseau + taxes) et frais fixes €/an.
     function pr(en, c, g){
+      if (c === 'Tarif social'){   // prix CREG du trimestre, réseau compris ; taxes « Tarif social » ; particuliers seulement
+        if (seg !== 'R') return null;
+        var se = row('energie', en, c, g.region), st = row('taxes', en, c, g.region);
+        if (n(se, 'prix_kwh') === null || n(st, 'prix_kwh') === null) return null;
+        return {prix: n(se, 'prix_kwh') + n(st, 'prix_kwh'), fixe: (n(se, 'fixe_an') || 0) + (n(st, 'fixe_an') || 0)};
+      }
       var reg = g.region, re = row('energie', en, c, reg), rs = row('reseau', en, g.code, reg), tx = row('taxes', en, reg, reg), vt = null;
       if (en === 'e'){ vt = re && n(re, 'vert_kwh') !== null ? re : (T.prix.filter(function(p){ return p.type === 'energie' && p.energie === 'e' && p.segment === seg && p.region === reg && n(p, 'vert_kwh') !== null; })[0] || null); }
       var k = [n(re, 'prix_kwh'), en === 'e' ? n(vt, 'vert_kwh') : 0, n(rs, 'prix_kwh'), n(tx, 'prix_kwh')];
