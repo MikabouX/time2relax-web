@@ -111,6 +111,16 @@
       <p class="hint" style="margin:6px 0 0">Les cartes arrivent dans votre dossier Téléchargements (Chrome demande la première fois d'autoriser les téléchargements multiples). Demandez ensuite à Claude de les lire.</p>
       <div id="cardLinks" class="hint" style="margin-top:6px"></div>
     </details>
+    <details class="sec" id="concBox">
+      <summary><strong>Cartes tarifaires de la concurrence (mois en cours)</strong> <span class="hint">(TotalEnergies, Eneco, Bolt, Octa+, Luminus)</span></summary>
+      <div class="row" style="margin-top:8px">
+        <button type="button" id="concAll">Tout ouvrir (<span id="concCount">0</span> cartes)</button>
+        <span class="msg" id="concMsg"></span>
+      </div>
+      <p class="hint" style="margin:6px 0 0">Chaque carte s'ouvre dans un onglet. Pour qu'elles se téléchargent directement : Chrome → Paramètres → Confidentialité → Paramètres des sites → Documents PDF → « Télécharger les PDF ». La première fois, autorisez aussi les pop-ups pour cette page (icône dans la barre d'adresse). Rangez ensuite les fichiers dans <code>~/Claude/Tarifs/Concurrence/AAAA-MM</code>.</p>
+      <p class="hint" style="margin:0">Liens construits d'après les adresses publiées par chaque fournisseur : certains peuvent ne pas exister (page d'erreur), le nom ou la référence d'un produit pouvant changer. Mega : cartes sur <a href="https://www.mega.be/" target="_blank" rel="noopener">mega.be</a>.</p>
+      <div id="concLinks" class="hint" style="margin-top:6px"></div>
+    </details>
     <details class="sec" id="avBox">
       <summary><strong>Avis des collègues</strong> <span class="hint" id="avCount"></span></summary>
       <p class="hint" style="margin:6px 0">Un avis qui reçoit une réponse est affiché (anonymement) sur la page des avis. Vider la réponse le retire.</p>
@@ -417,6 +427,61 @@
   $('dlAutres').textContent = 'Autres tarifs seulement (' + $('cardLinks').querySelectorAll('a.autre').length + ')';
   $('dlAutres').addEventListener('click', function(){ dlRun(this, 'a.autre'); });
   $('dlAll').addEventListener('click', function(){ dlRun(this, 'a'); });
+  // Cartes de la concurrence du mois en cours (adresses relevées sur les sites des fournisseurs).
+  function concCards(){
+    var d = new Date(), Y = d.getFullYear(), M = d.getMonth() + 1, MM = String(M).padStart(2, '0'), YY = String(Y).slice(2), QM = Math.floor((M - 1) / 3) * 3 + 1;
+    var R3 = [['WAL', 'Wallonie'], ['BXL', 'Bruxelles'], ['VL', 'Flandre']], L = [];
+    function te(seg, y, m, prod, en, reg){ return 'https://totalenergies.be/static/marketing-documents/' + seg + '/tariff-card/' + y + '_' + m + '_' + prod + '_' + en + '_' + reg + '_FR.pdf'; }
+    // TotalEnergies : année_mois_PRODUIT_ÉNERGIE_RÉGION
+    [['MYESSENTIAL', 'myEssential Variable', ['ELECTRICITY', 'GAS']], ['PIXEL', 'Pixel', ['ELECTRICITY']], ['MYDRIVE', 'myDrive', ['ELECTRICITY']]].forEach(function(p){
+      p[2].forEach(function(en){ R3.forEach(function(r){ L.push(['TotalEnergies', p[1] + (en === 'GAS' ? ' gaz' : ' élec'), r[1], 'Particuliers', te('b2c', Y, M, p[0], en, r[0])]); }); });
+    });
+    L.push(['TotalEnergies', 'Pixie élec', 'Flandre', 'Particuliers', te('b2c', Y, M, 'PIXIE', 'ELECTRICITY', 'VL')]);
+    ['ELECTRICITY', 'GAS'].forEach(function(en){ L.push(['TotalEnergies', 'Tarif social ' + (en === 'GAS' ? 'gaz' : 'élec') + ' (trimestre)', 'Toutes', 'Particuliers', te('b2c', Y, QM, 'TARIFF_SOCIAL', en, 'ALL')]); });
+    ['ELECTRICITY', 'GAS'].forEach(function(en){ R3.forEach(function(r){ L.push(['TotalEnergies', 'proEssential Variable ' + (en === 'GAS' ? 'gaz' : 'élec'), r[1], 'Professionnels', te('b2b', Y, M, 'PROESSENTIAL', en, r[0])]); }); });
+    // Eneco : BC_032_01AAMM (particuliers), BB_032_02AAMM (professionnels)
+    [['BC_032_01', 'Particuliers'], ['BB_032_02', 'Professionnels']].forEach(function(s){
+      [['POWER_FIX', 'Soleil & Vent Fixe'], ['POWER_FLEX', 'Soleil & Vent Flex'], ['GAS_FIX', 'Gaz Naturel Fixe'], ['GAS_FLEX', 'Gaz Naturel Flex']].forEach(function(p){
+        L.push(['Eneco', p[1], 'Toutes', s[1], 'https://cdn.eneco.be/downloads/fr/general/tk/' + s[0] + YY + MM + '_FR_ENECO_' + p[0] + '.pdf']);
+      });
+    });
+    // Bolt Fixe : fix_{res|pro}_{el|ng}_fr_AAAAMM
+    [['res', 'Particuliers'], ['pro', 'Professionnels']].forEach(function(s){ [['el', 'élec'], ['ng', 'gaz']].forEach(function(e){
+      L.push(['Bolt', 'Fixe ' + e[1], 'Toutes', s[1], 'https://files.boltenergie.be/pricelists/fix/fix_' + s[0] + '_' + e[0] + '_fr_' + Y + MM + '.pdf']);
+    }); });
+    // Octa+ : adresse fixe, carte du mois en cours
+    [['FLOW', 'Flow', 'EG'], ['FLUX', 'Flux', 'E'], ['SMARTVARIABLE', 'Smart Variable', 'EG'], ['Fixed', 'Fixed', 'EG'], ['DYNAMIC', 'Dynamic', 'E']].forEach(function(p){
+      p[2].split('').forEach(function(en){ [['WL', 'Wallonie'], ['BR', 'Bruxelles'], ['VL', 'Flandre']].forEach(function(r){
+        L.push(['Octa+', p[1] + (en === 'G' ? ' gaz' : ' élec'), r[1], 'Particuliers', 'https://files.octaplus.be/tariffs/' + en + '_OCTA_' + p[0] + '_RE_' + r[0] + '_FR.pdf']);
+      }); });
+    });
+    // Luminus : adresse fixe, carte du mois en cours
+    [['ec0c_fr_comfy_elec', 'Comfy élec'], ['ecf0c_fr_comfyflex_elec', 'ComfyFlex élec'], ['ebfl0c_fr_basicflex_elec', 'BasicFlex élec'], ['gbfl0c_fr_basicflex_gas', 'BasicFlex gaz'],
+     ['ebfi2c_fr_basicfix_elec', 'BasicFix élec'], ['exfl2c_fr_maxxflex_elec', 'MaxxFlex élec'], ['exfi2c_fr_maxxfix_elec', 'MaxxFix élec'], ['eec_fr_essential_elec', 'Essential élec']].forEach(function(p){
+      L.push(['Luminus', p[1], 'Toutes', 'Particuliers', 'https://www.luminus.be/-/media/general/pricelists/fr/' + p[0] + '.pdf']);
+    });
+    return L;
+  }
+  (function(){
+    var L = concCards(), by = {};
+    L.forEach(function(c){ (by[c[0]] = by[c[0]] || []).push(c); });
+    $('concLinks').innerHTML = Object.keys(by).map(function(f){
+      return '<p style="margin:8px 0 2px"><strong>' + esc(f) + '</strong></p><ul style="margin:0;padding-left:18px">' + by[f].map(function(c){
+        return '<li><a class="conc" href="' + esc(c[4]) + '" target="_blank" rel="noopener">' + esc(c[1]) + '</a> · ' + esc(c[2]) + ' · ' + esc(c[3]) + '</li>';
+      }).join('') + '</ul>';
+    }).join('');
+    $('concCount').textContent = L.length;
+    $('concAll').addEventListener('click', function(){
+      var a = $('concLinks').querySelectorAll('a.conc'), n = 0, bl = 0;
+      a.forEach(function(x){ var w = window.open(x.href, '_blank'); n++; if (!w) bl++; else try { w.opener = null; } catch (e){} });
+      msg('concMsg', bl && bl === n ? 'Pop-ups bloqués : autorisez-les pour cette page (icône dans la barre d\'adresse), puis recommencez.' : n + ' cartes ouvertes.', bl === n ? 'err' : 'ok');
+    });
+  })();
+  // Lien direct : admin-prix/#cartes ouvre les cartes ENGIE, #concurrence celles de la concurrence.
+  (function(){
+    var h = location.hash.replace('#', ''), box = h === 'cartes' ? $('cards') : h === 'concurrence' ? $('concBox') : null;
+    if (box){ box.open = true; setTimeout(function(){ box.scrollIntoView({block: 'start'}); }, 300); }
+  })();
   function dlRun(btn, sel){
     var urls = Array.prototype.map.call($('cardLinks').querySelectorAll(sel), function(a){ return a.href; }), i = 0;
     btn.disabled = true;
