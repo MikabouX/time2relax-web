@@ -185,6 +185,11 @@
   .cptel b{font-weight:650}
   .hubkwh label{display:flex;align-items:center;gap:6px;font-size:14px}
   .hubkwh input{width:72px}
+  .hubkwh .erow{display:flex;align-items:flex-end;gap:6px;font-size:14px;flex-wrap:wrap}
+  .hubkwh .erow>span:first-child{align-self:center}
+  .hk{display:inline-flex;flex-direction:column;align-items:center;gap:2px;font-size:11px;font-weight:650;color:var(--muted);line-height:1}
+  .hk input{width:72px}
+  .hksep{align-self:stretch;width:2px;background:var(--line);border-radius:1px;margin:0 2px}
   .dot{display:inline-block;width:9px;height:9px;border-radius:50%}
   .dot.e{background:var(--elec)} .dot.g{background:var(--gas)}
   .zbtns{display:flex;flex-direction:column;gap:6px;justify-content:center}
@@ -199,6 +204,7 @@
   @media (max-width:600px){
     .hub{grid-template-columns:1fr}
     .zbtn{font-size:13px}
+    .hk input,.hubkwh input{width:62px}
   }
 </style>
 </head>
@@ -236,9 +242,14 @@
       <div class="cptel" id="cpTel" hidden></div>
     </div>
     <div class="tool hubkwh">
-      <strong>Consommation annuelle</strong>
-      <label><span class="dot e"></span>Électricité <input type="text" inputmode="numeric" class="px" id="hubE" maxlength="7" placeholder="jour"> <input type="text" inputmode="numeric" class="px" id="hubEN" maxlength="7" placeholder="nuit"> kWh</label>
-      <label><span class="dot g"></span>Gaz <input type="text" inputmode="numeric" class="px" id="hubG" maxlength="7"> kWh</label>
+      <strong>Consommation annuelle (kWh)</strong>
+      <div class="erow"><span><span class="dot e"></span> Électricité</span>
+        <label class="hk">☀️ HI<input type="text" inputmode="numeric" class="px" id="hubE" maxlength="7" title="Heures pleines (HI)"></label>
+        <label class="hk">🌙 LO<input type="text" inputmode="numeric" class="px" id="hubEN" maxlength="7" title="Heures creuses (LO)"></label>
+        <span class="hksep" aria-hidden="true"></span>
+        <label class="hk">☀️/🌙 TH<input type="text" inputmode="numeric" class="px" id="hubET" maxlength="7" title="Total / mono-horaire (TH) = HI + LO"></label>
+      </div>
+      <label><span class="dot g"></span>Gaz <input type="text" inputmode="numeric" class="px" id="hubG" maxlength="7"></label>
       <span class="hint" id="hubHint">Vide : l'estimation est utilisée.</span>
     </div>
     <div class="zbtns" role="tablist">
@@ -1624,17 +1635,17 @@
     o.textContent = (neg ? '−' : '') + h + ' h ' + (mn < 10 ? '0' : '') + mn + ' min';
   });
   // ---------- Barre commune : consommation, zones, page des prix intégrée ----------
-  var HUB = {e: null, g: null};
+  var HUB = {e: null, g: null}, MONO = false;   // MONO : consommation tapée dans TH (mono-horaire)
   function hubSync(showE, showG, effE, effG, knE, knG, twoIdx){
     var act = document.activeElement;
-    if (act !== $('hubE')) $('hubE').value = $('knE').value.trim();
-    if (act !== $('hubEN')) $('hubEN').value = $('knEN').value.trim();
+    if (act !== $('hubE')) $('hubE').value = MONO ? '' : $('knE').value.trim();
+    if (act !== $('hubEN')) $('hubEN').value = MONO ? '' : $('knEN').value.trim();
+    if (act !== $('hubET')) $('hubET').value = !showE ? '0' : knE !== null ? String(knE) : '';
     if (act !== $('hubG')) $('hubG').value = knG !== null ? String(knG) : '';
     // Jour / nuit : deux valeurs → leur répartition ; une seule → 50/50 (ou la part de nuit choisie) ; en mono-horaire, les deux s'additionnent.
     var pn = pnum($('pct').value); pn = pn === null ? 0.5 : Math.min(100, pn) / 100;
     $('hubE').placeholder = fmt(effE * (1 - pn)).replace(/\s/g, ''); $('hubEN').placeholder = fmt(effE * pn).replace(/\s/g, '');
-    $('hubG').placeholder = fmt(effG).replace(/\s/g, '');
-    $('hubE').title = 'Heures pleines (jour), ou consommation totale si une seule valeur'; $('hubEN').title = 'Heures creuses (nuit)';
+    $('hubG').placeholder = fmt(effG).replace(/\s/g, ''); $('hubET').placeholder = fmt(effE).replace(/\s/g, '');
     // Énergie non demandée : 0 dans la case (les deux cases restent visibles pour pouvoir la remettre).
     if (!showE && act !== $('hubE')) $('hubE').value = '0';
     if (!showG && act !== $('hubG')) $('hubG').value = '0';
@@ -1656,8 +1667,15 @@
     if (en === 'e' || vE === '0') { $('knE').value = vE === '0' ? '' : vE; if (vE === '0' || vE === ''){ $('knEN').value = ''; $('hubEN').value = ''; } }
     if (en === 'g' || vG === '0') $('knG').value = vG === '0' ? '' : vG;
   }
-  $('hubE').addEventListener('input', function(){ hubIn('e'); });
-  $('hubEN').addEventListener('input', function(){ var v = this.value.replace(/\D/g, ''); $('knEN').value = v; if (v && !$('hubE').value.trim()){ $('hubE').value = '0'; $('knE').value = '0'; } if (v && $('hubG').value.trim() === ''){ $('hubG').value = '0'; hubIn('g'); } });
+  $('hubE').addEventListener('input', function(){ MONO = false; hubIn('e'); });
+  // TH (mono-horaire) : total tapé directement → HI et LO vidés, répartition 50/50.
+  $('hubET').addEventListener('input', function(){
+    var v = this.value.replace(/\D/g, ''); MONO = v !== '' && v !== '0';
+    $('hubE').value = v; hubIn('e'); $('hubE').value = '';
+    $('knEN').value = ''; $('hubEN').value = '';
+  });
+  ['knE', 'knEN'].forEach(function(id){ $(id).addEventListener('input', function(){ MONO = false; }); });
+  $('hubEN').addEventListener('input', function(){ MONO = false; var v = this.value.replace(/\D/g, ''); $('knEN').value = v; if (v && !$('hubE').value.trim()){ $('hubE').value = '0'; $('knE').value = '0'; } if (v && $('hubG').value.trim() === ''){ $('hubG').value = '0'; hubIn('g'); } });
   $('hubG').addEventListener('input', function(){ hubIn('g'); });
   function framePost(){
     var fr = $('prixFrame'); if (!fr || !fr.contentWindow) return;

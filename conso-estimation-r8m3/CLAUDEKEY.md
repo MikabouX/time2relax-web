@@ -7,7 +7,7 @@ Outil interne pour les collègues de Michaël (centre de contact, sous-traitant 
 https://time2relax.app/conso-estimation-r8m3/ (page non référencée). Une seule page avec :
 - vignettes : TVA (HT ↔ 6 % ↔ 21 %), HR helper (4,5 ↔ 4 h 30), code postal → gestionnaire de réseau
   (secteur ORES, téléphones par énergie) ;
-- barre commune : code postal + consommation (élec jour/nuit, gaz) + 3 boutons de zone :
+- barre commune : code postal + consommation (élec ☀️ HI + 🌙 LO | ☀️/🌙 TH = total auto, ou mono-horaire tapé dans TH ; gaz) + 3 boutons de zone :
   1. **Estimation** (grille du formateur, profils Économe −20 %, Relax −10 %, Calories + +10 %) ;
   2. **Les détails de prix** (iframe `prix/?embed=1`) + « Coût annuel et acompte » ;
   3. **La régularisation** (segments de contrats, profils Synergrid).
