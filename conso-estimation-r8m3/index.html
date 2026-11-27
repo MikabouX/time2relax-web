@@ -468,6 +468,9 @@
         <div class="row" id="pv2Row"><span class="clbl">Panneaux solaires</span>
           <div class="opts"><label><input type="radio" name="pv2" value="0" checked>Non</label><label><input type="radio" name="pv2" value="1">Oui</label></div>
         </div>
+        <div class="row" id="pcpt2Row"><span class="clbl">Compteur communicant</span>
+          <div class="opts"><label><input type="radio" name="pcpt2" value="classique" checked>Non</label><label><input type="radio" name="pcpt2" value="comm">Oui</label></div>
+        </div>
         <div class="sub" id="pv2Box" hidden>
           <div class="row"><span class="clbl">Puissance</span><input type="text" inputmode="decimal" class="px" id="kva2"> <span>kVA / kWc (4,5 si inconnu)</span></div>
           <div class="row"><span class="clbl">Compensation</span><div class="opts"><label><input type="radio" name="comp2" value="0" checked>Non</label><label><input type="radio" name="comp2" value="1">Oui (Wallonie, installés avant 2024)</label></div></div>
@@ -1178,6 +1181,7 @@
     // Zone 2 : mêmes réponses que l'estimation (panneaux, puissance, compensation).
     document.querySelector('input[name="pv2"][value="' + (inp.pv ? '1' : '0') + '"]').checked = true;
     document.querySelector('input[name="comp2"][value="' + (inp.comp ? '1' : '0') + '"]').checked = true;
+    document.querySelector('input[name="pcpt2"][value="' + (val('pcpt') === 'comm' ? 'comm' : 'classique') + '"]').checked = true;
     $('pv2Box').hidden = !inp.pv;
     if (document.activeElement !== $('kva2')) $('kva2').value = $('kwe').value || String(inp.kwc || '').replace('.', ',');
     $('prosBox').hidden = !(inp.pv && inp.comp);
@@ -1265,10 +1269,13 @@
       var forfait = rate !== null ? kwe * rate : null, prop = comm && reK !== null ? kComp * reK / 100 : null, pros = null, how = '', rist = 0;
       if (comm){ pros = prop !== null && forfait !== null ? Math.min(prop, forfait) : (prop !== null ? prop : forfait);
         if (prop !== null && forfait !== null && prop < forfait) rist = forfait - prop;
-        how = fmt(kComp) + ' kWh compensés × ' + (reK !== null ? num2(reK * DF()) : '?') + ' c€ (réseau)' + (forfait !== null ? ', plafond ' + num2(kwe) + ' kVA × ' + num2(rate * DF()) + ' € = ' + fmt(forfait * DF()) + ' €' + (rist ? ' (ristourne ' + fmt(rist * DF()) + ' €)' : ' (plafond atteint)') : ''); }
+        how = fmt(kComp) + ' kWh × ' + (reK !== null ? num2(reK * DF()) : '?') + ' c€' + (forfait !== null && !rist ? ' (plafonné à ' + fmt(forfait * DF()) + ' €)' : ''); }
       else { pros = forfait; how = num2(kwe) + ' kVA × ' + (rate !== null ? num2(rate * DF()) : '?') + ' €/kVA'; }
-      if (pros === null){ nMiss++; html += '<div class="line"><span>Tarif prosumer</span><span class="hint">tarif €/kVA à compléter</span></div>'; costTxt += '\nTarif prosumer : tarif non renseigné'; }
-      else { var pu = SEG() === 'P' ? 'HTVA' : 'TVAC'; tot += pros; totEn.e += pros; prosAn = pros; html += '<div class="line"><span>Tarif prosumer : ' + esc(how) + '</span><span>' + fmt(pros * DF()) + ' € ' + pu + '</span></div>'; costTxt += '\nTarif prosumer (' + (comm ? 'compteur communicant' : 'compteur classique') + ') : ' + how + ' = ' + fmt(pros * DF()) + ' €/an ' + pu; }
+      // Compteur communicant : pas de tarif prosumer ; seul le réseau des kWh compensés (pris au réseau puis compensés) est dû.
+      var plbl = comm ? 'Réseau sur les kWh compensés' : 'Tarif prosumer';
+      if (comm){ html += '<div class="line"><span>Tarif prosumer</span><span class="hint">pas de tarif prosumer (compteur communicant)</span></div>'; costTxt += '\nTarif prosumer : pas de tarif prosumer (compteur communicant)'; }
+      if (pros === null){ nMiss++; html += '<div class="line"><span>' + plbl + '</span><span class="hint">' + (comm ? 'coût du réseau à compléter' : 'tarif €/kVA à compléter') + '</span></div>'; costTxt += '\n' + plbl + ' : non renseigné'; }
+      else { var pu = SEG() === 'P' ? 'HTVA' : 'TVAC'; tot += pros; totEn.e += pros; prosAn = pros; html += '<div class="line"><span>' + plbl + ' : ' + esc(how) + '</span><span>' + fmt(pros * DF()) + ' € ' + pu + '</span></div>'; costTxt += '\n' + plbl + ' : ' + how + ' = ' + fmt(pros * DF()) + ' €/an ' + pu; }
       var ps = $('prosSrc'); ps.textContent = rate === null ? 'Tarif non encodé pour ce gestionnaire : à compléter.' : ($('prosRate').value === ($('prosRate').dataset.src || '') ? 'Tarif de la liste' + (T && T.mois ? ' – ' + moisLbl(T.mois) : '') + '.' : 'Tarif corrigé à la main.');
     }
     if (showG) costLine('Gaz', knG !== null ? knG : r.g, P.g.prixMoyen, P.g.fixe);
@@ -1525,7 +1532,7 @@
           cur.push({en: 'e', per: perLbl('E', dE), contrat: segContrat('e'), kwh: tot, cost: tE});
           var det = hc !== null ? fmt(hp) + ' kWh pleines + ' + fmt(hc) + ' kWh creuses' + (bi() || tri() ? '' : ' (additionnés, compteur simple)') : fmt(tot) + ' kWh (index unique)';
           out += '<div class="line"><span>Électricité : ' + det + ' sur ' + fmt(dE) + ' jours' + (!back && (hp < 0 || (hc !== null && hc < 0)) ? ' <b style="color:#9a3b2b">(index de fin plus petit ?)</b>' : '') + '</span><span>' + fmt(tE) + ' € TVAC</span></div>';
-          out += '<div class="hint used">Consommation ' + fmt(R.c * (1 + rate)) + ' € + frais fixes ' + fmt(R.fx * (1 + rate)) + ' € (' + fmt(dE) + '/365 jours)' + (prE ? ' + prosumer ' + fmt(prE * (1 + rate)) + ' €' : '') + ' TVAC' + (R.det.length ? ' · ' + R.det.join(', ') : '') + '</div>';
+          out += '<div class="hint used">Consommation ' + fmt(R.c * (1 + rate)) + ' € + frais fixes ' + fmt(R.fx * (1 + rate)) + ' € (' + fmt(dE) + '/365 jours)' + (prE ? (val('pcpt') === 'comm' ? ' + réseau des kWh compensés ' : ' + prosumer ') + fmt(prE * (1 + rate)) + ' €' : '') + ' TVAC' + (R.det.length ? ' · ' + R.det.join(', ') : '') + '</div>';
           if (perdu) out += '<div class="hint" style="color:#9a5b00">Production supérieure à la consommation : ' + fmt(perdu) + ' kWh de surplus, non compensés (perdus pour le client).</div>';
           else if (back && tot >= 0) out += '<div class="hint">Compteur qui tourne à l\'envers : index nets (consommation − production).</div>';
         }
@@ -1737,6 +1744,7 @@
   function setRadio(name, v){ var r = document.querySelector('input[name="' + name + '"][value="' + v + '"]'); if (r && !r.checked){ r.checked = true; r.dispatchEvent(new Event('change', {bubbles: true})); } }
   document.querySelectorAll('input[name="pv2"]').forEach(function(r){ r.addEventListener('change', function(e){ e.stopPropagation(); $('pv2Box').hidden = this.value !== '1'; setRadio('pv', this.value); }); });
   document.querySelectorAll('input[name="comp2"]').forEach(function(r){ r.addEventListener('change', function(e){ e.stopPropagation(); setRadio('comp', this.value); }); });
+  document.querySelectorAll('input[name="pcpt2"]').forEach(function(r){ r.addEventListener('change', function(e){ e.stopPropagation(); setRadio('pcpt', this.value); }); });
   $('kva2').addEventListener('input', function(e){
     e.stopPropagation();
     var v = pnum(this.value);
