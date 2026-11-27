@@ -1832,15 +1832,14 @@
   function ocrCount(){ return OCR.rows.filter(function(r){ return r.on; }).length; }
   function svcRow(name, amt){
     var d = document.createElement('div'); d.className = 'row svcrow';
-    d.innerHTML = '<input type="text" class="svcn" placeholder="Service" style="width:130px" value="' + esc(name || '') + '"> <input type="text" inputmode="decimal" class="px svca" style="width:60px" value="' + (amt || '') + '"> € × <input type="text" inputmode="numeric" class="px svck" style="width:40px"> fois <span class="svct hint"></span> <button type="button" class="svcdel" title="Supprimer ce service" aria-label="Supprimer ce service">✕</button>';
-    $('svcRows').appendChild(d); d.querySelector('.svck').value = ocrCount() || ''; return d;
+    d.innerHTML = '<input type="text" class="svcn" placeholder="Service" style="width:130px" value="' + esc(name || '') + '"> <input type="text" inputmode="decimal" class="px svca" style="width:60px" value="' + (amt || '') + '"> € × <input type="text" inputmode="numeric" class="px svck" placeholder="0" style="width:40px"> fois <span class="svct hint"></span> <button type="button" class="svcdel" title="Supprimer ce service" aria-label="Supprimer ce service">✕</button>';
+    $('svcRows').appendChild(d); return d;
   }
   function ocrRender(){
     var n = ocrCount(), sum = 0, fees = 0, svc = 0, txt = [];
     OCR.rows.forEach(function(r){ if (r.on){ sum += r.paid - r.fee; fees += r.fee; } });
     [].forEach.call(document.querySelectorAll('.svcrow'), function(d){
-      var k = d.querySelector('.svck'); if (!k.dataset.edited) k.value = n || '';
-      var a = pnum(d.querySelector('.svca').value), c = pnum(k.value), t = a !== null && c !== null ? a * c : 0;
+      var a = pnum(d.querySelector('.svca').value), c = pnum(d.querySelector('.svck').value), t = a !== null && c !== null ? a * c : 0;
       d.querySelector('.svct').textContent = t ? '= ' + money(t) + ' €' : ''; svc += t;
       if (t) txt.push((d.querySelector('.svcn').value || 'service') + ' ' + money(a) + ' € × ' + c);
     });
@@ -1861,7 +1860,7 @@
     if (t.type === 'checkbox') r.on = t.checked; else { var v = pnum(t.value); if (v !== null) r[t.dataset.k] = v; }
     ocrTable(); });
   $('ocrRows').addEventListener('input', function(e){ e.stopPropagation(); });
-  $('svcRows').addEventListener('input', function(e){ e.stopPropagation(); if (e.target.classList.contains('svck')) e.target.dataset.edited = '1'; ocrRender(); });
+  $('svcRows').addEventListener('input', function(e){ e.stopPropagation(); ocrRender(); });
   $('svcRows').addEventListener('click', function(e){ var b = e.target.closest('.svcdel'); if (!b) return; b.closest('.svcrow').remove(); ocrRender(); });
   $('svcAdd').addEventListener('click', function(){ svcRow('', '').querySelector('.svcn').focus(); ocrRender(); });
   function loadTess(){
