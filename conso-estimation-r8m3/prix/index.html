@@ -218,7 +218,7 @@
         line('Total', o.tot, o.fix.tot, 'tot');
       h += '<details class="ct"><summary>' + esc(x.c) + ' <span class="hint">simple ' + fr(o.tot.k === null ? null : o.tot.k * df, 3) + ' c€/kWh · fixe ' + fr(o.fix.tot === null ? null : o.fix.tot * df, 2) + ' €/an ' + unit + '</span></summary><div class="in">' +
         '<div class="tblwrap"><table><thead><tr><th>' + unit + '</th>' + cs.map(function(t){ return '<th>' + COL_LBL[t] + '<br>c€/kWh</th>'; }).join('') + '<th>Fixe<br>€/an</th></tr></thead><tbody>' + lines + '</tbody></table></div>' +
-        (o.pros !== null && reg === 'Wallonie' && en === 'e' ? '<p class="hint">Tarif prosumer ' + esc(G.nom) + ' (compteur qui tourne à l\'envers) : ' + fr(o.pros * df, 2) + ' €/kWe/an.</p>' : '') +
+        (o.pros !== null && reg === 'Wallonie' && en === 'e' ? '<p class="hint">Tarif prosumer ' + esc(G.nom) + ' (compteur qui tourne à l\'envers) : ' + fr(o.pros * df, 2) + ' €/kVA/an.</p>' : '') +
         (o.soc ? '<p class="note">Tarif social : prix fixé par la CREG chaque trimestre, réseau compris, sans redevance fixe ni tarif prosumer.</p>' : '') +
         (fm ? '<p class="hint">' + esc(fm) + '</p>' : '') +
         (url ? '<p><a href="' + url + '" target="_blank" rel="noopener">Fiche ENGIE (PDF)</a></p>' : '') +
@@ -273,7 +273,7 @@
       var kw = capKw();
       fx('Tarif capacitaire ' + fr(v[0], 4) + ' €/kW/an × ' + fr(kw, 1) + ' kW' + (kw === 2.5 ? ' (minimum)' : ''), v[0] * kw, true);
       fx('Gestion des données (relevé mensuel/annuel)', v[4], true); fx('Gestion des données (quart-horaire)', v[3], false);
-      if (an){ var a = an[2]; f.extra = 'Compteur classique (analogique) : terme fixe ' + fr(a[0], 2) + ' €/an, simple ' + fr(a[1], 3) + ' c€/kWh, exclusif nuit ' + fr(a[2], 3) + ' c€/kWh, gestion des données ' + fr(a[3], 2) + ' €/an, tarif prosumer ' + fr(a[4], 2) + ' €/kWe/an.'; }
+      if (an){ var a = an[2]; f.extra = 'Compteur classique (analogique) : terme fixe ' + fr(a[0], 2) + ' €/an, simple ' + fr(a[1], 3) + ' c€/kWh, exclusif nuit ' + fr(a[2], 3) + ' c€/kWh, gestion des données ' + fr(a[3], 2) + ' €/an, tarif prosumer ' + fr(a[4], 2) + ' €/kVA/an.'; }
     } else {
       r = grdRow(d.t[0], code); if (!r) return null; v = r[2];
       if (L === 'eW'){ f.dist = {k: v[0], j: v[1], n: v[2], a: v[3], b: v[4], c: v[5], x: v[6]}; fx('Terme fixe distribution', v[7], true); f.pros = v[8]; f.trans = v[9]; }
@@ -382,7 +382,7 @@
     if (F.bandes) R += '<div class="tblwrap"><table><thead><tr><th>Tranches de consommation (distribution)</th><th>Fixe €/an</th><th>Proportionnel c€/kWh</th></tr></thead><tbody>' +
       F.bandes.map(function(b, i){ return '<tr' + (i === F.bi ? ' class="pick"' : '') + '><td>' + b.lbl + (i === F.bi ? ' ← retenue' : '') + '</td><td>' + fr(b.fixe, 2) + '</td><td>' + fr(b.prop, 3) + '</td></tr>'; }).join('') + '</tbody></table></div>';
     R += '<div class="tblwrap"><table><tbody>' + F.fixes.filter(function(x){ return !x.aff; }).map(function(x){ return '<tr' + (x.inT ? '' : ' class="sub"') + '><td>' + esc(x.lbl) + (x.inT ? '' : ' (non compté)') + (x.d ? '<br><span class="hint">' + esc(x.d) + '</span>' : '') + '</td><td>' + fr(x.v, 2) + ' €/an</td></tr>'; }).join('') +
-      (F.pros !== null ? '<tr><td>Tarif prosumer (compteur qui tourne à l\'envers)</td><td>' + fr(F.pros, 2) + ' €/kWe/an</td></tr>' : '') + '</tbody></table></div>';
+      (F.pros !== null ? '<tr><td>Tarif prosumer (compteur qui tourne à l\'envers)</td><td>' + fr(F.pros, 2) + ' €/kVA/an</td></tr>' : '') + '</tbody></table></div>';
     if (F.extra) R += '<p class="hint">' + esc(F.extra) + '</p>';
     if (vert !== null) R += '<p class="sec-t">Coût énergie verte et cogénération</p><p>' + fr(vert, 3) + ' c€/kWh</p>';
     F.groups.forEach(function(g){
@@ -537,7 +537,7 @@
     var fm = E.F && E.src === 'formule' ? (E.F.param === 'FIXE' ? 'Prix fixe signé en ' + moisLbl(m) + '.' : 'Variable : ' + B.map(function(t){ var p = {k: 'k', j: 'j', n: 'n', x: 'x', a: 't1', b: 't2', c: 't3'}[t]; var a = E.F[p + '_a'], b = E.F[p + '_b']; if ((a === null || a === undefined) && (t === 'j' || t === 'n')) p = 'k', a = E.F.k_a, b = E.F.k_b; return a === null || a === undefined ? '' : BL[t].toLowerCase() + ' ' + fr(+a, 4) + ' + ' + fr(+b, 4) + ' × ' + E.F.param; }).filter(Boolean).join(' ; ') + ' (HTVA' + (E.idx !== undefined ? ', ' + E.F.param + ' = ' + fr(E.idx, 2) : '') + ').') : 'Prix de la fiche de ' + moisLbl(m) + '.';
     var url = docUrl2(regDoc(E.doc, reg), m);
     h += '<p class="vn">' + esc(fm) + ' Réseau et taxes : fiche de ' + moisLbl(iso(D.mois)) + '.' + (url ? ' <a href="' + url + '" target="_blank" rel="noopener">Fiche PDF</a>' : '') + '</p>';
-    if (F.pros !== null && en === 'e') h += '<p class="vn">Prosumer : ' + fr(F.pros, 2) + ' €/kWe/an.</p>';
+    if (F.pros !== null && en === 'e') h += '<p class="vn">Prosumer : ' + fr(F.pros, 2) + ' €/kVA/an.</p>';
     var txt = (en === 'e' ? 'Électricité' : 'Gaz') + ' – ' + cle + ' (signé en ' + moisLbl(m) + '), ' + G.nom + (TVA > 1 ? ', TVAC' : ', HTVA (TVA 21 % en plus)') + ' :\n' +
       B.map(function(t, i){ return '- ' + BL[t] + ' : ' + fr(tot[i], 3) + ' c€/kWh (énergie ' + fr(en_[i], 3) + (vt ? ' + verte ' + fr(vt, 3) : '') + ' + distribution ' + fr(F.bandes ? F.bandes[F.bi].prop : dist(t), 3) + ' + transport ' + (F.transNote ? 'compris' : fr(trans, 3)) + ' + taxes ' + fr(sk, 3) + ')'; }).join('\n') +
       '\n- Fixe : ' + fr(fixAll, 2) + ' €/an' + (cost !== null ? '\n- ≈ ' + fr(cost, 0) + ' €/an pour ' + costLbl : '');

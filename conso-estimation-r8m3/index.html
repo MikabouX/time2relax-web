@@ -206,11 +206,12 @@
     .zbtn{font-size:13px}
     .hk input,.hubkwh input{width:62px}
   }
+  h1 .maj{font-size:11px;font-weight:400;opacity:.65;vertical-align:middle;margin-left:6px}
 </style>
 </head>
 <body>
 <header>
-  <h1>Simulateur énergie</h1>
+  <h1>Simulateur énergie <span class="maj" id="maj"></span></h1>
   <p>Électricité et gaz naturel : petits outils, estimation de la consommation, détail des prix et acompte, régularisation</p>
 </header>
 
@@ -337,7 +338,7 @@
           <label><input type="radio" name="pv" value="1">Oui</label>
         </div>
         <div class="sub" id="pvBox" hidden>
-          <div class="row"><input type="number" id="kwc" min="0" step="0.5" value="4.5"> <span>kWc installés (4,5 si inconnu)</span></div>
+          <div class="row"><input type="number" id="kwc" min="0" step="0.5" value="4.5"> <span>kVA / kWc installés (4,5 si inconnu)</span></div>
           <div>
             <div class="hint" style="margin-bottom:4px">Compensation (certifié avant 2024) ?</div>
             <div class="opts">
@@ -348,12 +349,12 @@
           </div>
           <div id="prosBox" hidden>
             <div class="hint" style="margin-bottom:4px">Tarif prosumer</div>
-            <div class="row" style="margin-top:6px"><input type="text" inputmode="decimal" class="px" id="kwe"> <span>kVA / kWe (puissance de l'onduleur ; par défaut = kWc)</span></div>
-            <div class="row" style="margin-top:6px"><input type="text" inputmode="decimal" class="px" id="prosRate"> <span>€/kWe/an HTVA – tarif prosumer du gestionnaire</span></div>
+            <div class="row" style="margin-top:6px"><input type="text" inputmode="decimal" class="px" id="kwe"> <span>kVA de l'onduleur, si différent (sinon la valeur ci-dessus)</span></div>
+            <div class="row" style="margin-top:6px"><input type="text" inputmode="decimal" class="px" id="prosRate"> <span>€/kVA/an HTVA – tarif prosumer du gestionnaire</span></div>
             <div class="hint" id="prosSrc"></div>
             <details class="explain" style="margin-top:6px"><summary><strong>Comment l'expliquer au client</strong></summary>
               <p><strong>Le principe de la compensation</strong> : sur l'année, l'électricité que vos panneaux envoient sur le réseau est déduite de celle que vous prenez au réseau. Vous ne payez l'énergie que sur la différence, si vous avez consommé plus que produit. Ce régime vaut pour les installations certifiées avant 2024 et reste d'application jusqu'à fin 2030.</p>
-              <p><strong>Avec un compteur classique (qui tourne à l'envers)</strong> : vous payez chaque année un forfait réseau, le tarif prosumer, calculé sur la puissance de votre onduleur (kWe × tarif du gestionnaire). Il est le même quelle que soit votre consommation.</p>
+              <p><strong>Avec un compteur classique (qui tourne à l'envers)</strong> : vous payez chaque année un forfait réseau, le tarif prosumer, calculé sur la puissance de votre onduleur (kVA × tarif du gestionnaire). Il est le même quelle que soit votre consommation.</p>
               <p><strong>Avec un compteur communicant</strong> : le compteur mesure séparément ce que vous prenez au réseau et ce que vous y envoyez. L'énergie compensée reste gratuite, mais vous payez le transport par le réseau de l'électricité que vous avez réellement prise. Ce montant ne peut jamais dépasser l'ancien forfait prosumer : si vous consommez surtout pendant que vos panneaux produisent, vous payez moins que le forfait (c'est une ristourne). Si vous consommez plus que ce que vous produisez, chaque kWh en plus est payé normalement : énergie, réseau et taxes.</p>
               <p><strong>En pratique</strong> : plus on consomme au moment où les panneaux produisent (en journée, au soleil), plus on économise avec un compteur communicant.</p>
             </details>
@@ -432,7 +433,7 @@
         <li>Voiture électrique : 18 kWh pour 100 km par défaut (modifiable par véhicule), pertes de recharge comprises. Hybride rechargeable : km roulés en électrique × 20 kWh pour 100 km par défaut.</li>
         <li>Panneaux solaires : 900 kWh produits par kWc et par an en Belgique. Part consommée directement : 30 % sans batterie, 65 % avec batterie.</li>
         <li>Prix encodés HTVA ; TVA de 6 % pour les particuliers et de 21 % pour les professionnels. Coût : kWh facturés × prix du kWh + frais fixes annuels ; acompte = coût annuel TVAC ÷ 12, arrondi à l'euro. Avec panneaux solaires, on facture la consommation nette (compensation) ou l'électricité prélevée (injection), sans compter le revenu de l'injection. Compteur bi-horaire : prix moyen selon la part de nuit indiquée.</li>
-        <li>Tarif prosumer (Wallonie, compensation) : compteur classique = puissance de l'onduleur (kWe) × tarif du gestionnaire en €/kWe ; compteur double flux ou communicant = kWh prélevés compensés par l'injection × coûts de réseau (distribution + transport), sans dépasser le forfait (ristourne de la différence) ; ces kWh compensés ne paient pas l'énergie. Les kWh consommés au-delà de la production paient énergie, réseau et taxes. Électricité prélevée estimée avec la même part d'autoconsommation (30 % sans batterie, 65 % avec).</li>
+        <li>Tarif prosumer (Wallonie, compensation) : compteur classique = puissance de l'onduleur (kVA) × tarif du gestionnaire en €/kVA ; compteur double flux ou communicant = kWh prélevés compensés par l'injection × coûts de réseau (distribution + transport), sans dépasser le forfait (ristourne de la différence) ; ces kWh compensés ne paient pas l'énergie. Les kWh consommés au-delà de la production paient énergie, réseau et taxes. Électricité prélevée estimée avec la même part d'autoconsommation (30 % sans batterie, 65 % avec).</li>
         <li>Les cinq personnes et plus utilisent la ligne « 5 personnes ». La cuisson n'est pas comptée à part.</li>
       </ul>
     </details>
@@ -464,6 +465,13 @@
         <div class="row" id="debutRow"><span class="clbl">Début prévu</span><input type="date" id="debut"><span class="hint" id="debutHint">facultatif</span></div>
         <div class="row" id="moisRow" hidden><span class="clbl">Prix de</span><select id="mois"></select></div>
         <label class="check" id="sameRow"><input type="checkbox" id="same" checked> Même contrat pour l'électricité et le gaz</label>
+        <div class="row" id="pv2Row"><span class="clbl">Panneaux solaires</span>
+          <div class="opts"><label><input type="radio" name="pv2" value="0" checked>Non</label><label><input type="radio" name="pv2" value="1">Oui</label></div>
+        </div>
+        <div class="sub" id="pv2Box" hidden>
+          <div class="row"><span class="clbl">Puissance</span><input type="text" inputmode="decimal" class="px" id="kva2"> <span>kVA / kWc (4,5 si inconnu)</span></div>
+          <div class="row"><span class="clbl">Compensation</span><div class="opts"><label><input type="radio" name="comp2" value="0" checked>Non</label><label><input type="radio" name="comp2" value="1">Oui (Wallonie, installés avant 2024)</label></div></div>
+        </div>
 
         <div class="pblock" id="blkE">
           <div class="ptitle e">Électricité</div>
@@ -1167,6 +1175,11 @@
     $('batSet').hidden = !(showE && inp.pv);
     for (var vi = 2; vi <= 3; vi++) $('veh' + vi).hidden = +$('evN').value < vi;
     document.getElementById('pvBox').hidden = !inp.pv;
+    // Zone 2 : mêmes réponses que l'estimation (panneaux, puissance, compensation).
+    document.querySelector('input[name="pv2"][value="' + (inp.pv ? '1' : '0') + '"]').checked = true;
+    document.querySelector('input[name="comp2"][value="' + (inp.comp ? '1' : '0') + '"]').checked = true;
+    $('pv2Box').hidden = !inp.pv;
+    if (document.activeElement !== $('kva2')) $('kva2').value = $('kwe').value || String(inp.kwc || '').replace('.', ',');
     $('prosBox').hidden = !(inp.pv && inp.comp);
     if (!$('kwe').value && inp.kwc) $('kwe').placeholder = String(inp.kwc).replace('.', ',');
     document.getElementById('boxE').hidden = !showE;
@@ -1252,9 +1265,9 @@
       var forfait = rate !== null ? kwe * rate : null, prop = comm && reK !== null ? kComp * reK / 100 : null, pros = null, how = '', rist = 0;
       if (comm){ pros = prop !== null && forfait !== null ? Math.min(prop, forfait) : (prop !== null ? prop : forfait);
         if (prop !== null && forfait !== null && prop < forfait) rist = forfait - prop;
-        how = fmt(kComp) + ' kWh compensés × ' + (reK !== null ? num2(reK * DF()) : '?') + ' c€ (réseau)' + (forfait !== null ? ', plafond ' + num2(kwe) + ' kWe × ' + num2(rate * DF()) + ' € = ' + fmt(forfait * DF()) + ' €' + (rist ? ' (ristourne ' + fmt(rist * DF()) + ' €)' : ' (plafond atteint)') : ''); }
-      else { pros = forfait; how = num2(kwe) + ' kWe × ' + (rate !== null ? num2(rate * DF()) : '?') + ' €/kWe'; }
-      if (pros === null){ nMiss++; html += '<div class="line"><span>Tarif prosumer</span><span class="hint">tarif €/kWe à compléter</span></div>'; costTxt += '\nTarif prosumer : tarif non renseigné'; }
+        how = fmt(kComp) + ' kWh compensés × ' + (reK !== null ? num2(reK * DF()) : '?') + ' c€ (réseau)' + (forfait !== null ? ', plafond ' + num2(kwe) + ' kVA × ' + num2(rate * DF()) + ' € = ' + fmt(forfait * DF()) + ' €' + (rist ? ' (ristourne ' + fmt(rist * DF()) + ' €)' : ' (plafond atteint)') : ''); }
+      else { pros = forfait; how = num2(kwe) + ' kVA × ' + (rate !== null ? num2(rate * DF()) : '?') + ' €/kVA'; }
+      if (pros === null){ nMiss++; html += '<div class="line"><span>Tarif prosumer</span><span class="hint">tarif €/kVA à compléter</span></div>'; costTxt += '\nTarif prosumer : tarif non renseigné'; }
       else { var pu = SEG() === 'P' ? 'HTVA' : 'TVAC'; tot += pros; totEn.e += pros; prosAn = pros; html += '<div class="line"><span>Tarif prosumer : ' + esc(how) + '</span><span>' + fmt(pros * DF()) + ' € ' + pu + '</span></div>'; costTxt += '\nTarif prosumer (' + (comm ? 'compteur communicant' : 'compteur classique') + ') : ' + how + ' = ' + fmt(pros * DF()) + ' €/an ' + pu; }
       var ps = $('prosSrc'); ps.textContent = rate === null ? 'Tarif non encodé pour ce gestionnaire : à compléter.' : ($('prosRate').value === ($('prosRate').dataset.src || '') ? 'Tarif de la liste' + (T && T.mois ? ' – ' + moisLbl(T.mois) : '') + '.' : 'Tarif corrigé à la main.');
     }
@@ -1307,7 +1320,7 @@
     var enLbl = {both: 'électricité + gaz', e: 'électricité seule', g: 'gaz seul'}[inp.energies];
     var evV = (inp.vehicles || []).filter(function(v){ return v.km > 0; });
     var evLbl = inp.ev && !inp.evHome ? 'oui, ' + $('evN').value + ' véhicule' + (+$('evN').value > 1 ? 's' : '') + ', pas de charge à la maison' : inp.ev && evV.length ? 'oui, ' + (evV.length > 1 ? evV.length + ' véhicules : ' : '') + evV.map(function(v){ return (v.t === 'h' ? 'hybride rechargeable ' : 'électrique ') + fmt(v.km) + ' km/an (' + String(v.c).replace('.', ',') + ' kWh/100 km)'; }).join(' ; ') + ', recharge à domicile' : 'non';
-    var pvLbl = inp.pv ? 'oui, ' + String(inp.kwc).replace('.', ',') + ' kWc, ' + (inp.comp ? 'compensation' : 'injection') : 'non';
+    var pvLbl = inp.pv ? 'oui, ' + String(inp.kwc).replace('.', ',') + ' kVA/kWc, ' + (inp.comp ? 'compensation' : 'injection') : 'non';
     var detailTxt = lines.map(function(l, k){
       if (k === 0) return '- ' + l.label + ' : ' + [showE ? 'élec ' + fmt(l.e) : '', showG ? 'gaz ' + fmt(l.g) : ''].filter(Boolean).join(' / ') + ' kWh';
       var parts = [];
@@ -1317,7 +1330,7 @@
     }).join('\n');
     var etatTxt = debutLbl() ? 'début le ' + debutLbl() : '';
     var acS = pnum($('acSouh').value);
-    var pvTxt = inp.pv ? 'oui, ' + String(inp.kwc).replace('.', ',') + ' kWc, ' + (inp.comp ? 'compensation (certifié avant 2024)' : 'sans compensation (injection)') : 'non';
+    var pvTxt = inp.pv ? 'oui, ' + String(inp.kwc).replace('.', ',') + ' kVA/kWc, ' + (inp.comp ? 'compensation (certifié avant 2024)' : 'sans compensation (injection)') : 'non';
     lastText = 'Demande : ' + ($('dem').value || 'non précisée') + (etatTxt ? ', ' + etatTxt : '') +
       '\nClient : ' + (SEG() === 'P' ? 'professionnel' : 'particulier') +
       '\nÉnergies : ' + enLbl + P.txt +
@@ -1720,6 +1733,20 @@
     if (z === 'prix') framePost();
   }
   document.querySelectorAll('.zbtn').forEach(function(b){ b.addEventListener('click', function(){ showZone(this.dataset.zone); }); });
+  // Zone 2 : panneaux solaires demandés aussi ici (renvoyés vers les champs de l'estimation, qui font le calcul).
+  function setRadio(name, v){ var r = document.querySelector('input[name="' + name + '"][value="' + v + '"]'); if (r && !r.checked){ r.checked = true; r.dispatchEvent(new Event('change', {bubbles: true})); } }
+  document.querySelectorAll('input[name="pv2"]').forEach(function(r){ r.addEventListener('change', function(e){ e.stopPropagation(); $('pv2Box').hidden = this.value !== '1'; setRadio('pv', this.value); }); });
+  document.querySelectorAll('input[name="comp2"]').forEach(function(r){ r.addEventListener('change', function(e){ e.stopPropagation(); setRadio('comp', this.value); }); });
+  $('kva2').addEventListener('input', function(e){
+    e.stopPropagation();
+    var v = pnum(this.value);
+    $('kwe').value = this.value;
+    if (v !== null){ $('kwc').value = v; $('kwc').dispatchEvent(new Event('input', {bubbles: true})); }
+    else $('kwe').dispatchEvent(new Event('input', {bubbles: true}));
+  });
+  // Heure de mise à jour du site (date de la page publiée).
+  (function(){ var d = new Date(document.lastModified); if (isNaN(d)) return;
+    $('maj').textContent = 'mis à jour le ' + d.toLocaleDateString('fr-BE', {day: 'numeric', month: 'short'}) + ' à ' + d.toLocaleTimeString('fr-BE', {hour: '2-digit', minute: '2-digit'}); })();
   showZone(/^#(est|prix|reg)$/.test(location.hash) ? location.hash.slice(1) : (function(){ try { return localStorage.getItem('t2rZone'); } catch (e){ return null; } })());
   document.getElementById('f').addEventListener('input', render);
   document.getElementById('f').addEventListener('change', render);
