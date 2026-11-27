@@ -1257,7 +1257,7 @@
       rows += '<tr class="known-row"><td>Consommation connue<br><small>utilisée pour le prix et l\'acompte</small></td>' +
         (showE ? '<td class="n">' + (knE !== null ? fmt(knE) : fmt(r.e) + '<br><small>(estimée)</small>') + '</td>' : '') +
         (showG ? '<td class="n">' + (knG !== null ? fmt(knG) : fmt(r.g) + '<br><small>(estimée)</small>') + '</td>' : '') + '</tr>' +
-        '<tr class="sep-row"><td colspan="' + (1 + (showE ? 1 : 0) + (showG ? 1 : 0)) + '">Estimation d\'après le logement (en gris : sans lien avec la consommation connue, pour comparer)</td></tr>';
+        '<tr class="sep-row"><td colspan="' + (1 + (showE ? 1 : 0) + (showG ? 1 : 0)) + '">Basé sur le tableau à gauche – inactif car consommation manuelle renseignée au-dessus</td></tr>';
     }
     rows += lines.map(function(l, k){
       var lbl = '<td' + (anyKn && (!showE || dE) && (!showG || dG) ? ' class="dim"' : '') + '>' + l.label + '</td>';
