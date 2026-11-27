@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="../icon.svg" type="image/svg+xml">
+<link rel="icon" href="../icon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="../icon-180.png">
+<title>Concurrence – fournisseurs d'énergie par région</title>
+<style>
+  :root{--bg:#f5f6f4;--card:#fff;--ink:#1d2a24;--muted:#5d6b64;--line:#dde3df;--accent:#1f7a5a;--accent-soft:#e3f2ec;
+    --elec:#2e6fb7;--gas:#d4a106;--elec-bg:#eef4fd;--elec-bd:#c9dbf3;--gas-bg:#fdf8e4;--gas-bd:#efe2a8}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink);font-size:15px;line-height:1.45}
+  header{background:var(--accent);color:#fff;padding:16px 20px}
+  header h1{margin:0;font-size:20px;font-weight:650;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  header p{margin:4px 0 0;opacity:.9;font-size:13px}
+  header a{color:#fff}
+  .wip{background:#fff3cd;color:#7a5a00;border-radius:999px;font-size:12px;padding:2px 10px;font-weight:600}
+  main{max-width:1100px;margin:0 auto;padding:18px 16px 40px;display:grid;gap:18px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;min-width:0}
+  h2{margin:0 0 6px;font-size:18px}
+  .hint{color:var(--muted);font-size:13px}
+  .tabs{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 10px}
+  .tabs button{font:inherit;border:1px solid var(--line);background:#fff;border-radius:999px;padding:6px 14px;cursor:pointer}
+  .tabs button[aria-selected=true]{background:var(--accent);border-color:var(--accent);color:#fff}
+  .tblwrap{overflow-x:auto}
+  table{border-collapse:collapse;width:100%;font-size:14px}
+  th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font-size:12px;color:var(--muted);font-weight:600}
+  td.num,th.num{text-align:right;white-space:nowrap}
+  .tag{display:inline-block;border-radius:6px;padding:1px 7px;font-size:12px;margin:0 3px 2px 0;border:1px solid}
+  .tag.e{background:var(--elec-bg);border-color:var(--elec-bd);color:#1d4f87}
+  .tag.g{background:var(--gas-bg);border-color:var(--gas-bd);color:#7a5c00}
+  .tag.u{background:#f1f1f1;border-color:#ddd;color:#666}
+  tr.engie td:first-child{font-weight:650}
+  tr.off td{color:var(--muted)}
+  .src{margin-top:8px}
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .ce{background:var(--elec-bg);border:1px solid var(--elec-bd);border-radius:10px;padding:10px}
+  .cg{background:var(--gas-bg);border:1px solid var(--gas-bd);border-radius:10px;padding:10px}
+  .ce h3,.cg h3{margin:0 0 6px;font-size:15px}
+  ul.todo{margin:6px 0 0;padding-left:20px}
+  @media (max-width:760px){.cols{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Concurrence <span class="wip">en construction</span></h1>
+  <p>État des fournisseurs par région et comparaison des contrats connus · <a href="../">← retour au simulateur</a></p>
+</header>
+<main>
+  <section class="card">
+    <h2>Fournisseurs actifs</h2>
+    <div class="tabs" id="regs" role="tablist"></div>
+    <div class="tabs" id="ens" role="tablist">
+      <button type="button" data-en="" aria-selected="true">Électricité et gaz</button>
+      <button type="button" data-en="e">Électricité</button>
+      <button type="button" data-en="g">Gaz</button>
+    </div>
+    <div class="tblwrap"><table><thead><tr><th>Fournisseur</th><th>Énergie</th><th>Téléphone</th><th>Site</th><th>Remarque</th></tr></thead><tbody id="fl"></tbody></table></div>
+    <p class="hint src" id="src"></p>
+    <p class="hint">Avoir une licence ne veut pas dire accepter de nouveaux clients : pour un code postal précis, le comparateur officiel de la région fait foi.</p>
+  </section>
+
+  <section class="card">
+    <h2>Comparaison des contrats</h2>
+    <p class="hint" id="cmpHint">Contrats ENGIE du mois pour la région choisie (prix de l'énergie seule, TVAC 6 % particulier). Les contrats des concurrents viendront à côté.</p>
+    <div class="cols">
+      <div class="ce"><h3>Électricité</h3><div class="tblwrap"><table><thead><tr><th>Contrat ENGIE</th><th class="num">c€/kWh</th><th class="num">€/an</th><th>Concurrents</th></tr></thead><tbody id="cmpE"></tbody></table></div></div>
+      <div class="cg"><h3>Gaz</h3><div class="tblwrap"><table><thead><tr><th>Contrat ENGIE</th><th class="num">c€/kWh</th><th class="num">€/an</th><th>Concurrents</th></tr></thead><tbody id="cmpG"></tbody></table></div></div>
+    </div>
+    <p class="hint" style="margin-top:10px"><b>À venir :</b></p>
+    <ul class="todo hint">
+      <li>encoder les cartes tarifaires des principaux concurrents (Luminus, TotalEnergies, Eneco, Mega, Octa+, Bolt…) ;</li>
+      <li>coût annuel total pour la consommation du simulateur, réseau et taxes compris (identiques chez tous les fournisseurs) ;</li>
+      <li>classement fixe / variable / dynamique.</li>
+    </ul>
+    <p class="hint">En attendant, comparateurs officiels : <a href="https://www.compacwape.be/" target="_blank" rel="noopener">CompaCWaPE</a> (Wallonie), <a href="https://www.brusim.be/" target="_blank" rel="noopener">BruSim</a> (Bruxelles), <a href="https://www.vtest.be/" target="_blank" rel="noopener">V-test</a> (Flandre).</p>
+  </section>
+</main>
+<script>
+  var SB_URL = 'https://gxftbzbvbveocwpdavtt.supabase.co', SB_KEY = 'sb_publishable_9fKWGXevueh6hHJpGQvmhg_EFOd_-dR';
+  function $(id){ return document.getElementById(id); }
+  function esc(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){ return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]; }); }
+  // e = électricité, g = gaz, '?' = à vérifier. Mettre à jour depuis les sites des régulateurs.
+  var REG = {
+    Wallonie: {src: 'Source : CWaPE, liste des fournisseurs titulaires d\'une licence pour les résidentiels (relevée en novembre 2026).', l: [
+      ['ENGIE Electrabel', 'eg', '078 35 33 33', 'https://www.engie.be/'],
+      ['Luminus', 'eg', '078 155 100', 'https://www.luminus.be/'],
+      ['TotalEnergies', 'eg', '078 48 64 64', 'https://totalenergies.be/fr/particuliers'],
+      ['Eneco', 'eg', '010 20 80 00', 'https://eneco.be/fr'],
+      ['Mega (Power Online)', 'eg', '04 268 20 00', 'https://www.mega.be/'],
+      ['Octa+', 'eg', '02 851 02 52', 'https://www.octaplus.be/fr/'],
+      ['Bolt', 'eg', '02 899 33 00', 'https://www.boltenergie.be/fr'],
+      ['Ecofix Gas & Power', 'eg', '02 882 86 86', 'https://www.ecofixgp.be/'],
+      ['Sparki', 'eg', '', ''],
+      ['DATS 24', 'eg', '02 620 81 81', 'https://www.dats24.be/', 'ne vend plus de nouveaux contrats (selon Selectra)'],
+      ['EnergyVision', 'eg', '', 'https://www.energyvision.be/fr-be', 'pas d\'offre commerciale disponible (CWaPE)'],
+      ['Aspiravi Energy', 'e', '056 70 27 36', 'https://www.aspiravi.com/fr/'],
+      ['Cociter', 'e', '080 68 57 38', 'https://www.cociter.be/']
+    ]},
+    Bruxelles: {src: 'Sources : Selectra (septembre 2026) ; Brugel comptait 5 fournisseurs actifs sur le marché résidentiel en décembre 2025. À vérifier sur brugel.brussels.', l: [
+      ['ENGIE Electrabel', 'eg', '078 35 33 33', 'https://www.engie.be/'],
+      ['TotalEnergies', 'eg', '078 48 64 64', 'https://totalenergies.be/fr/particuliers'],
+      ['Luminus', 'eg', '078 155 100', 'https://www.luminus.be/'],
+      ['Bolt', 'eg', '02 899 33 00', 'https://www.boltenergie.be/fr'],
+      ['Sparki', '?', '', ''],
+      ['Brusol (EnergyVision)', 'e', '', '']
+    ]},
+    Flandre: {src: 'Source : Selectra (septembre 2026, 27 fournisseurs). Énergies et contacts à compléter depuis la liste de la Vlaamse Nutsregulator (vlaamsenutsregulator.be/nl/leveranciers).', l: [
+      ['ENGIE Electrabel', 'eg', '078 35 33 33', 'https://www.engie.be/'], ['Luminus', 'eg', '078 155 100', 'https://www.luminus.be/'], ['TotalEnergies', 'eg', '078 48 64 64', 'https://totalenergies.be/'],
+      ['Eneco', 'eg', '', 'https://eneco.be/'], ['Mega', 'eg', '', 'https://www.mega.be/'], ['Octa+', 'eg', '', 'https://www.octaplus.be/'], ['Bolt', 'eg', '', 'https://www.boltenergie.be/'],
+      ['Ecofix', 'eg', '', ''], ['EnergyVision', 'eg', '', ''], ['Ecopower', 'e', '', ''], ['Aspiravi Energy', 'e', '', ''],
+      ['Energie.be', '?', '', ''], ['Frank Energie', '?', '', ''], ['Energy Knights', '?', '', ''], ['Elegant', '?', '', ''], ['Belvus', '?', '', ''],
+      ['DATS 24', '?', '', '', 'ne vend plus de nouveaux contrats (selon Selectra)'], ['Dots', '?', '', ''], ['EBEM', '?', '', ''], ['Evident Energie', '?', '', ''], ['Hoa Energy', '?', '', ''],
+      ['Power2you', '?', '', ''], ['Servolt Energie', '?', '', ''], ['Smappee Smiles', '?', '', ''], ['Sparki', '?', '', ''], ['Trevion', '?', '', ''], ['Wase Wind', '?', '', ''], ['Wind voor A', '?', '', '']
+    ]}
+  };
+  var q = new URLSearchParams(location.search), cur = REG[q.get('r')] ? q.get('r') : 'Wallonie', en = '', T = null;
+  $('regs').innerHTML = Object.keys(REG).map(function(r){ return '<button type="button" data-r="' + r + '">' + r + '</button>'; }).join('');
+  function tags(s){ if (s === '?') return '<span class="tag u">à vérifier</span>'; return (s.indexOf('e') >= 0 ? '<span class="tag e">Électricité</span>' : '') + (s.indexOf('g') >= 0 ? '<span class="tag g">Gaz</span>' : ''); }
+  function drawList(){
+    document.querySelectorAll('#regs button').forEach(function(b){ b.setAttribute('aria-selected', b.dataset.r === cur); });
+    document.querySelectorAll('#ens button').forEach(function(b){ b.setAttribute('aria-selected', b.dataset.en === en); });
+    var R = REG[cur], L = R.l.filter(function(f){ return !en || f[1] === '?' || f[1].indexOf(en) >= 0; });
+    $('fl').innerHTML = L.map(function(f){
+      return '<tr class="' + (/^ENGIE/.test(f[0]) ? 'engie' : '') + (f[4] ? ' off' : '') + '"><td>' + esc(f[0]) + '</td><td>' + tags(f[1]) + '</td><td style="white-space:nowrap">' + (f[2] ? '<a href="tel:' + f[2].replace(/\s/g, '') + '">' + esc(f[2]) + '</a>' : '') + '</td><td>' + (f[3] ? '<a href="' + esc(f[3]) + '" target="_blank" rel="noopener">' + esc(f[3].replace(/^https?:\/\/(www\.)?/, '').replace(/\/.*$/, '')) + '</a>' : '') + '</td><td class="hint">' + esc(f[4] || '') + '</td></tr>';
+    }).join('');
+    $('src').textContent = L.length + ' fournisseur' + (L.length > 1 ? 's' : '') + ' affiché' + (L.length > 1 ? 's' : '') + '. ' + R.src;
+    drawCmp();
+  }
+  function n(x){ return x === null || x === undefined ? null : +x; }
+  function fr(x, d){ return x === null ? '–' : x.toLocaleString('fr-BE', {minimumFractionDigits: d, maximumFractionDigits: d}); }
+  function drawCmp(){
+    ['e', 'g'].forEach(function(e){
+      var tb = $(e === 'e' ? 'cmpE' : 'cmpG');
+      if (!T){ tb.innerHTML = '<tr><td colspan="4" class="hint">Chargement des prix…</td></tr>'; return; }
+      var rows = (T.prix || []).filter(function(p){ return p.type === 'energie' && p.segment === 'R' && p.energie === e && p.region === cur && p.cle !== 'Tarif social'; })
+        .sort(function(a, b){ return a.cle.localeCompare(b.cle, 'fr'); });
+      tb.innerHTML = rows.length ? rows.map(function(p){
+        var k = n(p.prix_kwh) !== null ? n(p.prix_kwh) : n(p.prix_jour), f = n(p.fixe_an);
+        return '<tr><td>' + esc(p.cle) + '</td><td class="num">' + (k === null ? '–' : fr(k * 1.06, 2)) + '</td><td class="num">' + (f === null ? '–' : fr(f * 1.06, 0)) + '</td><td class="hint">à venir</td></tr>';
+      }).join('') : '<tr><td colspan="4" class="hint">Pas de prix ENGIE encodé pour cette région.</td></tr>';
+    });
+    if (T && T.mois) $('cmpHint').textContent = 'Contrats ENGIE de ' + new Date(T.mois + 'T00:00:00').toLocaleDateString('fr-BE', {month: 'long', year: 'numeric'}) + ' pour ' + cur + ' (prix de l\'énergie seule, sans réseau ni taxes, TVAC 6 % particulier). Les contrats des concurrents viendront à côté.';
+  }
+  $('regs').addEventListener('click', function(e){ var b = e.target.closest('button'); if (b){ cur = b.dataset.r; drawList(); } });
+  $('ens').addEventListener('click', function(e){ var b = e.target.closest('button'); if (b){ en = b.dataset.en; drawList(); } });
+  drawList();
+  fetch(SB_URL + '/rest/v1/rpc/conso_prix_get', {method: 'POST', headers: {'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY, 'Content-Type': 'application/json'}, body: JSON.stringify({p_mois: null})})
+    .then(function(r){ return r.json(); }).then(function(d){ T = d; drawCmp(); })
+    .catch(function(){ T = {prix: []}; drawCmp(); });
+</script>
+</body>
+</html>
