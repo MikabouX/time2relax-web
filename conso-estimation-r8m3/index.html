@@ -210,6 +210,14 @@
   .vtitle{font-weight:600;margin-bottom:2px}
   .vres{font-weight:400;font-size:12px;opacity:.75;margin-left:6px}
   .idxtot{font-weight:600;color:#1e6b3a;margin-left:4px}.idxtot.bad{color:#9a3b2b}
+  .tot.known{box-shadow:inset 0 0 0 2px #1e6b3a}
+  .tot .unit .est{display:block;font-size:11px;opacity:.55;margin-top:2px}
+  #detail td.dim{color:#a3aba7}
+  tr.known-row td{background:#eef7f1;border-top:2px solid #1e6b3a;border-bottom:2px solid #1e6b3a;font-weight:700}
+  tr.known-row td:first-child{border-left:2px solid #1e6b3a}
+  tr.known-row td:last-child{border-right:2px solid #1e6b3a}
+  tr.known-row small{font-weight:400;opacity:.7}
+  tr.sep-row td{font-size:11.5px;color:#7d8682;padding-top:12px;border-bottom:0}
   h1 .maj{font-size:11px;font-weight:400;opacity:.65;vertical-align:middle;margin-left:6px}
 </style>
 </head>
@@ -1231,20 +1239,32 @@
     var P = prixUI(showE, showG);
     var r = compute(inp);
 
+    // Consommation connue : elle seule compte. Elle est encadrée ; l'estimation reste visible en gris, à titre de comparaison
+    // (les collègues croyaient que les deux étaient liées).
     document.getElementById('totE').textContent = fmt(knE !== null ? knE : r.e);
     document.getElementById('totG').textContent = fmt(knG !== null ? knG : r.g);
-    document.getElementById('totEsub').textContent = knE !== null ? 'kWh / an prélevés (connus) · estimation ' + fmt(r.e) : (r.solar ? 'kWh / an consommés au total' : 'kWh / an');
-    $('totGsub').textContent = knG !== null ? 'kWh / an (connus) · estimation ' + fmt(r.g) : 'kWh / an';
+    $('boxE').classList.toggle('known', knE !== null); $('boxG').classList.toggle('known', knG !== null);
+    document.getElementById('totEsub').innerHTML = knE !== null ? 'kWh / an · <b>consommation connue</b><span class="est">estimation sans lien : ' + fmt(r.e) + '</span>' : (r.solar ? 'kWh / an consommés au total' : 'kWh / an');
+    $('totGsub').innerHTML = knG !== null ? 'kWh / an · <b>consommation connue</b><span class="est">estimation sans lien : ' + fmt(r.g) + '</span>' : 'kWh / an';
     hubSync(showE, showG, knE !== null ? knE : r.e, knG !== null ? knG : r.g, knE, knG, $('knEN').value.trim() !== '');
 
+    var anyKn = knE !== null || knG !== null, dE = showE && knE !== null, dG = showG && knG !== null;
+    function dim(html, on){ return on ? html.replace('<td class="n', '<td class="dim n') : html; }
     document.getElementById('head').innerHTML = '<tr><th>Détail</th>' + (showE ? '<th class="n">Électricité</th>' : '') + (showG ? '<th class="n">Gaz</th>' : '') + '</tr>';
     var lines = r.lines.filter(function(l, k){ return k === 0 || (showE && l.e) || (showG && l.g); });
-    var rows = lines.map(function(l, k){
-      if (k === 0) return '<tr><td>' + l.label + '</td>' + (showE ? '<td class="n">' + fmt(l.e) + '</td>' : '') + (showG ? '<td class="n">' + fmt(l.g) + '</td>' : '') + '</tr>';
-      return '<tr><td>' + l.label + '</td>' + (showE ? cell(l.e) : '') + (showG ? cell(l.g) : '') + '</tr>';
+    var rows = '';
+    if (anyKn){
+      rows += '<tr class="known-row"><td>Consommation connue<br><small>utilisée pour le prix et l\'acompte</small></td>' +
+        (showE ? '<td class="n">' + (knE !== null ? fmt(knE) : fmt(r.e) + '<br><small>(estimée)</small>') + '</td>' : '') +
+        (showG ? '<td class="n">' + (knG !== null ? fmt(knG) : fmt(r.g) + '<br><small>(estimée)</small>') + '</td>' : '') + '</tr>' +
+        '<tr class="sep-row"><td colspan="' + (1 + (showE ? 1 : 0) + (showG ? 1 : 0)) + '">Estimation d\'après le logement (en gris : sans lien avec la consommation connue, pour comparer)</td></tr>';
+    }
+    rows += lines.map(function(l, k){
+      var lbl = '<td' + (anyKn && (!showE || dE) && (!showG || dG) ? ' class="dim"' : '') + '>' + l.label + '</td>';
+      if (k === 0) return '<tr>' + lbl + (showE ? dim('<td class="n">' + fmt(l.e) + '</td>', dE) : '') + (showG ? dim('<td class="n">' + fmt(l.g) + '</td>', dG) : '') + '</tr>';
+      return '<tr>' + lbl + (showE ? dim(cell(l.e), dE) : '') + (showG ? dim(cell(l.g), dG) : '') + '</tr>';
     }).join('');
-    rows += '<tr class="tot-row"><td>' + (knE !== null || knG !== null ? 'Total estimé' : 'Total consommé') + '</td>' + (showE ? '<td class="n">' + fmt(r.e) + '</td>' : '') + (showG ? '<td class="n">' + fmt(r.g) + '</td>' : '') + '</tr>';
-    if (knE !== null || knG !== null) rows += '<tr class="tot-row"><td>Connu (utilisé pour le prix)</td>' + (showE ? '<td class="n">' + (knE !== null ? fmt(knE) : '–') + '</td>' : '') + (showG ? '<td class="n">' + (knG !== null ? fmt(knG) : '–') + '</td>' : '') + '</tr>';
+    rows += '<tr class="tot-row"><td' + (anyKn && (!showE || dE) && (!showG || dG) ? ' class="dim"' : '') + '>' + (anyKn ? 'Total estimé' : 'Total consommé') + '</td>' + (showE ? dim('<td class="n">' + fmt(r.e) + '</td>', dE) : '') + (showG ? dim('<td class="n">' + fmt(r.g) + '</td>', dG) : '') + '</tr>';
     document.getElementById('detail').innerHTML = rows;
 
     var s = document.getElementById('solar'), solarTxt = '';
