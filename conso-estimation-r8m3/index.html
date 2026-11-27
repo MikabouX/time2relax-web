@@ -209,6 +209,7 @@
   .vcard{border:1px solid #dfe7e1;border-radius:10px;padding:6px 10px;margin:6px 0}
   .vtitle{font-weight:600;margin-bottom:2px}
   .vres{font-weight:400;font-size:12px;opacity:.75;margin-left:6px}
+  .idxtot{font-weight:600;color:#1e6b3a;margin-left:4px}.idxtot.bad{color:#9a3b2b}
   h1 .maj{font-size:11px;font-weight:400;opacity:.65;vertical-align:middle;margin-left:6px}
 </style>
 </head>
@@ -562,14 +563,15 @@
         <div id="regE">
           <legend>Électricité</legend>
           <div class="row"><span class="clbl">Période</span>du <input type="date" id="rgEs"> au <input type="date" id="rgEe"> <span class="hint">ou</span> <input type="number" id="rgEd" min="1" max="800" value="365" style="width:70px"> <span>jours</span></div>
-          <div class="row"><span class="clbl" id="rgELbl">Heures pleines</span><input type="text" inputmode="decimal" class="px" id="rgE1" placeholder="début" style="width:90px"> → <input type="text" inputmode="decimal" class="px" id="rgE2" placeholder="fin" style="width:90px"> <span>kWh</span></div>
+          <div class="row"><span class="clbl" id="rgELbl">Heures pleines</span><input type="text" inputmode="decimal" class="px" id="rgE1" placeholder="début" style="width:90px"> → <input type="text" inputmode="decimal" class="px" id="rgE2" placeholder="fin" style="width:90px"> <span>kWh</span> <span class="idxtot" id="rgE1t"></span></div>
           <div class="hint" style="margin:-2px 0 4px">Un seul index (ancien compteur mono-horaire) : laissez « heures creuses » vide.</div>
-          <div class="row" id="rgENRow"><span class="clbl">Heures creuses</span><input type="text" inputmode="decimal" class="px" id="rgN1" placeholder="début" style="width:90px"> → <input type="text" inputmode="decimal" class="px" id="rgN2" placeholder="fin" style="width:90px"> <span>kWh</span></div>
+          <div class="row" id="rgENRow"><span class="clbl">Heures creuses</span><input type="text" inputmode="decimal" class="px" id="rgN1" placeholder="début" style="width:90px"> → <input type="text" inputmode="decimal" class="px" id="rgN2" placeholder="fin" style="width:90px"> <span>kWh</span> <span class="idxtot" id="rgN1t"></span></div>
+          <div class="row idxsum" id="rgEsum" hidden><span class="clbl">Total électricité</span><b id="rgEsumV"></b></div>
         </div>
         <div id="regG" style="margin-top:10px">
           <legend>Gaz</legend>
           <div class="row"><span class="clbl">Période</span>du <input type="date" id="rgGs"> au <input type="date" id="rgGe"> <span class="hint">ou</span> <input type="number" id="rgGd" min="1" max="800" value="365" style="width:70px"> <span>jours</span></div>
-          <div class="row"><span class="clbl">Index</span><input type="text" inputmode="decimal" class="px" id="rgG1" placeholder="début" style="width:90px"> → <input type="text" inputmode="decimal" class="px" id="rgG2" placeholder="fin" style="width:90px"> <select id="rgGu"><option value="m3">m³</option><option value="kwh">kWh</option></select></div>
+          <div class="row"><span class="clbl">Index</span><input type="text" inputmode="decimal" class="px" id="rgG1" placeholder="début" style="width:90px"> → <input type="text" inputmode="decimal" class="px" id="rgG2" placeholder="fin" style="width:90px"> <select id="rgGu"><option value="m3">m³</option><option value="kwh">kWh</option></select> <span class="idxtot" id="rgG1t"></span></div>
           <div class="row" id="rgGfRow"><span class="clbl">Conversion</span><input type="text" inputmode="decimal" class="px" id="rgGf" value="11,6" style="width:60px"> <span>kWh par m³ (voir la facture ; gaz riche en Belgique : environ 11,5 à 11,7)</span></div>
         </div>
         <div id="perBox" style="margin-top:10px">
@@ -1344,6 +1346,7 @@
     } else costTxt = '';
     cst.innerHTML = html; cst.hidden = !nOk; $('costEmpty').hidden = !!nOk;
     regul(showE, showG, P, prosAn);
+    if (typeof idxTotals === 'function') idxTotals();
 
     var typeLbl = ['appartement', '2 façades', '3 façades', '4 façades'][inp.type];
     var heatLbl = {gaz: 'gaz', elec: 'électrique', pac: 'pompe à chaleur', mazout: 'chaudière mazout', poelegaz: 'poêle au gaz', pellets: 'poêle à pellets'}[inp.heating];
@@ -1764,6 +1767,20 @@
     if (z === 'prix') framePost();
   }
   document.querySelectorAll('.zbtn').forEach(function(b){ b.addEventListener('click', function(){ showZone(this.dataset.zone); }); });
+  // Outil 3 : consommation entre les index (fin − début), à côté des index.
+  function idxTotals(){
+    function diff(a, b){ var x = pnum($(a).value), y = pnum($(b).value); return x === null || y === null ? null : y - x; }
+    function show(id, d, unit, extra){ var el = $(id); el.classList.toggle('bad', d !== null && d < 0); el.textContent = d === null ? '' : d < 0 ? 'fin plus petite que le début' : '= ' + (unit === 'm³' ? (Math.round(d * 10) / 10).toLocaleString('fr-BE') : fmt(d)) + ' ' + unit + (extra || ''); }
+    var e = diff('rgE1', 'rgE2'), n = diff('rgN1', 'rgN2');
+    show('rgE1t', e, 'kWh'); show('rgN1t', n, 'kWh');
+    var both = e !== null && n !== null && e >= 0 && n >= 0;
+    $('rgEsum').hidden = !both; if (both) $('rgEsumV').textContent = fmt(e + n) + ' kWh';
+    var g = diff('rgG1', 'rgG2'), m3 = $('rgGu').value === 'm3', f = pnum($('rgGf').value);
+    show('rgG1t', g, m3 ? 'm³' : 'kWh', m3 && g !== null && g >= 0 && f ? ' ≈ ' + fmt(Math.round(g * f)) + ' kWh' : '');
+  }
+  ['rgE1', 'rgE2', 'rgN1', 'rgN2', 'rgG1', 'rgG2', 'rgGf'].forEach(function(id){ $(id).addEventListener('input', idxTotals); });
+  $('rgGu').addEventListener('change', idxTotals);
+  idxTotals();
   // Véhicules : le choix de taille remplit les kWh/100 km ; « Autre » laisse taper. Hybride : 20 par défaut.
   [1, 2, 3].forEach(function(i){
     var p = $('ev' + i + 'p'), c = $('ev' + i + 'c'), t = $('ev' + i + 't');
