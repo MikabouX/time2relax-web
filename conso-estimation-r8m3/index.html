@@ -103,6 +103,7 @@
   .tot.e,#blkE,#regSet div#regE{background:var(--elec-bg);border-color:var(--elec-bd)}
   .tot.g,#blkG,#regSet #regG{background:var(--gas-bg);border-color:var(--gas-bd)}
   #regSet div#regE,#regSet #regG{border:1px solid;border-radius:10px;padding:8px 12px}
+  .ctrs{margin-top:6px} .ctr{flex-wrap:wrap;gap:4px 6px;padding:5px 0;border-top:1px dashed rgba(0,0,0,.12)} .ctr input[type=date]{width:auto} .ctr .ctrK{width:70px}
   .ecols-eg td:nth-child(2),.ecols-eg th:nth-child(2),.ecols-e td:nth-child(2),.ecols-e th:nth-child(2){background:var(--elec-bg)}
   .ecols-eg td:nth-child(3),.ecols-eg th:nth-child(3),.ecols-g td:nth-child(2),.ecols-g th:nth-child(2){background:var(--gas-bg)}
   .cost .le{background:var(--elec-bg);margin:0 -8px;padding-left:8px;padding-right:8px}
@@ -599,12 +600,14 @@
           <div class="hint" style="margin:-2px 0 4px">Un seul index (ancien compteur mono-horaire) : laissez « heures creuses » vide.</div>
           <div class="row" id="rgENRow"><span class="clbl">Heures creuses</span><input type="text" inputmode="decimal" class="px" id="rgN1" placeholder="début" style="width:90px"> → <input type="text" inputmode="decimal" class="px" id="rgN2" placeholder="fin" style="width:90px"> <span>kWh</span> <span class="idxtot" id="rgN1t"></span></div>
           <div class="row idxsum" id="rgEsum" hidden><span class="clbl">Total électricité</span><b id="rgEsumV"></b></div>
+          <div class="ctrs" data-en="e"><div class="ctrRows"></div><button type="button" class="sec ctrAdd">+ Changement de contrat pendant la période</button> <span class="hint ctrHint"></span></div>
         </div>
         <div id="regG" style="margin-top:10px">
           <legend>Gaz</legend>
           <div class="row"><span class="clbl">Période</span>du <input type="date" id="rgGs"> au <input type="date" id="rgGe"> <span class="hint">ou</span> <input type="number" id="rgGd" min="1" max="800" value="365" style="width:70px"> <span>jours</span></div>
           <div class="row"><span class="clbl">Index</span><input type="text" inputmode="decimal" class="px" id="rgG1" placeholder="début" style="width:90px"> → <input type="text" inputmode="decimal" class="px" id="rgG2" placeholder="fin" style="width:90px"> <select id="rgGu"><option value="m3">m³</option><option value="kwh">kWh</option></select> <span class="idxtot" id="rgG1t"></span></div>
           <div class="row" id="rgGfRow"><span class="clbl">Conversion</span><input type="text" inputmode="decimal" class="px" id="rgGf" value="11,6" style="width:60px"> <span>kWh par m³ <span class="hint">(à vérifier sur le décompte détaillé, si disponible ; sinon environ 11,5 à 11,7 en Belgique)</span></span></div>
+          <div class="ctrs" data-en="g"><div class="ctrRows"></div><button type="button" class="sec ctrAdd">+ Changement de contrat pendant la période</button> <span class="hint ctrHint"></span></div>
         </div>
         <div id="perBox" style="margin-top:10px">
           <div class="row"><span class="clbl">Prix</span><span class="hint" id="perHint">prix de l'étape 2</span></div>
@@ -1501,10 +1504,10 @@
     return w;
   }
   // Découpe la période (dates de début et de fin) par trimestre civil (ou par mois) : [{q, m, d, s, e}]. null sans dates.
-  function socialPieces(en, mensuel){
+  function socialPieces(en, mensuel, s0, e0){
     var a = $('rg' + (en === 'e' ? 'E' : 'G') + 's').value, b = $('rg' + (en === 'e' ? 'E' : 'G') + 'e').value;
-    if (!a || !b) return null;
-    var cur = Date.parse(a), end = Date.parse(b), out = [];
+    if (s0 === undefined && (!a || !b)) return null;
+    var cur = s0 !== undefined ? s0 : Date.parse(a), end = e0 !== undefined ? e0 : Date.parse(b), out = [];
     if (!(end > cur)) return null;
     while (cur < end){
       var dt = new Date(cur), y = dt.getUTCFullYear(), qm = mensuel ? dt.getUTCMonth() : Math.floor(dt.getUTCMonth() / 3) * 3, nx = Math.min(Date.UTC(y, qm + (mensuel ? 1 : 3), 1), end);
@@ -1535,15 +1538,15 @@
     return null;
   }
   // Somme des composantes (énergie + verte + réseau + taxes), HTVA, pour un mois donné.
-  function priceSet(m, en, noEn){
+  function priceSet(m, en, noEn, nm){
     var F = ['k', 'j', 'n', 'a', 'b', 'c', 'f'], out = {};
     function fill(get){ F.forEach(function(f){ var t = 0, any = false; COMPS.forEach(function(c){ if (c.k === 'vt' && (en === 'g' || f === 'f')) return; if (noEn && c.k === 'en') return; var v = get(c.k, f);
       if ((f === 'j' || f === 'n') && (v === null || v === undefined)) v = get(c.k, 'k');
       if ((f === 'a' || f === 'b' || f === 'c') && (v === null || v === undefined)){ v = get(c.k, f === 'a' ? 'j' : 'n'); if (v === null || v === undefined) v = get(c.k, 'k'); }
       if (v !== null && v !== undefined){ t += +v; any = true; } }); out[f] = any ? t : null; }); return out; }
-    if (T && m === T.mois) return fill(function(c, f){ return VAL[en][c][f]; });
+    if (T && m === T.mois && (!nm || nm === contractName(en))) return fill(function(c, f){ return VAL[en][c][f]; });
     var d = monthData(m); if (!d) return 'load';
-    var reg = regionOf(en), grd = $(en === 'e' ? 'grdE' : 'grdG').value, name = contractName(en), seg = SEG();
+    var reg = regionOf(en), grd = $(en === 'e' ? 'grdE' : 'grdG').value, name = nm || contractName(en), seg = SEG();
     function find(type, cle, sg){ return (d.prix || []).filter(function(p){ return p.type === type && p.energie === en && p.cle === cle && p.region === reg && p.segment === sg; })[0] || null; }
     var enR = name && reg ? find('energie', name, seg) : null; if (!enR && !noEn) return null;
     var soc = !!enR && (enR.cle === 'Tarif social' || /_SOCIAL_/.test(enR.doc || ''));
@@ -1566,6 +1569,92 @@
     perOptions($('perList').lastElementChild.querySelector('.perM')); render();
   });
   $('perList').addEventListener('click', function(e){ if (e.target.classList.contains('perDel')){ e.target.closest('.per').remove(); render(); } });
+  // ---------- Plusieurs contrats sur la période (ex. Easy fixe jusqu'au 30/03, puis Easy variable) ----------
+  // Chaque ligne : du … au … (inclus), contrat, mois de signature, kWh si l'index du changement est connu.
+  // Sans kWh, la consommation est répartie entre les lignes selon les profils Synergrid.
+  var DAY = 86400000;
+  function isoD(t){ return new Date(t).toISOString().slice(0, 10); }
+  function dmy(iso){ var p = iso.split('-'); return p[2] + '/' + p[1] + '/' + p[0]; }
+  function formulesOf(en, nm){ var sg = SEG(); return FQ && nm ? FQ.f.filter(function(f){ return f.cle === nm && f.segment === sg && f.energie === en; }) : []; }
+  function isSocial(en, nm){ var r = nm ? findRow('energie', en, nm, regionOf(en)) : null; return nm === 'Tarif social' || !!(r && /_SOCIAL_/.test(r.doc || '')); }
+  function ctrBox(en){ return document.querySelector('.ctrs[data-en="' + en + '"]'); }
+  function ctrOpts(en, row){
+    var cs = row.querySelector('.ctrC'), v = cs.value || cs.dataset.v || '', L = names(en);
+    var h = '<option value="">Contrat…</option>' + L.map(function(n){ return '<option>' + esc(n) + '</option>'; }).join('');
+    if (cs.dataset.h !== h){ cs.innerHTML = h; cs.dataset.h = h; } cs.value = v; cs.dataset.v = cs.value;
+    var ss = row.querySelector('.ctrS'), sv = ss.value || ss.dataset.v || '', F = isSocial(en, cs.value) ? [] : formulesOf(en, cs.value);
+    var hs = '<option value="">' + (isSocial(en, cs.value) ? 'CREG par trimestre' : 'Signé en : inconnu (cartes de chaque mois)') + '</option>' + F.map(function(f){ var m = String(f.mois).slice(0, 10); return '<option value="' + m + '">Signé en ' + moisLbl(m) + '</option>'; }).join('');
+    if (ss.dataset.h !== hs){ ss.innerHTML = hs; ss.dataset.h = hs; } ss.value = sv; if (ss.value !== sv) ss.value = ''; ss.dataset.v = ss.value;
+  }
+  function ctrAddRow(en, du, au, nm, sig){
+    var box = ctrBox(en), d = document.createElement('div'); d.className = 'row ctr';
+    d.innerHTML = 'du <input type="date" class="ctrDu"> au <input type="date" class="ctrAu"> <select class="ctrC"></select> <select class="ctrS"></select> <input type="text" inputmode="decimal" class="px ctrK" placeholder="kWh ?" title="kWh de cette ligne, si l\'index au changement de contrat est connu (sinon réparti selon les profils Synergrid)"> <button type="button" class="sec ctrDel" title="Retirer">×</button>';
+    d.querySelector('.ctrDu').value = du || ''; d.querySelector('.ctrAu').value = au || '';
+    d.querySelector('.ctrC').dataset.v = nm || ''; d.querySelector('.ctrS').dataset.v = sig || '';
+    box.querySelector('.ctrRows').appendChild(d); ctrOpts(en, d);
+  }
+  document.querySelectorAll('.ctrs').forEach(function(box){
+    var en = box.dataset.en, X = en === 'e' ? 'E' : 'G';
+    box.querySelector('.ctrAdd').addEventListener('click', function(){
+      var rows = box.querySelectorAll('.ctr');
+      if (!rows.length){   // 1re fois : le contrat actuel sur toute la période, puis une 2e ligne à compléter
+        var s0 = $('rg' + X + 's').value, e0 = $('rg' + X + 'e').value;
+        ctrAddRow(en, s0, '', contractName(en), $(en === 'e' ? 'rgSigE' : 'rgSigG').value);
+        ctrAddRow(en, '', e0 ? isoD(Date.parse(e0) - DAY) : '', '', '');
+      } else {
+        var last = rows[rows.length - 1], au = last.querySelector('.ctrAu').value;
+        ctrAddRow(en, au ? isoD(Date.parse(au) + DAY) : '', '', '', '');
+      }
+      render();
+    });
+    box.addEventListener('click', function(e){ if (e.target.classList.contains('ctrDel')){ e.target.closest('.ctr').remove(); render(); } });
+    box.addEventListener('change', function(e){
+      var r = e.target.closest('.ctr'); if (!r) return;
+      if (e.target.classList.contains('ctrC')){ e.target.dataset.v = e.target.value; r.querySelector('.ctrS').dataset.v = ''; r.querySelector('.ctrS').value = ''; ctrOpts(en, r); }
+      if (e.target.classList.contains('ctrS')) e.target.dataset.v = e.target.value;
+      if (e.target.classList.contains('ctrAu') && e.target.value && r.nextElementSibling) r.nextElementSibling.querySelector('.ctrDu').value = isoD(Date.parse(e.target.value) + DAY);   // la ligne suivante commence le lendemain
+    });
+  });
+  function ctrRows(en){
+    var out = [];
+    ctrBox(en).querySelectorAll('.ctr').forEach(function(r){ ctrOpts(en, r);
+      var du = r.querySelector('.ctrDu').value, au = r.querySelector('.ctrAu').value;
+      out.push({du: du, au: au, s: du ? Date.parse(du) : null, e: au ? Date.parse(au) + DAY : null, nm: r.querySelector('.ctrC').value, sig: r.querySelector('.ctrS').value, k: pnum(r.querySelector('.ctrK').value)});
+    });
+    return out.length ? out : null;
+  }
+  // Coût HTVA d'une ligne [s, e[ : prix de chaque mois (ou trimestre CREG), consommation répartie selon les profils ; frais fixes au prorata des jours.
+  function spanCost(en, r, tot, hp, hc){
+    var soc = isSocial(en, r.nm), F = !soc && r.sig ? formulesOf(en, r.nm).filter(function(f){ return String(f.mois).slice(0, 10) === r.sig; })[0] || null : null;
+    var ps = socialPieces(en, !soc, r.s, r.e), w = ps.map(function(p){ return profW(en, p.s, p.e); }), wt = w.reduce(function(t, x){ return t + x; }, 0), nd = ps.reduce(function(t, p){ return t + p.d; }, 0), c = 0, fx = 0;
+    for (var i = 0; i < ps.length; i++){
+      var p = ps[i], k = wt > 0 ? w[i] / wt : p.d / nd, m = T && T.mois_dispo && T.mois_dispo.indexOf(p.m) >= 0 ? p.m : (T ? T.mois : null);
+      var S = soc ? socialSet(p, en) : F ? formSet(p, en, F) : priceSet(m, en, false, r.nm);
+      if (S === 'load') return 'load';
+      if (!S) return {err: soc ? 'tarif social du ' + trimLbl(p.q) + ' (pas encore encodé)' : r.nm + ' absent ' + deMois(m)};
+      if (S.miss) return {err: 'paramètre ' + F.param + ' inconnu pour ' + moisLbl(p.m)};
+      var kc = kwhCost(S, en, tot * k, hp !== null ? hp * k : null, hc !== null ? hc * k : null, en === 'e' && hc === null);
+      if (kc === null) return {err: 'prix ' + r.nm};
+      c += kc; fx += (S.f || 0) * p.d / 365;
+    }
+    return {c: c, fx: fx};
+  }
+  function rowsCost(en, rows, tot, hp, hc){
+    var bad = rows.filter(function(r){ return !r.s || !r.e || r.e <= r.s || !r.nm; });
+    if (bad.length) return {err: 'changement de contrat : dates (du, au) et contrat de chaque ligne'};
+    var known = 0, wt = 0, days = 0;
+    rows.forEach(function(r){ r.d = Math.round((r.e - r.s) / DAY); days += r.d; if (r.k !== null) known += r.k; else { r.w = profW(en, r.s, r.e); wt += r.w; } });
+    var rest = tot - known, c = 0, fx = 0, det = [];
+    for (var i = 0; i < rows.length; i++){
+      var r = rows[i], kw = r.k !== null ? r.k : (wt > 0 ? rest * r.w / wt : 0), sh = tot ? kw / tot : 0;
+      var R = spanCost(en, r, kw, hp !== null ? hp * sh : null, hc !== null ? hc * sh : null);
+      if (R === 'load') return 'load';
+      if (R.err) return R;
+      c += R.c; fx += R.fx;
+      det.push(r.nm + (r.sig ? ' (signé ' + moisLbl(r.sig) + ')' : '') + ' du ' + dmy(r.du) + ' au ' + dmy(r.au) + ' : ' + fmt(kw) + ' kWh' + (r.k !== null ? '' : ' (profil)') + ', ' + fmt((R.c + R.fx) * (1 + tvaRate())) + ' €');
+    }
+    return {c: c, fx: fx, det: det, days: days, rows: true};
+  }
   // Dates de début et de fin → nombre de jours (fin − début), sinon le nombre de jours tapé.
   function regDays(en){
     var a = $('rg' + en + 's').value, b = $('rg' + en + 'e').value, d = $('rg' + en + 'd');
@@ -1594,7 +1683,13 @@
     function d(a, b){ var x = pnum($(a).value), y = pnum($(b).value); return x !== null && y !== null ? y - x : null; }
     function days(id){ var n = pnum($(id).value); return n && n > 0 ? n : 365; }
     function periodsCost(en, tot, hp, hc, dTot){
-      var c = 0, fx = 0, det = [];
+      var c = 0, fx = 0, det = [], CR = ctrRows(en);
+      if (CR){
+        var RC = rowsCost(en, CR, tot, hp, hc);
+        if (RC === 'load'){ loading = true; return null; }
+        if (RC.err){ miss.push((en === 'e' ? 'électricité' : 'gaz') + ' : ' + RC.err); return null; }
+        return RC;
+      }
       var FF = !SOCIAL[en] ? formSel(en) : null, mp = FF ? monthPieces(en) : null;
       if (FF && mp){   // contrat variable : formule du mois de signature × paramètre de chaque mois
         var md = mp.reduce(function(t, p){ return t + p.d; }, 0), mw = mp.map(function(p){ return profW(en, p.s, p.e); }), mwt = mw.reduce(function(t, x){ return t + x; }, 0), nomiss = [];
@@ -1644,11 +1739,12 @@
         if (back && tot < 0){ perdu = -tot; hp = 0; hc = hc !== null ? 0 : null; tot = 0; }
         var R = periodsCost('e', tot, hp, hc, dE);
         if (R){
+          if (R.rows) dE = R.days;
           var prE = (prosAn || 0) * dE / 365, tE = (R.c + R.fx + prE) * (1 + rate); totT += tE; ok++;
           cur.push({en: 'e', per: perLbl('E', dE), contrat: segContrat('e'), kwh: tot, cost: tE});
           var det = hc !== null ? fmt(hp) + ' kWh pleines + ' + fmt(hc) + ' kWh creuses' + (bi() || tri() ? '' : ' (additionnés, compteur simple)') : fmt(tot) + ' kWh (index unique)';
           out += '<div class="line"><span>Électricité : ' + det + ' sur ' + fmt(dE) + ' jours' + (!back && (hp < 0 || (hc !== null && hc < 0)) ? ' <b style="color:#9a3b2b">(index de fin plus petit ?)</b>' : '') + '</span><span>' + fmt(tE) + ' € TVAC</span></div>';
-          out += '<div class="hint used">Consommation ' + fmt(R.c * (1 + rate)) + ' € + frais fixes ' + fmt(R.fx * (1 + rate)) + ' € (' + fmt(dE) + '/365 jours)' + (prE ? (val('pcpt') === 'comm' ? ' + réseau des kWh compensés ' : ' + prosumer ') + fmt(prE * (1 + rate)) + ' €' : '') + ' TVAC' + (R.det.length ? ' · ' + R.det.join(', ') : '') + '</div>';
+          out += '<div class="hint used">Consommation ' + fmt(R.c * (1 + rate)) + ' € + frais fixes ' + fmt(R.fx * (1 + rate)) + ' € (' + fmt(dE) + '/365 jours)' + (prE ? (val('pcpt') === 'comm' ? ' + réseau des kWh compensés ' : ' + prosumer ') + fmt(prE * (1 + rate)) + ' €' : '') + ' TVAC' + (R.det.length && !R.rows ? ' · ' + R.det.join(', ') : '') + '</div>' + (R.rows ? R.det.map(function(x){ return '<div class="hint">• ' + esc(x) + '</div>'; }).join('') : '');
           if (perdu) out += '<div class="hint" style="color:#9a5b00">Production supérieure à la consommation : ' + fmt(perdu) + ' kWh de surplus, non compensés (perdus pour le client).</div>';
           else if (back && tot >= 0) out += '<div class="hint">Compteur qui tourne à l\'envers : index nets (consommation − production).</div>';
         }
@@ -1659,10 +1755,11 @@
       if (g !== null){
         var f = $('rgGu').value === 'm3' ? (pnum($('rgGf').value) || 11.6) : 1, kG = g * f, RG = periodsCost('g', kG, null, null, dG);
         if (RG){
+          if (RG.rows) dG = RG.days;
           var tG = (RG.c + RG.fx) * (1 + rate); totT += tG; ok++;
           cur.push({en: 'g', per: perLbl('G', dG), contrat: segContrat('g'), kwh: kG, cost: tG});
           out += '<div class="line"><span>Gaz : ' + ($('rgGu').value === 'm3' ? fmt(g) + ' m³ × ' + String(f).replace('.', ',') + ' = ' : '') + fmt(kG) + ' kWh sur ' + fmt(dG) + ' jours' + (g < 0 ? ' <b style="color:#9a3b2b">(index de fin plus petit ?)</b>' : '') + '</span><span>' + fmt(tG) + ' € TVAC</span></div>';
-          out += '<div class="hint used">Consommation ' + fmt(RG.c * (1 + rate)) + ' € + frais fixes ' + fmt(RG.fx * (1 + rate)) + ' € (' + fmt(dG) + '/365 jours) TVAC' + (RG.det.length ? ' · ' + RG.det.join(', ') : '') + '</div>';
+          out += '<div class="hint used">Consommation ' + fmt(RG.c * (1 + rate)) + ' € + frais fixes ' + fmt(RG.fx * (1 + rate)) + ' € (' + fmt(dG) + '/365 jours) TVAC' + (RG.det.length && !RG.rows ? ' · ' + RG.det.join(', ') : '') + '</div>' + (RG.rows ? RG.det.map(function(x){ return '<div class="hint">• ' + esc(x) + '</div>'; }).join('') : '');
         }
       }
     }
@@ -1684,7 +1781,7 @@
         out += '<div class="line"><span>Acomptes versés</span><span>− ' + fmt(ac) + ' €</span></div>';
         out += '<div class="line acompte big ' + (Math.abs(diff) < 0.5 ? '' : diff > 0 ? 'apayer' : 'arembourser') + '"><span>' + (Math.abs(diff) < 0.5 ? 'Régularisation : rien à payer ni à rembourser' : diff > 0 ? 'Régularisation : à payer' : 'Régularisation : à rembourser') + '</span><span>' + fmt(Math.abs(diff)) + ' €</span></div>';
       } else out += '<div class="hint">Entrez le total des acomptes versés pour obtenir le montant de la régularisation.</div>';
-      out += '<div class="hint">Estimation : ' + ((fmE && monthPieces('e')) || (fmG && monthPieces('g')) ? 'formule du contrat et paramètre de chaque mois ; réseau et taxes du mois quand ils sont encodés, sinon de l\'étape 2' + (perRows().length ? ' ; prix de chaque période pour l\'autre énergie' : '') : (socE && socialPieces('e')) || (socG && socialPieces('g')) ? 'tarif social CREG de chaque trimestre' + (perRows().length ? ' et prix de chaque période' : '') : perRows().length ? 'prix de chaque période' : 'prix de l\'étape 2' + (T && T.mois ? ' (' + moisLbl(T.mois) + ')' : '')) + ', frais fixes au prorata des jours. La facture réelle peut différer (index estimés, primes, dates exactes des changements de prix).</div>' +
+      out += '<div class="hint">Estimation : ' + ((showE && ctrRows('e')) || (showG && ctrRows('g')) ? 'contrats successifs : prix de chaque contrat mois par mois (formule ou prix fixe du mois de signature s\'il est connu, sinon carte du mois)' : ((fmE && monthPieces('e')) || (fmG && monthPieces('g')) ? 'formule du contrat et paramètre de chaque mois ; réseau et taxes du mois quand ils sont encodés, sinon de l\'étape 2' + (perRows().length ? ' ; prix de chaque période pour l\'autre énergie' : '') : (socE && socialPieces('e')) || (socG && socialPieces('g')) ? 'tarif social CREG de chaque trimestre' + (perRows().length ? ' et prix de chaque période' : '') : perRows().length ? 'prix de chaque période' : 'prix de l\'étape 2' + (T && T.mois ? ' (' + moisLbl(T.mois) + ')' : ''))) + ', frais fixes au prorata des jours. La facture réelle peut différer (index estimés, primes, dates exactes des changements de prix).</div>' +
         '<div class="hint">Quand le prix change en cours de période (contrat variable, tarif social), la consommation est répartie entre les mois selon les profils de consommation de Synergrid (RLP 2025-2026), comme le font les gestionnaires de réseau pour un compteur relevé une fois par an : davantage en hiver, surtout pour le gaz (janvier ≈ 18 % de l\'année, juillet ≈ 1,5 %). Les frais fixes restent au prorata des jours.</div>';
     }
     if (miss.length) out += '<div class="hint" style="color:#9a3b2b">Manque : ' + miss.join(', ') + '.</div>';
@@ -1695,6 +1792,7 @@
   var SEGS = [], CURSEG = [], REGHTML = null;
   function perLbl(X, dd){ var a = $('rg' + X + 's').value, b = $('rg' + X + 'e').value; function f(x){ var p = x.split('-'); return p[2] + '/' + p[1] + '/' + p[0]; } return a && b ? f(a) + ' → ' + f(b) + ' (' + fmt(dd) + ' j)' : fmt(dd) + ' jours'; }
   function segContrat(en){
+    var CR = ctrRows(en); if (CR) return CR.map(function(r){ return r.nm || '?'; }).join(' puis ');
     var k = pnum($(en === 'e' ? 'rgPE' : 'rgPG').value), F = formSel(en), n = contractName(en);
     if (k !== null) return 'prix ' + String(k).replace('.', ',') + ' c€';
     return (n || 'contrat ?') + (F ? ' (signé ' + moisLbl(String(F.mois).slice(0, 10)) + ')' : SOCIAL[en] ? ' (CREG par trimestre)' : '');
@@ -1705,7 +1803,7 @@
       ['E', 'G'].forEach(function(X){ var fin = $('rg' + X + 'e').value; $('rg' + X + 's').value = fin; $('rg' + X + 'e').value = ''; $('rg' + X + 'd').readOnly = false; $('rg' + X + 'd').value = ''; });
       [['rgE1', 'rgE2'], ['rgN1', 'rgN2'], ['rgG1', 'rgG2']].forEach(function(x){ $(x[0]).value = $(x[1]).value; $(x[1]).value = ''; });   // l'index de fin devient l'index de début
       ['rgPE', 'rgPEn', 'rgFE', 'rgPG', 'rgFG'].forEach(function(id){ $(id).value = ''; });
-      $('rgSigE').value = ''; $('rgSigG').value = ''; $('perList').innerHTML = '';
+      $('rgSigE').value = ''; $('rgSigG').value = ''; $('perList').innerHTML = ''; document.querySelectorAll('.ctrRows').forEach(function(b){ b.innerHTML = ''; });
       render(); $('regSet').scrollIntoView({behavior: 'smooth', block: 'start'});
     } else if (e.target.classList.contains('segDel')){ SEGS.splice(+e.target.dataset.i, 1); render(); }
   });
@@ -1723,6 +1821,12 @@
       if (sel.dataset.h !== html){ var v = sel.value; sel.innerHTML = html; sel.dataset.h = html; sel.value = v; if (sel.value !== v) sel.value = ''; }
       row.hidden = !L.length || (en === 'e' ? !showE : !showG);
       if (row.hidden) sel.value = '';
+    });
+    ['e', 'g'].forEach(function(en){   // contrats successifs : remplacent le contrat unique
+      var box = ctrBox(en), n = box.querySelectorAll('.ctr').length;
+      if (n){ $(en === 'e' ? 'rgCtrE' : 'rgCtrG').hidden = true; $(en === 'e' ? 'rgSigERow' : 'rgSigGRow').hidden = true; }
+      box.querySelector('.ctrAdd').textContent = n ? '+ Ajouter un contrat' : '+ Changement de contrat pendant la période';
+      box.querySelector('.ctrHint').textContent = n ? 'dates incluses ; kWh vides = répartis selon les profils Synergrid' : '';
     });
     $('rgPEbi').hidden = $('rgPEn').hidden = !bi();
     $('rgPE').placeholder = bi() ? 'pleines' : 'c€/kWh';
@@ -2066,7 +2170,7 @@
   showZone(/^#(est|prix|reg|akw)$/.test(location.hash) ? location.hash.slice(1) : (function(){ try { return localStorage.getItem('t2rZone'); } catch (e){ return null; } })());
   document.getElementById('f').addEventListener('input', render);
   document.getElementById('f').addEventListener('change', render);
-  document.getElementById('reset').addEventListener('click', function(){ document.getElementById('f').reset(); $('cpHint').textContent = CP_HINT; $('cpTel').hidden = true; hideSug(); resetPrices(); SEGS = []; $('perList').innerHTML = ''; onDebut(); render(); });
+  document.getElementById('reset').addEventListener('click', function(){ document.getElementById('f').reset(); $('cpHint').textContent = CP_HINT; $('cpTel').hidden = true; hideSug(); resetPrices(); SEGS = []; $('perList').innerHTML = ''; document.querySelectorAll('.ctrRows').forEach(function(b){ b.innerHTML = ''; }); onDebut(); render(); });
   document.getElementById('copy').addEventListener('click', function(){
     var btn = this;
     function done(ok){ btn.textContent = ok ? 'Copié ✓' : 'Copie impossible'; setTimeout(function(){ btn.textContent = 'Copier le résultat'; }, 1500); }
