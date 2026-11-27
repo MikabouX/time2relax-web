@@ -280,6 +280,7 @@
       <button type="button" class="zbtn" data-zone="est" role="tab">Estimation</button>
       <button type="button" class="zbtn" data-zone="prix" role="tab">Les détails de prix</button>
       <button type="button" class="zbtn" data-zone="reg" role="tab">La régularisation</button>
+      <button type="button" class="zbtn" data-zone="akw" role="tab">Acompte → kWh</button>
     </div>
   </section>
   <section class="step" data-zone="est" aria-label="Estimation de la consommation">
@@ -618,6 +619,33 @@
         <h3>Régularisation attendue <button type="button" class="zcopy sec" data-z="regul">Copier</button></h3>
         <div class="cost" id="regOut" hidden></div>
         <p class="hint" id="regEmpty">Entrez le code postal, le contrat (ou les prix) et les index de début et de fin pour estimer la facture de régularisation.</p>
+      </div>
+    </div>
+  </section>
+  <section class="step akw" data-zone="akw" aria-label="Acompte vers kWh">
+    <div class="stephead"><span class="num">4</span><div><h2>Acompte → kWh</h2><p>Acompte souhaité par le client et contrat → kWh par an que cet acompte permet de payer</p></div></div>
+    <div class="cols">
+      <div class="card">
+      <fieldset id="akSet">
+        <legend>Acompte et contrat</legend>
+        <div class="row"><span class="clbl">Client</span>
+          <div class="opts"><label><input type="radio" name="akSeg" value="R" checked>Particulier</label><label><input type="radio" name="akSeg" value="P">Professionnel</label></div>
+        </div>
+        <div class="row"><span class="clbl">Énergie</span>
+          <div class="opts"><label><input type="radio" name="akEn" value="both" checked>Électricité + gaz</label><label><input type="radio" name="akEn" value="e">Électricité</label><label><input type="radio" name="akEn" value="g">Gaz</label></div>
+        </div>
+        <div class="row"><span class="clbl">Acompte</span><input type="text" inputmode="decimal" class="px" id="akAm" maxlength="8"> <span id="akAmU">€ / mois TVAC</span></div>
+        <div class="hint" id="akSplit">Électricité + gaz : l'acompte est réparti 50 % électricité, 50 % gaz.</div>
+        <div class="row"><span class="clbl">Contrat</span>
+          <div class="opts"><label><input type="radio" name="akCt" value="Easy fixe" checked>Easy fixe</label><label><input type="radio" name="akCt" value="Easy variable">Easy variable</label><label><input type="radio" name="akCt" value="Flow variable">Flow</label></div>
+        </div>
+        <div class="hint">Gestionnaire de réseau : celui du code postal en haut de la page. Prix du mois en cours, compteur simple, sans panneaux solaires.</div>
+      </fieldset>
+      </div>
+      <div class="card result" aria-live="polite">
+        <h3>kWh couverts par l'acompte <button type="button" class="zcopy sec" data-z="akw">Copier</button></h3>
+        <div class="cost" id="akOut" hidden></div>
+        <p class="hint" id="akEmpty">Entrez le code postal en haut et l'acompte souhaité.</p>
       </div>
     </div>
   </section>
@@ -1805,13 +1833,48 @@
     setTimeout(function(){ var sg = $(en === 'e' ? 'rgSigE' : 'rgSigG'); if (mois && Array.prototype.some.call(sg.options, function(o){ return o.value === mois; })){ sg.value = mois; render(); } }, 0);
   }
   function showZone(z){
-    if (['est', 'prix', 'reg'].indexOf(z) < 0) z = 'est';
+    if (['est', 'prix', 'reg', 'akw'].indexOf(z) < 0) z = 'est';
     document.querySelectorAll('.step[data-zone]').forEach(function(el){ el.hidden = el.dataset.zone !== z; });
     document.querySelectorAll('.zbtn').forEach(function(b){ var on = b.dataset.zone === z; b.classList.toggle('on', on); b.setAttribute('aria-selected', on ? 'true' : 'false'); });
     try { localStorage.setItem('t2rZone', z); } catch (e){}
     if (z === 'prix') framePost();
   }
   document.querySelectorAll('.zbtn').forEach(function(b){ b.addEventListener('click', function(){ showZone(this.dataset.zone); }); });
+  // Outil 4 : acompte souhaité → kWh par an. kWh = (acompte × 12 ÷ (1 + TVA) − frais fixes) ÷ prix du kWh (énergie + verte + réseau + taxes).
+  function akCalc(){
+    var seg = document.querySelector('input[name="akSeg"]:checked').value, en0 = document.querySelector('input[name="akEn"]:checked').value;
+    var ct = document.querySelector('input[name="akCt"]:checked').value, am = pnum($('akAm').value), tva = seg === 'P' ? 0.21 : 0.06;
+    var both = en0 === 'both', out = $('akOut'), html = '', txt = [];
+    $('akSplit').hidden = !both; $('akAmU').textContent = '€ / mois ' + (seg === 'P' ? 'HTVA' : 'TVAC');
+    function row(type, en, cle, reg){ var sg = type === 'reseau' ? '*' : seg; return (T ? T.prix : []).filter(function(p){ return p.segment === sg && p.type === type && p.energie === en && p.cle === cle && p.region === reg; })[0] || null; }
+    function n(r, k){ return r && r[k] !== null && r[k] !== undefined ? +r[k] : null; }
+    var miss = '';
+    if (am === null || am <= 0) miss = 'Entrez l\'acompte souhaité.';
+    else if (!T) miss = 'Prix en cours de chargement…';
+    (both ? ['e', 'g'] : [en0]).forEach(function(en){
+      if (miss) return;
+      var g = grdOf($(en === 'e' ? 'grdE' : 'grdG').value), lbl = en === 'e' ? 'Électricité' : 'Gaz';
+      if (!g){ html += '<div class="line"><span>' + lbl + '</span><span class="hint">code postal en haut à remplir</span></div>'; return; }
+      var reg = g.region, re = row('energie', en, ct, reg), rs = row('reseau', en, g.code, reg), tx = row('taxes', en, reg, reg), vt = null;
+      if (en === 'e'){ vt = re && n(re, 'vert_kwh') !== null ? re : (T.prix.filter(function(p){ return p.type === 'energie' && p.energie === 'e' && p.segment === seg && p.region === reg && n(p, 'vert_kwh') !== null; })[0] || null); }
+      var k = [n(re, 'prix_kwh'), en === 'e' ? n(vt, 'vert_kwh') : 0, n(rs, 'prix_kwh'), n(tx, 'prix_kwh')];
+      if (k.indexOf(null) >= 0){ html += '<div class="line"><span>' + lbl + '</span><span class="hint">prix ' + ct + ' non disponible (' + esc(reg) + ')</span></div>'; return; }
+      var prix = k.reduce(function(a, b){ return a + b; }, 0), fixe = (n(re, 'fixe_an') || 0) + (n(rs, 'fixe_an') || 0) + (n(tx, 'fixe_an') || 0);
+      var a = both ? am / 2 : am, anHT = seg === 'P' ? a * 12 : a * 12 / (1 + tva), kwh = (anHT - fixe) / (prix / 100), df = seg === 'P' ? 1 : 1 + tva, u = seg === 'P' ? 'HTVA' : 'TVAC';
+      html += '<div class="line"' + (html ? ' style="margin-top:12px"' : '') + '><span><b>' + lbl + '</b> : ' + money(a) + ' €/mois × 12</span><span>' + fmt(a * 12) + ' €/an ' + u + '</span></div>';
+      html += '<div class="hint used">' + esc(ct) + ', ' + esc(g.nom) + ' : ' + num2(prix * df) + ' c€/kWh + ' + fmt(fixe * df) + ' €/an de frais fixes ' + u + '</div>';
+      if (kwh <= 0){ html += '<div class="line acompte"><span>' + lbl + '</span><span>ne couvre pas les frais fixes</span></div>'; txt.push(lbl + ' : ' + money(a) + ' €/mois ne couvre pas les frais fixes (' + fmt(fixe * df) + ' €/an)'); return; }
+      html += '<div class="line acompte"><span>' + lbl + ' : kWh par an</span><span>' + fmt(kwh) + ' kWh</span></div><div class="hint">soit environ ' + fmt(kwh / 12) + ' kWh par mois</div>';
+      txt.push(lbl + ' : ' + money(a) + ' €/mois ' + u + ' (' + ct + ', ' + g.nom + ') → ' + fmt(kwh) + ' kWh/an (~' + fmt(kwh / 12) + ' kWh/mois)');
+    });
+    $('akEmpty').textContent = miss || 'Entrez le code postal en haut et l\'acompte souhaité.';
+    $('akEmpty').hidden = !!html; out.hidden = !html; out.innerHTML = html;
+    AKTXT = txt.length ? 'Acompte → kWh' + (both ? ' (50 % électricité, 50 % gaz)' : '') + '\n' + txt.join('\n') : '';
+  }
+  var AKTXT = '';
+  $('akSet').addEventListener('input', function(e){ e.stopPropagation(); akCalc(); });
+  $('akSet').addEventListener('change', function(e){ e.stopPropagation(); akCalc(); });
+  render = (function(o){ return function(){ o.apply(this, arguments); try { akCalc(); } catch (e){} }; })(render);
   // Outil 3 : lire une capture d'écran des paiements (lecture dans le navigateur avec Tesseract.js ; l'image ne quitte pas le PC).
   // Chaque ligne : montant payé (1re colonne) − frais de rappel (2e colonne) = acompte. Les services (Home Assistance…)
   // compris dans les paiements sont retirés : montant × nombre de mensualités.
@@ -1947,6 +2010,7 @@
     function clean(t){ return String(t || '').replace(/\s+/g, ' ').trim(); }
     function lines(el){ return Array.prototype.map.call(el.querySelectorAll('.line'), function(l){ var sp = l.querySelectorAll('span'); return sp.length > 1 ? clean(sp[0].textContent) + ' : ' + clean(sp[sp.length - 1].textContent) : clean(l.textContent); }); }
     var out = [];
+    if (z === 'akw') return AKTXT;
     if (z === 'tva'){ var a = $('tv0').value, b = $('tv6').value, c = $('tv21').value; if (!a && !b && !c) return ''; out.push('HTVA ' + a + ' € · TVAC 6 % ' + b + ' € · TVAC 21 % ' + c + ' €'); }
     if (z === 'conso'){
       out.push('Consommation estimée');
