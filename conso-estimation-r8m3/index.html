@@ -226,6 +226,7 @@
   table.ocrt td:first-child,table.ocrt th:first-child{text-align:center;width:26px}
   table.ocrt input.px{width:72px}
   table.ocrt tr.off td{opacity:.45}
+  .svcdel{border:0;background:none;color:#9a3b2b;font-size:15px;cursor:pointer;padding:2px 6px}
   .svc{margin-top:8px}.svc .row{margin:4px 0}
   .ocrsum{margin-top:8px;padding:8px;background:#eef7f1;border-radius:8px}
   h1 .maj{font-size:11px;font-weight:400;opacity:.65;vertical-align:middle;margin-left:6px}
@@ -1831,7 +1832,7 @@
   function ocrCount(){ return OCR.rows.filter(function(r){ return r.on; }).length; }
   function svcRow(name, amt){
     var d = document.createElement('div'); d.className = 'row svcrow';
-    d.innerHTML = '<input type="text" class="svcn" placeholder="Service" style="width:130px" value="' + esc(name || '') + '"> <input type="text" inputmode="decimal" class="px svca" style="width:60px" value="' + (amt || '') + '"> € × <input type="text" inputmode="numeric" class="px svck" style="width:40px"> fois <span class="svct hint"></span>';
+    d.innerHTML = '<input type="text" class="svcn" placeholder="Service" style="width:130px" value="' + esc(name || '') + '"> <input type="text" inputmode="decimal" class="px svca" style="width:60px" value="' + (amt || '') + '"> € × <input type="text" inputmode="numeric" class="px svck" style="width:40px"> fois <span class="svct hint"></span> <button type="button" class="svcdel" title="Supprimer ce service" aria-label="Supprimer ce service">✕</button>';
     $('svcRows').appendChild(d); d.querySelector('.svck').value = ocrCount() || ''; return d;
   }
   function ocrRender(){
@@ -1853,7 +1854,7 @@
       return '<tr class="' + (r.on ? '' : 'off') + '"><td><input type="checkbox" data-i="' + i + '"' + (r.on ? ' checked' : '') + '></td><td><input type="text" class="px" data-i="' + i + '" data-k="paid" value="' + money(r.paid) + '"></td><td><input type="text" class="px" data-i="' + i + '" data-k="fee" value="' + money(r.fee) + '"></td><td>' + money(r.paid - r.fee) + '</td></tr>';
     }).join('');
     $('ocrRes').hidden = !OCR.rows.length;
-    if (OCR.rows.length && !document.querySelector('.svcrow')) svcRow('Home Assistance', '8,91');
+    if (OCR.rows.length && !OCR.svcInit){ OCR.svcInit = true; svcRow('Home Assistance', '8,91'); }
     ocrRender();
   }
   $('ocrRows').addEventListener('change', function(e){ e.stopPropagation(); var t = e.target, r = OCR.rows[+t.dataset.i]; if (!r) return;
@@ -1861,6 +1862,7 @@
     ocrTable(); });
   $('ocrRows').addEventListener('input', function(e){ e.stopPropagation(); });
   $('svcRows').addEventListener('input', function(e){ e.stopPropagation(); if (e.target.classList.contains('svck')) e.target.dataset.edited = '1'; ocrRender(); });
+  $('svcRows').addEventListener('click', function(e){ var b = e.target.closest('.svcdel'); if (!b) return; b.closest('.svcrow').remove(); ocrRender(); });
   $('svcAdd').addEventListener('click', function(){ svcRow('', '').querySelector('.svcn').focus(); ocrRender(); });
   function loadTess(){
     return window.Tesseract ? Promise.resolve() : new Promise(function(ok, ko){ var sc = document.createElement('script'); sc.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'; sc.onload = ok; sc.onerror = ko; document.head.appendChild(sc); });
