@@ -98,6 +98,15 @@
   .tot .unit{font-size:13px;font-weight:500;color:var(--muted)}
   .totals.one{grid-template-columns:1fr}
   .tot.e{border-top:4px solid var(--elec)} .tot.g{border-top:4px solid var(--gas)}
+  /* Code couleur ENGIE : fond bleu pâle pour l'électricité, jaune pâle pour le gaz */
+  :root{--elec-bg:#eef4fd;--elec-bd:#c9dbf3;--gas-bg:#fdf8e4;--gas-bd:#efe2a8}
+  .tot.e,#blkE,#regSet div#regE{background:var(--elec-bg);border-color:var(--elec-bd)}
+  .tot.g,#blkG,#regSet #regG{background:var(--gas-bg);border-color:var(--gas-bd)}
+  #regSet div#regE,#regSet #regG{border:1px solid;border-radius:10px;padding:8px 12px}
+  .ecols-eg td:nth-child(2),.ecols-eg th:nth-child(2),.ecols-e td:nth-child(2),.ecols-e th:nth-child(2){background:var(--elec-bg)}
+  .ecols-eg td:nth-child(3),.ecols-eg th:nth-child(3),.ecols-g td:nth-child(2),.ecols-g th:nth-child(2){background:var(--gas-bg)}
+  .cost .le{background:var(--elec-bg);margin:0 -8px;padding-left:8px;padding-right:8px}
+  .cost .lg{background:var(--gas-bg);margin:0 -8px;padding-left:8px;padding-right:8px}
   .solar{background:var(--accent-soft);border-radius:10px;padding:10px 12px;margin-bottom:14px;font-size:14px}
   .solar[hidden]{display:none}
   .solar b{font-variant-numeric:tabular-nums}
@@ -1309,6 +1318,7 @@
 
     var anyKn = knE !== null || knG !== null, dE = showE && knE !== null, dG = showG && knG !== null;
     function dim(html, on){ return on ? html.replace('<td class="n', '<td class="dim n') : html; }
+    document.getElementById('head').parentNode.className = 'ecols-' + (showE ? 'e' : '') + (showG ? 'g' : '');
     document.getElementById('head').innerHTML = '<tr><th>Détail</th>' + (showE ? '<th class="n">Électricité</th>' : '') + (showG ? '<th class="n">Gaz</th>' : '') + '</tr>';
     var lines = r.lines.filter(function(l, k){ return k === 0 || (showE && l.e) || (showG && l.g); });
     var rows = '';
@@ -1915,13 +1925,23 @@
       txt.push(lbl + ' : ' + money(a) + ' €/mois ' + u + ' (' + ct + ', ' + g.nom + ') → ' + fmt(kwh) + ' kWh/an' + m3 + ' (~' + fmt(kwh / 12) + ' kWh/mois)');
     });
     $('akEmpty').textContent = miss || 'Entrez le code postal en haut et l\'acompte souhaité.';
-    $('akEmpty').hidden = !!html; out.hidden = !html; out.innerHTML = html;
+    $('akEmpty').hidden = !!html; out.hidden = !html; out.innerHTML = html; colorLines('akOut');
     AKTXT = (txt.length ? 'Acompte → kWh' + (both ? ' (50 % électricité, 50 % gaz)' : '') + '\n' + txt.join('\n') : '') + (recTxt ? (txt.length ? '\n' : '') + recTxt : '');
   }
   var AKTXT = '';
   $('akSet').addEventListener('input', function(e){ e.stopPropagation(); akCalc(); });
   $('akSet').addEventListener('change', function(e){ e.stopPropagation(); akCalc(); });
-  render = (function(o){ return function(){ o.apply(this, arguments); try { akCalc(); } catch (e){} }; })(render);
+  // Lignes de résultat : fond selon l'énergie (« électricité » / « gaz » dans le libellé ; les notes suivent leur ligne).
+  function colorLines(id){
+    var el = $(id), cur = ''; if (!el) return;
+    Array.prototype.forEach.call(el.children, function(c){
+      c.classList.remove('le', 'lg');
+      if (c.classList.contains('line')){ var t = ((c.querySelector('span') || c).textContent || '').toLowerCase(); cur = /électricité|elec/.test(t) ? 'le' : /\bgaz\b/.test(t) ? 'lg' : ''; }
+      else if (!c.classList.contains('hint')) cur = '';
+      if (cur) c.classList.add(cur);
+    });
+  }
+  render = (function(o){ return function(){ o.apply(this, arguments); try { akCalc(); } catch (e){} try { ['cost', 'regOut', 'akOut', 'akRecOut'].forEach(colorLines); } catch (e){} }; })(render);
   // Outil 3 : lire une capture d'écran des paiements (lecture dans le navigateur avec Tesseract.js ; l'image ne quitte pas le PC).
   // Chaque ligne : montant payé (1re colonne) − frais de rappel (2e colonne) = acompte. Les services (Home Assistance…)
   // compris dans les paiements sont retirés : montant × nombre de mensualités.
