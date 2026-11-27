@@ -83,7 +83,7 @@ async function main() {
       eq(await page.locator('.welcome .swatch').count(), 0, 'bienvenue : pas de choix de couleur');
       eq(await page.locator('.welcome').getByRole('button', { name: 'Nederlands' }).count(), 1, 'bienvenue : choix de la langue');
       eq(await page.locator('.welcome .feature-list li').count(), 5, "bienvenue : les fonctions de l'application");
-      eq(await page.locator(`.welcome a[href="${'https://play.google.com/apps/testing/com.mikaboux.time2relax'}"]`).count(), 2, 'bienvenue : Android sur Google Play (bandeau et bas de page)');
+      eq(await page.locator(`.welcome a[href="${'https://play.google.com/store/apps/details?id=com.mikaboux.time2relax'}"]`).count(), 2, 'bienvenue : Android sur Google Play (bandeau et bas de page)');
       eq(await page.locator('.welcome a[href="https://apps.apple.com/app/id6829148802"]').count(), 2, 'bienvenue : iPhone App Store (bandeau et bas de page)');
       check((await text(page, '.test-banner')).includes('App Store'), 'bandeau : iPhone sur l’App Store');
       eq(await page.locator('.welcome a[href="https://bardiaux.wordpress.com/"]').count(), 1, 'bienvenue : lien vers la page explicative');

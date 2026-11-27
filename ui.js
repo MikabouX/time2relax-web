@@ -300,7 +300,7 @@ function homeView() {
     settingsSection());
 }
 
-/** Bandeau en haut de page : l'appli Android est en test fermé, il faut demander l'accès. */
+/** Bandeau en haut de page : liens vers Google Play et l'App Store. */
 const TESTER_MAIL = 'mb.technogeek@atomicmail.io';
 const testBanner = () => h('div', { class: 'test-banner', role: 'note' },
   h('div', { class: 'test-banner-title' }, icon('phone_android', 22), t('apps_banner_title')),
@@ -308,11 +308,7 @@ const testBanner = () => h('div', { class: 'test-banner', role: 'note' },
     h('div', { class: 'test-banner-col' },
       h('div', { class: 'test-banner-sub' }, 'Android'),
       h('p', {}, t('android_test_note')),
-      h('a', {
-        class: 'btn test-banner-btn',
-        href: `mailto:${TESTER_MAIL}?subject=${encodeURIComponent('Time2Relax : accès testeur Android')}`,
-      }, icon('mail', 18), t('android_banner_btn')),
-      h('a', { class: 'btn tonal test-banner-store', href: safeUrl(ANDROID_URL), target: '_blank', rel: 'noopener noreferrer' },
+      h('a', { class: 'btn test-banner-btn', href: safeUrl(ANDROID_URL), target: '_blank', rel: 'noopener noreferrer' },
         icon('phone_android', 18), t('android_store_btn'))),
     h('div', { class: 'test-banner-col' },
       h('div', { class: 'test-banner-sub' }, 'iPhone'),
