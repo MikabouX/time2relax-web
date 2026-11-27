@@ -82,6 +82,9 @@
   .cost .line{display:flex;justify-content:space-between;gap:10px;padding:3px 0}
   .cost .line span:last-child{font-variant-numeric:tabular-nums;white-space:nowrap}
   .cost .acompte{border-top:1px solid var(--line);margin-top:6px;padding-top:8px;font-weight:700;font-size:17px}
+  .akrec{font-size:12px;color:var(--muted);font-weight:600}
+  .akcts label:has(input:checked) .akrec{color:var(--accent)}
+  #akRecOut{margin-bottom:14px}
   .cost .hint{margin-top:4px}
   .cost .used{margin:0 0 8px;padding-left:8px;border-left:2px solid var(--line)}
   .check{display:inline-flex;align-items:center;gap:6px;font-size:14px;cursor:pointer}
@@ -637,12 +640,15 @@
         <div class="row"><span class="clbl">Acompte</span><input type="text" inputmode="decimal" class="px" id="akAm" maxlength="8"> <span id="akAmU">€ / mois TVAC</span></div>
         <div class="hint" id="akSplit">Électricité + gaz : l'acompte est réparti 50 % électricité, 50 % gaz.</div>
         <div class="row"><span class="clbl">Contrat</span>
-          <div class="opts"><label><input type="radio" name="akCt" value="Easy fixe" checked>Easy fixe</label><label><input type="radio" name="akCt" value="Easy variable">Easy variable</label><label><input type="radio" name="akCt" value="Flow variable">Flow</label></div>
+          <div class="opts akcts"><label><input type="radio" name="akCt" value="Easy fixe" checked>Easy fixe <span class="akrec"></span></label><label><input type="radio" name="akCt" value="Easy variable">Easy variable <span class="akrec"></span></label><label><input type="radio" name="akCt" value="Flow variable">Flow <span class="akrec"></span></label><label><input type="radio" name="akCt" value="Basic Online variable">Basic <span class="akrec"></span></label></div>
+        </div>
+        <div class="hint" id="akRecHint">Acompte minimum recommandé : pour la consommation de la barre du haut (connue ou estimée).
         </div>
         <div class="hint">Gestionnaire de réseau : celui du code postal en haut de la page. Prix du mois en cours, compteur simple, sans panneaux solaires.</div>
       </fieldset>
       </div>
       <div class="card result" aria-live="polite">
+        <div class="cost" id="akRecOut" hidden></div>
         <h3>kWh couverts par l'acompte <button type="button" class="zcopy sec" data-z="akw">Copier</button></h3>
         <div class="cost" id="akOut" hidden></div>
         <p class="hint" id="akEmpty">Entrez le code postal en haut et l'acompte souhaité.</p>
@@ -1848,6 +1854,40 @@
     $('akSplit').hidden = !both; $('akAmU').textContent = '€ / mois ' + (seg === 'P' ? 'HTVA' : 'TVAC');
     function row(type, en, cle, reg){ var sg = type === 'reseau' ? '*' : seg; return (T ? T.prix : []).filter(function(p){ return p.segment === sg && p.type === type && p.energie === en && p.cle === cle && p.region === reg; })[0] || null; }
     function n(r, k){ return r && r[k] !== null && r[k] !== undefined ? +r[k] : null; }
+    // Prix HTVA d'un contrat : c€/kWh (énergie + verte + réseau + taxes) et frais fixes €/an.
+    function pr(en, c, g){
+      var reg = g.region, re = row('energie', en, c, reg), rs = row('reseau', en, g.code, reg), tx = row('taxes', en, reg, reg), vt = null;
+      if (en === 'e'){ vt = re && n(re, 'vert_kwh') !== null ? re : (T.prix.filter(function(p){ return p.type === 'energie' && p.energie === 'e' && p.segment === seg && p.region === reg && n(p, 'vert_kwh') !== null; })[0] || null); }
+      var k = [n(re, 'prix_kwh'), en === 'e' ? n(vt, 'vert_kwh') : 0, n(rs, 'prix_kwh'), n(tx, 'prix_kwh')];
+      if (k.indexOf(null) >= 0) return null;
+      return {prix: k.reduce(function(a, b){ return a + b; }, 0), fixe: (n(re, 'fixe_an') || 0) + (n(rs, 'fixe_an') || 0) + (n(tx, 'fixe_an') || 0)};
+    }
+    // Acompte minimum recommandé de chaque contrat, pour la consommation de la barre du haut (arrondi à l'euro supérieur).
+    var dfR = seg === 'P' ? 1 : 1 + tva, uR = seg === 'P' ? 'HTVA' : 'TVAC', recTxt = '', recHtml = '';
+    function rec(c){
+      if (!T) return null;
+      var tot = 0, parts = [];
+      for (var i = 0, ens = both ? ['e', 'g'] : [en0]; i < ens.length; i++){
+        var en = ens[i], g = grdOf($(en === 'e' ? 'grdE' : 'grdG').value), kwh = HUB[en];
+        if (!g || kwh === null || kwh === undefined) return null;
+        var q = pr(en, c, g); if (!q) return null;
+        var m = Math.ceil((kwh * q.prix / 100 + q.fixe) * dfR / 12); tot += m; parts.push({en: en, m: m, kwh: kwh});
+      }
+      return {tot: tot, parts: parts};
+    }
+    document.querySelectorAll('input[name="akCt"]').forEach(function(r){
+      var o = rec(r.value), sp = r.parentNode.querySelector('.akrec');
+      sp.textContent = o ? '· ' + fmt(o.tot) + ' €' : '· –';
+      sp.title = o ? 'Acompte minimum recommandé ' + uR : 'Prix non disponible pour ce code postal';
+    });
+    var R0 = rec(ct);
+    if (R0){
+      recHtml = '<div class="line acompte"><span>Acompte minimum recommandé (' + esc(ct) + ')</span><span>' + fmt(R0.tot) + ' €/mois ' + uR + '</span></div>' +
+        '<div class="hint">' + R0.parts.map(function(x){ return (x.en === 'e' ? 'électricité ' : 'gaz ') + fmt(x.m) + ' € pour ' + fmt(x.kwh) + ' kWh/an'; }).join(' + ') + '</div>' +
+        (am !== null && am > 0 && am < R0.tot ? '<div class="hint" style="color:#9a3b2b;font-weight:600">L\'acompte souhaité (' + money(am) + ' €) est sous le minimum recommandé : risque de régularisation à payer.</div>' : '');
+      recTxt = 'Acompte minimum recommandé (' + ct + ') : ' + fmt(R0.tot) + ' €/mois ' + uR + ' (' + R0.parts.map(function(x){ return (x.en === 'e' ? 'électricité ' : 'gaz ') + fmt(x.m) + ' € pour ' + fmt(x.kwh) + ' kWh'; }).join(' + ') + ')';
+    }
+    $('akRecOut').innerHTML = recHtml; $('akRecOut').hidden = !recHtml;
     var miss = '';
     if (am === null || am <= 0) miss = 'Entrez l\'acompte souhaité.';
     else if (!T) miss = 'Prix en cours de chargement…';
@@ -1855,21 +1895,20 @@
       if (miss) return;
       var g = grdOf($(en === 'e' ? 'grdE' : 'grdG').value), lbl = en === 'e' ? 'Électricité' : 'Gaz';
       if (!g){ html += '<div class="line"><span>' + lbl + '</span><span class="hint">code postal en haut à remplir</span></div>'; return; }
-      var reg = g.region, re = row('energie', en, ct, reg), rs = row('reseau', en, g.code, reg), tx = row('taxes', en, reg, reg), vt = null;
-      if (en === 'e'){ vt = re && n(re, 'vert_kwh') !== null ? re : (T.prix.filter(function(p){ return p.type === 'energie' && p.energie === 'e' && p.segment === seg && p.region === reg && n(p, 'vert_kwh') !== null; })[0] || null); }
-      var k = [n(re, 'prix_kwh'), en === 'e' ? n(vt, 'vert_kwh') : 0, n(rs, 'prix_kwh'), n(tx, 'prix_kwh')];
-      if (k.indexOf(null) >= 0){ html += '<div class="line"><span>' + lbl + '</span><span class="hint">prix ' + ct + ' non disponible (' + esc(reg) + ')</span></div>'; return; }
-      var prix = k.reduce(function(a, b){ return a + b; }, 0), fixe = (n(re, 'fixe_an') || 0) + (n(rs, 'fixe_an') || 0) + (n(tx, 'fixe_an') || 0);
+      var reg = g.region, q = pr(en, ct, g);
+      if (!q){ html += '<div class="line"><span>' + lbl + '</span><span class="hint">prix ' + ct + ' non disponible (' + esc(reg) + ')</span></div>'; return; }
+      var prix = q.prix, fixe = q.fixe;
       var a = both ? am / 2 : am, anHT = seg === 'P' ? a * 12 : a * 12 / (1 + tva), kwh = (anHT - fixe) / (prix / 100), df = seg === 'P' ? 1 : 1 + tva, u = seg === 'P' ? 'HTVA' : 'TVAC';
       html += '<div class="line"' + (html ? ' style="margin-top:12px"' : '') + '><span><b>' + lbl + '</b> : ' + money(a) + ' €/mois × 12</span><span>' + fmt(a * 12) + ' €/an ' + u + '</span></div>';
       html += '<div class="hint used">' + esc(ct) + ', ' + esc(g.nom) + ' : ' + num2(prix * df) + ' c€/kWh + ' + fmt(fixe * df) + ' €/an de frais fixes ' + u + '</div>';
       if (kwh <= 0){ html += '<div class="line acompte"><span>' + lbl + '</span><span>ne couvre pas les frais fixes</span></div>'; txt.push(lbl + ' : ' + money(a) + ' €/mois ne couvre pas les frais fixes (' + fmt(fixe * df) + ' €/an)'); return; }
-      html += '<div class="line acompte"><span>' + lbl + ' : kWh par an</span><span>' + fmt(kwh) + ' kWh</span></div><div class="hint">soit environ ' + fmt(kwh / 12) + ' kWh par mois</div>';
-      txt.push(lbl + ' : ' + money(a) + ' €/mois ' + u + ' (' + ct + ', ' + g.nom + ') → ' + fmt(kwh) + ' kWh/an (~' + fmt(kwh / 12) + ' kWh/mois)');
+      var f3 = pnum($('rgGf').value) || 11.6, m3 = en === 'g' ? ' ≈ ' + fmt(kwh / f3) + ' m³' : '';
+      html += '<div class="line acompte"><span>' + lbl + ' : kWh par an</span><span>' + fmt(kwh) + ' kWh' + m3 + '</span></div><div class="hint">soit environ ' + fmt(kwh / 12) + ' kWh par mois' + (en === 'g' ? ' (' + fmt(kwh / 12 / f3) + ' m³) · ' + String(f3).replace('.', ',') + ' kWh par m³' : '') + '</div>';
+      txt.push(lbl + ' : ' + money(a) + ' €/mois ' + u + ' (' + ct + ', ' + g.nom + ') → ' + fmt(kwh) + ' kWh/an' + m3 + ' (~' + fmt(kwh / 12) + ' kWh/mois)');
     });
     $('akEmpty').textContent = miss || 'Entrez le code postal en haut et l\'acompte souhaité.';
     $('akEmpty').hidden = !!html; out.hidden = !html; out.innerHTML = html;
-    AKTXT = txt.length ? 'Acompte → kWh' + (both ? ' (50 % électricité, 50 % gaz)' : '') + '\n' + txt.join('\n') : '';
+    AKTXT = (txt.length ? 'Acompte → kWh' + (both ? ' (50 % électricité, 50 % gaz)' : '') + '\n' + txt.join('\n') : '') + (recTxt ? (txt.length ? '\n' : '') + recTxt : '');
   }
   var AKTXT = '';
   $('akSet').addEventListener('input', function(e){ e.stopPropagation(); akCalc(); });
@@ -1995,7 +2034,7 @@
   // Heure de mise à jour du site (date de la page publiée).
   (function(){ var d = new Date(document.lastModified); if (isNaN(d)) return;
     $('maj').textContent = 'mis à jour le ' + d.toLocaleDateString('fr-BE', {day: 'numeric', month: 'short'}) + ' à ' + d.toLocaleTimeString('fr-BE', {hour: '2-digit', minute: '2-digit'}); })();
-  showZone(/^#(est|prix|reg)$/.test(location.hash) ? location.hash.slice(1) : (function(){ try { return localStorage.getItem('t2rZone'); } catch (e){ return null; } })());
+  showZone(/^#(est|prix|reg|akw)$/.test(location.hash) ? location.hash.slice(1) : (function(){ try { return localStorage.getItem('t2rZone'); } catch (e){ return null; } })());
   document.getElementById('f').addEventListener('input', render);
   document.getElementById('f').addEventListener('change', render);
   document.getElementById('reset').addEventListener('click', function(){ document.getElementById('f').reset(); $('cpHint').textContent = CP_HINT; $('cpTel').hidden = true; hideSug(); resetPrices(); SEGS = []; $('perList').innerHTML = ''; onDebut(); render(); });
