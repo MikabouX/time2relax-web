@@ -218,6 +218,16 @@
   tr.known-row td:last-child{border-right:2px solid #1e6b3a}
   tr.known-row small{font-weight:400;opacity:.7}
   tr.sep-row td{font-size:11.5px;color:#7d8682;padding-top:12px;border-bottom:0}
+  .ocrdrop{border:2px dashed #9fbfaa;border-radius:10px;padding:14px;text-align:center;color:var(--muted);margin:8px 0;cursor:pointer}
+  .ocrdrop.over,.ocrdrop:focus{border-color:#1e6b3a;background:#eef7f1;outline:0}
+  .ocrpick{color:#1e6b3a;text-decoration:underline;cursor:pointer}
+  table.ocrt{width:100%;font-size:13px}
+  table.ocrt td,table.ocrt th{padding:2px 4px;text-align:right}
+  table.ocrt td:first-child,table.ocrt th:first-child{text-align:center;width:26px}
+  table.ocrt input.px{width:72px}
+  table.ocrt tr.off td{opacity:.45}
+  .svc{margin-top:8px}.svc .row{margin:4px 0}
+  .ocrsum{margin-top:8px;padding:8px;background:#eef7f1;border-radius:8px}
   h1 .maj{font-size:11px;font-weight:400;opacity:.65;vertical-align:middle;margin-left:6px}
 </style>
 </head>
@@ -587,6 +597,20 @@
           <div id="perList" hidden></div>
         </div>
         <div class="row" style="margin-top:10px"><span class="clbl">Acomptes versés</span><input type="text" inputmode="decimal" class="px" id="rgAc" style="width:90px"> <span>€ TVAC au total sur la période</span></div>
+        <details class="explain ocr" id="ocrBox">
+          <summary>Calculer les acomptes depuis une capture d'écran des paiements</summary>
+          <div class="ocrdrop" id="ocrDrop" tabindex="0">Collez ici la capture (<b>Ctrl+V</b>) ou glissez l'image<br><small>Sélectionnez les lignes des acomptes avec leurs frais (Win+Maj+S), ou <label class="ocrpick">choisissez une image<input type="file" accept="image/*" id="ocrFile" hidden></label></small></div>
+          <p class="hint" id="ocrStatus"></p>
+          <div id="ocrRes" hidden>
+            <table class="ocrt"><thead><tr><th></th><th>Payé</th><th>Frais de rappel</th><th>Acompte</th></tr></thead><tbody id="ocrRows"></tbody></table>
+            <p class="hint">Vérifiez les montants lus (corrigeables). Les lignes très différentes des autres (régularisation, remboursement) sont décochées.</p>
+            <div class="svc"><b>Services compris dans les paiements</b> <span class="hint">(à retirer : Home Assistance, Home Maintenance…)</span>
+              <div id="svcRows"></div>
+              <button type="button" class="sec" id="svcAdd">+ Ajouter un service</button>
+            </div>
+            <div class="ocrsum" id="ocrSum"></div>
+          </div>
+        </details>
       </fieldset>
       </div>
       <div class="card result" aria-live="polite">
@@ -1787,6 +1811,90 @@
     if (z === 'prix') framePost();
   }
   document.querySelectorAll('.zbtn').forEach(function(b){ b.addEventListener('click', function(){ showZone(this.dataset.zone); }); });
+  // Outil 3 : lire une capture d'écran des paiements (lecture dans le navigateur avec Tesseract.js ; l'image ne quitte pas le PC).
+  // Chaque ligne : montant payé (1re colonne) − frais de rappel (2e colonne) = acompte. Les services (Home Assistance…)
+  // compris dans les paiements sont retirés : montant × nombre de mensualités.
+  var OCR = {rows: [], worker: null};
+  function money(x){ return (Math.round(x * 100) / 100).toLocaleString('fr-BE', {minimumFractionDigits: 2, maximumFractionDigits: 2}); }
+  function parseOcr(text){
+    var out = [];
+    text.split(/\n/).forEach(function(l){
+      var m = l.replace(/[£©]/g, '€').match(/-?\d{1,3}(?:[ . ]\d{3})*[,.]\d{2}/g);
+      if (!m) return;
+      var n = m.map(function(x){ return parseFloat(x.replace(/[ . ](?=\d{3})/g, '').replace(',', '.')); });
+      out.push({paid: n[0], fee: n.length > 1 ? n[1] : 0, on: true});
+    });
+    var v = out.map(function(r){ return r.paid; }).slice().sort(function(a, b){ return a - b; }), med = v.length ? v[Math.floor(v.length / 2)] : 0;
+    out.forEach(function(r){ if (r.paid <= 0 || (med && Math.abs(r.paid - r.fee - med) > med * 0.3)) r.on = false; });
+    return out;
+  }
+  function ocrCount(){ return OCR.rows.filter(function(r){ return r.on; }).length; }
+  function svcRow(name, amt){
+    var d = document.createElement('div'); d.className = 'row svcrow';
+    d.innerHTML = '<input type="text" class="svcn" placeholder="Service" style="width:130px" value="' + esc(name || '') + '"> <input type="text" inputmode="decimal" class="px svca" style="width:60px" value="' + (amt || '') + '"> € × <input type="text" inputmode="numeric" class="px svck" style="width:40px"> fois <span class="svct hint"></span>';
+    $('svcRows').appendChild(d); d.querySelector('.svck').value = ocrCount() || ''; return d;
+  }
+  function ocrRender(){
+    var n = ocrCount(), sum = 0, fees = 0, svc = 0, txt = [];
+    OCR.rows.forEach(function(r){ if (r.on){ sum += r.paid - r.fee; fees += r.fee; } });
+    [].forEach.call(document.querySelectorAll('.svcrow'), function(d){
+      var k = d.querySelector('.svck'); if (!k.dataset.edited) k.value = n || '';
+      var a = pnum(d.querySelector('.svca').value), c = pnum(k.value), t = a !== null && c !== null ? a * c : 0;
+      d.querySelector('.svct').textContent = t ? '= ' + money(t) + ' €' : ''; svc += t;
+      if (t) txt.push((d.querySelector('.svcn').value || 'service') + ' ' + money(a) + ' € × ' + c);
+    });
+    var tot = sum - svc;
+    $('ocrSum').innerHTML = n + ' paiement' + (n > 1 ? 's' : '') + ' : ' + money(sum + fees) + ' € − frais de rappel ' + money(fees) + ' €' + (svc ? ' − services ' + money(svc) + ' €' : '') +
+      '<br><b>Acomptes énergie : ' + money(tot) + ' €</b> <span class="hint">(repris dans « Acomptes versés »)</span>';
+    if (n){ $('rgAc').value = money(tot).replace(/\s| /g, ''); $('rgAc').dispatchEvent(new Event('input', {bubbles: true})); }
+  }
+  function ocrTable(){
+    $('ocrRows').innerHTML = OCR.rows.map(function(r, i){
+      return '<tr class="' + (r.on ? '' : 'off') + '"><td><input type="checkbox" data-i="' + i + '"' + (r.on ? ' checked' : '') + '></td><td><input type="text" class="px" data-i="' + i + '" data-k="paid" value="' + money(r.paid) + '"></td><td><input type="text" class="px" data-i="' + i + '" data-k="fee" value="' + money(r.fee) + '"></td><td>' + money(r.paid - r.fee) + '</td></tr>';
+    }).join('');
+    $('ocrRes').hidden = !OCR.rows.length;
+    if (OCR.rows.length && !document.querySelector('.svcrow')) svcRow('Home Assistance', '8,91');
+    ocrRender();
+  }
+  $('ocrRows').addEventListener('change', function(e){ e.stopPropagation(); var t = e.target, r = OCR.rows[+t.dataset.i]; if (!r) return;
+    if (t.type === 'checkbox') r.on = t.checked; else { var v = pnum(t.value); if (v !== null) r[t.dataset.k] = v; }
+    ocrTable(); });
+  $('ocrRows').addEventListener('input', function(e){ e.stopPropagation(); });
+  $('svcRows').addEventListener('input', function(e){ e.stopPropagation(); if (e.target.classList.contains('svck')) e.target.dataset.edited = '1'; ocrRender(); });
+  $('svcAdd').addEventListener('click', function(){ svcRow('', '').querySelector('.svcn').focus(); ocrRender(); });
+  function loadTess(){
+    return window.Tesseract ? Promise.resolve() : new Promise(function(ok, ko){ var sc = document.createElement('script'); sc.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'; sc.onload = ok; sc.onerror = ko; document.head.appendChild(sc); });
+  }
+  function ocrImage(file){
+    if (!file || !/^image\//.test(file.type)) return;
+    $('ocrBox').open = true; $('ocrStatus').textContent = 'Lecture de la capture… (la première fois, quelques secondes pour charger le lecteur)';
+    var img = new Image(), url = URL.createObjectURL(file);
+    img.onload = function(){
+      // Agrandie ×3 en gris : la lecture des chiffres est bien plus fiable.
+      var k = img.width < 900 ? 3 : 2, c = document.createElement('canvas'); c.width = img.width * k; c.height = img.height * k;
+      var g = c.getContext('2d'); g.filter = 'grayscale(1) contrast(1.4)'; g.imageSmoothingQuality = 'high'; g.drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url);
+      loadTess().then(function(){ return OCR.worker || Tesseract.createWorker('eng').then(function(w){ OCR.worker = w; return w.setParameters({tessedit_pageseg_mode: '6'}).then(function(){ return w; }); }); })
+        .then(function(w){ return w.recognize(c); })
+        .then(function(res){
+          OCR.rows = parseOcr(res.data.text);
+          $('ocrStatus').textContent = OCR.rows.length ? OCR.rows.length + ' ligne' + (OCR.rows.length > 1 ? 's' : '') + ' lue' + (OCR.rows.length > 1 ? 's' : '') + '.' : 'Aucun montant trouvé : faites une capture d\'écran nette (pas une photo) des colonnes des montants.';
+          ocrTable();
+        })
+        .catch(function(){ $('ocrStatus').textContent = 'Lecture impossible (connexion au lecteur ?). Tapez le total à la main.'; });
+    };
+    img.src = url;
+  }
+  var drop = $('ocrDrop');
+  drop.addEventListener('dragover', function(e){ e.preventDefault(); drop.classList.add('over'); });
+  drop.addEventListener('dragleave', function(){ drop.classList.remove('over'); });
+  drop.addEventListener('drop', function(e){ e.preventDefault(); drop.classList.remove('over'); ocrImage(e.dataTransfer.files[0]); });
+  drop.addEventListener('click', function(e){ if (e.target.tagName !== 'INPUT') $('ocrFile').click(); });
+  $('ocrFile').addEventListener('change', function(e){ e.stopPropagation(); ocrImage(this.files[0]); this.value = ''; });
+  document.addEventListener('paste', function(e){
+    var it = [].filter.call((e.clipboardData || {}).items || [], function(x){ return /^image\//.test(x.type); })[0];
+    if (!it || document.querySelector('section.step.regul').hidden) return;
+    e.preventDefault(); ocrImage(it.getAsFile());
+  });
   // Outil 3 : consommation entre les index (fin − début), à côté des index.
   function idxTotals(){
     function diff(a, b){ var x = pnum($(a).value), y = pnum($(b).value); return x === null || y === null ? null : y - x; }
