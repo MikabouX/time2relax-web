@@ -9,11 +9,12 @@
 <link rel="apple-touch-icon" href="../icon-180.png">
 <title>Concurrence – fournisseurs d'énergie par région</title>
 <style>
-  :root{--bg:#f5f6f4;--card:#fff;--ink:#1d2a24;--muted:#5d6b64;--line:#dde3df;--accent:#1f7a5a;--accent-soft:#e3f2ec;
-    --elec:#2e6fb7;--gas:#d4a106;--elec-bg:#eef4fd;--elec-bd:#c9dbf3;--gas-bg:#fdf8e4;--gas-bd:#efe2a8}
+  :root{--bg:#f5f6f4;--card:#fff;--ink:#1d2a24;--muted:#5d6b64;--line:#dde3df;--accent:#0071b5;--accent-soft:#e5f2fa;
+    --elec:#f6852b;--gas:#009fe3;--elec-bg:#fef3ea;--elec-bd:#f9cfae;--gas-bg:#e6f5fc;--gas-bd:#a9dcf3}
   *{box-sizing:border-box}
   body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink);font-size:15px;line-height:1.45}
-  header{background:var(--accent);color:#fff;padding:16px 20px}
+  header{position:relative;background:linear-gradient(105deg,#00609e 0%,#0080b8 55%,#1f8a80 100%);color:#fff;padding:16px 20px 20px}
+  header::after{content:"";position:absolute;left:0;right:0;bottom:0;height:5px;background:linear-gradient(90deg,var(--elec) 0%,#ffb27a 42%,#62c6ee 58%,var(--gas) 100%)}
   header h1{margin:0;font-size:20px;font-weight:650;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
   header p{margin:4px 0 0;opacity:.9;font-size:13px}
   header a{color:#fff}
@@ -31,8 +32,8 @@
   th{font-size:12px;color:var(--muted);font-weight:600}
   td.num,th.num{text-align:right;white-space:nowrap}
   .tag{display:inline-block;border-radius:6px;padding:1px 7px;font-size:12px;margin:0 3px 2px 0;border:1px solid}
-  .tag.e{background:var(--elec-bg);border-color:var(--elec-bd);color:#1d4f87}
-  .tag.g{background:var(--gas-bg);border-color:var(--gas-bd);color:#7a5c00}
+  .tag.e{background:var(--elec-bg);border-color:var(--elec-bd);color:#a14d0c}
+  .tag.g{background:var(--gas-bg);border-color:var(--gas-bd);color:#00648f}
   .tag.u{background:#f1f1f1;border-color:#ddd;color:#666}
   tr.engie td:first-child{font-weight:650}
   tr.off td{color:var(--muted)}
