@@ -10,28 +10,31 @@
 <title>Simulateur énergie</title>
 <style>
   :root{
-    --bg:#f5f6f4; --card:#ffffff; --ink:#1d2a24; --muted:#5d6b64; --line:#dde3df;
-    --accent:#1f7a5a; --accent-soft:#e3f2ec; --elec:#2e6fb7; --gas:#d4a106; --warn:#fff6dc; --warn-line:#e6c766;
+    /* Couleurs des cartes tarifaires ENGIE : orange pour l'électricité, bleu pour le gaz ; bleu nuit pour le reste */
+    --bg:#f6f7fa; --card:#ffffff; --ink:#1a2433; --muted:#5b6678; --line:#dfe4ec;
+    --accent:#17487a; --accent-soft:#e7eef7; --elec:#f08a00; --gas:#1a96d4; --warn:#fff6dc; --warn-line:#e6c766;
+    --edit:#7a4cc2; --edit-bg:#f4effc;
   }
   *{box-sizing:border-box}
   body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink);font-size:15px;line-height:1.45}
-  header{background:var(--accent);color:#fff;padding:18px 20px}
+  header{position:relative;background:linear-gradient(115deg,#123a63 0%,#17487a 55%,#1d5f98 100%);color:#fff;padding:18px 20px 22px}
+  header::after{content:"";position:absolute;left:0;right:0;bottom:0;height:5px;background:linear-gradient(90deg,var(--elec) 0%,#ffb03b 42%,#5cc0ec 58%,var(--gas) 100%)}
   header h1{margin:0;font-size:20px;font-weight:650}
   header p{margin:4px 0 0;opacity:.9;font-size:13px}
   main{max-width:1240px;margin:0 auto;padding:18px 16px 40px;display:grid;gap:18px;min-width:0}
   main > *, .steps > *, .cols > *{min-width:0}
   .steps{display:grid;gap:22px}
-  .step{border-radius:14px;padding:14px;background:#eaf3ee;border:1px solid #cfe3d7}
-  .step.prix{background:#eaf0f8;border-color:#cad8ea}
-  .step.regul{background:#f6f1e7;border-color:#e3d6bd}
-  .step.regul .stephead .num{background:#9a6b1f}
+  .step{border-radius:14px;padding:14px;background:#eef2f8;border:1px solid #d8e0ec}
+  .step.prix{background:linear-gradient(135deg,#fff5e8 0%,#f7f4f2 50%,#eaf6fc 100%);border-color:#e6dfd8}
+  .step.regul{background:#f3f1f8;border-color:#dedaea}
+  .step.regul .stephead .num{background:#5b4f8a}
   #regSet legend{font-weight:600;margin-bottom:4px}
   #regSet [hidden]{display:none}
   .perDel{padding:2px 8px}
   .cost .big{font-size:1.15em;font-weight:700}
   .stephead{display:flex;align-items:center;gap:12px;margin:0 2px 12px}
   .stephead .num{flex:none;width:34px;height:34px;border-radius:50%;background:var(--accent);color:#fff;font-weight:700;display:grid;place-items:center;font-size:17px}
-  .step.prix .stephead .num{background:#2e5f9e}
+  .step.prix .stephead .num{background:linear-gradient(135deg,var(--elec),var(--gas))}
   .stephead h2{margin:0;font-size:18px}
   .stephead p{margin:2px 0 0;color:var(--muted);font-size:13px}
   .cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;align-items:start}
@@ -40,7 +43,7 @@
   .card.result h3{display:flex;justify-content:space-between;align-items:center;gap:8px}
   .zcopy{font-size:12px;padding:3px 10px;font-weight:600;flex:0 0 auto}
   .card h3{margin:0 0 12px;font-size:15.5px}
-  .actions.bar{justify-content:center;position:sticky;bottom:0;z-index:15;padding:8px;margin:0 -8px;background:rgba(245,246,244,.94);backdrop-filter:blur(4px);border-top:1px solid var(--line)}
+  .actions.bar{justify-content:center;position:sticky;bottom:0;z-index:15;padding:8px;margin:0 -8px;background:rgba(246,247,250,.94);backdrop-filter:blur(4px);border-top:1px solid var(--line)}
   .actions.bar button{font-size:14.5px;padding:9px 16px}
   .banner{background:#fff;border:1px solid var(--line);border-radius:10px;padding:8px 14px;font-size:13.5px;text-align:center}
   .banner a{color:var(--accent);text-decoration:none}
@@ -70,7 +73,7 @@
   table.comp th{font-weight:600;color:var(--muted);font-size:12px}
   table.comp td.n input.px{width:72px}
   table.comp tr.sum td{font-weight:650;border-bottom:0}
-  input.px.edit{border-color:#e0a000;background:#fff8e6}
+  input.px.edit{border-color:var(--edit);background:var(--edit-bg)}
   input.px.miss{border-color:#e7b7ad}
   .tag{font-size:11.5px;color:var(--muted);display:block}
   .prop{display:grid;grid-template-columns:1fr auto;gap:6px;align-items:center;background:#fafbfa;border:1px dashed var(--line);border-radius:8px;padding:8px}
@@ -98,8 +101,8 @@
   .tot .unit{font-size:13px;font-weight:500;color:var(--muted)}
   .totals.one{grid-template-columns:1fr}
   .tot.e{border-top:4px solid var(--elec)} .tot.g{border-top:4px solid var(--gas)}
-  /* Code couleur ENGIE : fond bleu pâle pour l'électricité, jaune pâle pour le gaz */
-  :root{--elec-bg:#eef4fd;--elec-bd:#c9dbf3;--gas-bg:#fdf8e4;--gas-bd:#efe2a8}
+  /* Code couleur des cartes ENGIE : fond orange pâle pour l'électricité, bleu pâle pour le gaz */
+  :root{--elec-bg:#fff4e5;--elec-bd:#f6d3a4;--gas-bg:#e9f6fd;--gas-bd:#b8def3}
   .tot.e,#blkE,#regSet div#regE{background:var(--elec-bg);border-color:var(--elec-bd)}
   .tot.g,#blkG,#regSet #regG{background:var(--gas-bg);border-color:var(--gas-bd)}
   #regSet div#regE,#regSet #regG{border:1px solid;border-radius:10px;padding:8px 12px}
@@ -223,17 +226,17 @@
   .vtitle{font-weight:600;margin-bottom:2px}
   .vres{font-weight:400;font-size:12px;opacity:.75;margin-left:6px}
   .idxtot{font-weight:600;color:#1e6b3a;margin-left:4px}.idxtot.bad{color:#9a3b2b}
-  .tot.known{box-shadow:inset 0 0 0 2px #1e6b3a}
+  .tot.known{box-shadow:inset 0 0 0 2px var(--accent)}
   .tot .unit .est{display:block;font-size:11px;opacity:.55;margin-top:2px}
   #detail td.dim{color:#a3aba7}
-  tr.known-row td{background:#eef7f1;border-top:2px solid #1e6b3a;border-bottom:2px solid #1e6b3a;font-weight:700}
-  tr.known-row td:first-child{border-left:2px solid #1e6b3a}
-  tr.known-row td:last-child{border-right:2px solid #1e6b3a}
+  tr.known-row td{background:var(--accent-soft);border-top:2px solid var(--accent);border-bottom:2px solid var(--accent);font-weight:700}
+  tr.known-row td:first-child{border-left:2px solid var(--accent)}
+  tr.known-row td:last-child{border-right:2px solid var(--accent)}
   tr.known-row small{font-weight:400;opacity:.7}
   tr.sep-row td{font-size:11.5px;color:#7d8682;padding-top:12px;border-bottom:0}
-  .ocrdrop{border:2px dashed #9fbfaa;border-radius:10px;padding:14px;text-align:center;color:var(--muted);margin:8px 0;cursor:pointer}
-  .ocrdrop.over,.ocrdrop:focus{border-color:#1e6b3a;background:#eef7f1;outline:0}
-  .ocrpick{color:#1e6b3a;text-decoration:underline;cursor:pointer}
+  .ocrdrop{border:2px dashed #a9bcd6;border-radius:10px;padding:14px;text-align:center;color:var(--muted);margin:8px 0;cursor:pointer}
+  .ocrdrop.over,.ocrdrop:focus{border-color:var(--accent);background:var(--accent-soft);outline:0}
+  .ocrpick{color:var(--accent);text-decoration:underline;cursor:pointer}
   table.ocrt{width:100%;font-size:13px}
   table.ocrt td,table.ocrt th{padding:2px 4px;text-align:right}
   table.ocrt td:first-child,table.ocrt th:first-child{text-align:center;width:26px}
@@ -241,7 +244,7 @@
   table.ocrt tr.off td{opacity:.45}
   .svcdel{border:0;background:none;color:#9a3b2b;font-size:15px;cursor:pointer;padding:2px 6px}
   .svc{margin-top:8px}.svc .row{margin:4px 0}
-  .ocrsum{margin-top:8px;padding:8px;background:#eef7f1;border-radius:8px}
+  .ocrsum{margin-top:8px;padding:8px;background:var(--accent-soft);border-radius:8px}
   h1 .maj{font-size:11px;font-weight:400;opacity:.65;vertical-align:middle;margin-left:6px}
 </style>
 </head>
@@ -562,7 +565,7 @@
             <div class="hint" id="pmsgG"></div>
           </div>
         </div>
-        <div class="hint">Montants comme sur la carte tarifaire : <strong>TVAC (6 %) pour un particulier, HTVA pour un professionnel</strong>. Prix par kWh et frais fixes par an pour l'énergie, le réseau et les taxes. Tout reste modifiable ; une valeur corrigée apparaît en orange.</div>
+        <div class="hint">Montants comme sur la carte tarifaire : <strong>TVAC (6 %) pour un particulier, HTVA pour un professionnel</strong>. Prix par kWh et frais fixes par an pour l'énergie, le réseau et les taxes. Tout reste modifiable ; une valeur corrigée apparaît en violet.</div>
       </fieldset>
       </div>
       <div class="card result" aria-live="polite">
@@ -1364,7 +1367,7 @@
       var c = kwh * pr / 100 + (fixe || 0), df = DF(), u = SEG() === 'P' ? 'HTVA' : 'TVAC', k = lbl === 'Gaz' ? 'g' : 'e'; tot += c; nOk++; totEn[k] += c; okEn[k] = true;
       html += '<div class="line"><span>' + lbl + ' : ' + fmt(kwh) + ' kWh × ' + num2(pr * df) + ' c€' + (fixe ? ' + ' + fmt(fixe * df) + ' €' : '') + '</span><span>' + fmt(c * df) + ' € ' + u + '</span></div>';
       var o = lbl === 'Gaz' ? P.g : P.e;
-      html += '<div class="hint used">' + (o.source ? esc(o.source) + '<br>' : '') + o.parts.map(function(p){ return esc(p.lbl) + ' : ' + esc(p.txt) + (p.edited ? ' <b style="color:#9a5b00">(corrigé)</b>' : p.manual && o.anyList ? ' <i>(saisi à la main)</i>' : ''); }).join('<br>') + '</div>';
+      html += '<div class="hint used">' + (o.source ? esc(o.source) + '<br>' : '') + o.parts.map(function(p){ return esc(p.lbl) + ' : ' + esc(p.txt) + (p.edited ? ' <b style="color:var(--edit)">(corrigé)</b>' : p.manual && o.anyList ? ' <i>(saisi à la main)</i>' : ''); }).join('<br>') + '</div>';
       var miss = o.parts.filter(function(p){ return p.txt === 'non renseigné'; }).map(function(p){ return p.lbl.toLowerCase(); });
       costTxt += '\n' + lbl + ' : ' + fmt(kwh) + ' kWh × ' + num2(pr * df) + ' c€/kWh' + (fixe ? ' + ' + fmt(fixe * df) + ' €/an' : '') + ' = ' + fmt(c * df) + ' €/an ' + u;
       if (miss.length){ html += '<div class="hint" style="color:#9a3b2b;margin-top:-4px">Incomplet : ' + miss.join(', ') + ' non renseigné' + (miss.length > 1 ? 's' : '') + '.</div>'; costTxt += ' – incomplet : ' + miss.join(', ') + ' manquant' + (miss.length > 1 ? 's' : ''); }
