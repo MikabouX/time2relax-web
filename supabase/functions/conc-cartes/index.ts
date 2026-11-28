@@ -1,6 +1,6 @@
 // Cartes tarifaires de la concurrence : récupère les PDF publics des fournisseurs et les renvoie en un seul ZIP.
 // Réservé aux administrateurs (t2r_is_admin). Seuls les sites des fournisseurs listés ci-dessous sont acceptés.
-const HOSTS = ["totalenergies.be", "cdn.eneco.be", "files.boltenergie.be", "files.octaplus.be", "www.luminus.be", "luminus.be", "my.mega.be"];
+const HOSTS = ["totalenergies.be", "cdn.eneco.be", "files.boltenergie.be", "files.octaplus.be", "www.luminus.be", "luminus.be", "my.mega.be", "portal.ecofixgp.be", "sparki.be"];
 const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info",
@@ -73,6 +73,23 @@ Deno.serve(async (req) => {
       }
       if (!found.length) pageMiss.push("Bolt : aucune carte trouvée sur boltenergie.be/fr/listes-des-prix (page à vérifier)");
     } catch { pageMiss.push("Bolt : page boltenergie.be/fr/listes-des-prix injoignable"); }
+  }
+  if (pages.includes("sparki")) {   // Sparki : noms de fichiers avec le mois (en néerlandais), on lit ses deux pages de tarifs
+    const NL = ["januari", "februari", "maart", "april", "mei", "juni", "juli", "augustus", "september", "oktober", "november", "december"], mo = NL[new Date().getMonth()];
+    let n = 0;
+    for (const pg of ["https://sparki.be/fr/electricite-gaz/tarifs/", "https://sparki.be/fr/pro/electricite-gaz/tarifs/"]) {
+      try {
+        const h = await (await fetch(pg, { headers: { "User-Agent": "Mozilla/5.0 (Time2Relax simulateur)" }, signal: AbortSignal.timeout(20000) })).text();
+        const found = [...new Set([...h.matchAll(/https:\/\/sparki\.be\/wp-content\/uploads\/\d{4}\/\d{2}\/Sparki_Tariefkaart_[A-Za-z0-9_]+\.pdf/g)].map((m) => m[0]))];
+        for (const u of found) {
+          const m = u.match(/Sparki_Tariefkaart_([a-z]+)_([A-Za-z]+)_([A-Za-z]+)_(Elek|Gas)_FR(_metSunFix)?\.pdf$/);   // _mois_segment_produit_énergie_FR(_metSunFix)
+          if (!m || m[1] !== mo) continue;
+          n++;
+          list.push({ url: u, name: ["Sparki", m[3] + (m[5] ? " + SunFix" : "") + (m[4] === "Gas" ? " gaz" : " élec"), "Toutes", m[2] === "Particulier" ? "Particuliers" : "Professionnels"].join(" - ") + ".pdf" });
+        }
+      } catch { /* page suivante */ }
+    }
+    if (!n) pageMiss.push("Sparki : aucune carte du mois trouvée sur sparki.be (pages tarifs à vérifier)");
   }
   list = list.filter((c) => { try { const u = new URL(c.url); return u.protocol === "https:" && HOSTS.includes(u.hostname); } catch { return false; } }).slice(0, 250);
   if (!list.length && !pageMiss.length) return new Response("aucune carte", { status: 400, headers: CORS });

@@ -112,7 +112,7 @@
       <div id="cardLinks" class="hint" style="margin-top:6px"></div>
     </details>
     <details class="sec" id="concBox">
-      <summary><strong>Cartes tarifaires de la concurrence (mois en cours)</strong> <span class="hint">(TotalEnergies, Eneco, Bolt, Octa+, Mega, Luminus)</span></summary>
+      <summary><strong>Cartes tarifaires de la concurrence (mois en cours)</strong> <span class="hint">(TotalEnergies, Eneco, Bolt, Octa+, Mega, Ecofix, Sparki, Luminus)</span></summary>
       <div class="row" style="margin-top:8px">
         <button type="button" id="concAll">Tout télécharger (<span id="concCount">0</span> cartes)</button>
         <span class="msg" id="concMsg"></span>
@@ -455,6 +455,10 @@
         L.push(['Octa+', p[1] + (en === 'G' ? ' gaz' : ' élec'), r[1], sg[1], 'https://files.octaplus.be/tariffs/' + en + '_OCTA_' + p[0] + '_' + sg[0] + '_' + r[0] + '_FR.pdf']);
       }); }); });
     });
+    // Ecofix : adresse fixe (dossier « current »)
+    [['EL_Ecofix_Flexy', 'Flexy élec'], ['GAS_Ecofix_Flexy', 'Flexy gaz'], ['EL_Ecofix_Flexy_Online', 'Flexy Online élec'], ['GAS_Ecofix_Flexy_Online', 'Flexy Online gaz'], ['EL_Ecofix_Motion', 'Motion élec'], ['EL_Ecofix_Motion_Online', 'Motion Online élec']].forEach(function(p){
+      L.push(['Ecofix', p[1], 'Toutes', 'Particuliers', 'https://portal.ecofixgp.be/docs/prices/current/' + p[0] + '_FR.pdf']);
+    });
     // Luminus : cartes servies par luminus.be/api-next/get-pricelist (une par région) ; le site refuse le serveur, donc liens à ouvrir à la main (hors ZIP)
     var LP = [['maxxfix', 'MaxxFix', 'EG'], ['maxxflex', 'MaxxFlex', 'EG'], ['comfy', 'Comfy', 'EG'], ['comfyflex', 'ComfyFlex', 'EG'], ['comfy-plus', 'Comfy+', 'EG'], ['comfyflex-plus', 'ComfyFlex+', 'EG'],
       ['smartflex', 'SmartFlex', 'E'], ['basicfix', 'BasicFix Online', 'EG'], ['basicflex', 'BasicFlex Online', 'EG'], ['dynamic', 'Dynamic Online', 'E'], ['tarif-social', 'Tarif social', 'EG']];
@@ -483,13 +487,13 @@
         return '<li><a class="' + (c[5] ? 'concM' : 'conc') + '" href="' + esc(c[4]) + '" target="_blank" rel="noopener">' + esc(c[1]) + '</a> · ' + esc(c[2]) + ' · ' + esc(c[3]) + '</li>';
       }).join('') + '</ul>';
     }).join('');
-    $('concCount').textContent = L.filter(function(c){ return !c[5]; }).length + ' + Mega + Bolt';
+    $('concCount').textContent = L.filter(function(c){ return !c[5]; }).length + ' + Mega, Bolt, Sparki';
     $('concAll').addEventListener('click', function(){
       // Le serveur (fonction conc-cartes) récupère les PDF et renvoie un seul ZIP : marche aussi sur Safari.
       var btn = this, d = new Date(), mo = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
       var cartes = concCards().filter(function(c){ return !c[5]; }).map(function(c){ return {url: c[4], name: [c[0], c[1], c[2], c[3]].join(' - ') + '.pdf'}; });
       btn.disabled = true; msg('concMsg', 'Le serveur récupère ' + cartes.length + ' cartes… (environ 30 secondes)');
-      var go = function(){ return fetch(URL + '/functions/v1/conc-cartes', {method: 'POST', headers: {apikey: KEY, Authorization: 'Bearer ' + S.access, 'Content-Type': 'application/json'}, body: JSON.stringify({cartes: cartes, pages: ['mega', 'bolt']})}); };
+      var go = function(){ return fetch(URL + '/functions/v1/conc-cartes', {method: 'POST', headers: {apikey: KEY, Authorization: 'Bearer ' + S.access, 'Content-Type': 'application/json'}, body: JSON.stringify({cartes: cartes, pages: ['mega', 'bolt', 'sparki']})}); };
       go().then(function(r){ return r.status === 401 ? renew().then(go) : r; }).then(function(r){
         if (!r.ok) return r.text().then(function(t){ throw new Error(t || ('erreur ' + r.status)); });
         var ok = r.headers.get('x-cartes-ok'), ko = +(r.headers.get('x-cartes-manquantes') || 0);
