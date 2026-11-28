@@ -12,4 +12,4 @@ Tout le détail pour reprendre le projet : `CLAUDEKEY.md` et le lisez-moi Word d
 `~/Claude/20261126 Simulateur énergie/` sur le Mac mini.
 
 ## Version mobile
-La version téléphone (time2relax.app/prix-mobile/) est fabriquée à partir du simulateur : après une modification, lancer `python3 tools/build_prix_mobile.py`.
+La version téléphone (time2relax.app/prix-mobile/) est fabriquée à partir du simulateur : après une modification, lancer `python3 tools/build_prix_mobile.py`. Une fois installée, elle s'adapte à l'écran (téléphone ou ordinateur) et fonctionne hors ligne avec les derniers prix téléchargés.

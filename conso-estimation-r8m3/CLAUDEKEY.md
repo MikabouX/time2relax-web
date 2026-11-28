@@ -69,7 +69,9 @@ https://time2relax.app/conso-estimation-r8m3/ (page non référencée). Une seul
 
 ## Version mobile (time2relax.app/prix-mobile/)
 - Fichier généré : `prix-mobile/index.html`. Après chaque modification de `conso-estimation-r8m3/index.html`, lancer `python3 tools/build_prix_mobile.py` puis committer les deux.
-- Différences : sans outils TVA et HR helper, onglets en barre fixe en bas, une colonne, installable (manifest, sw.js et icônes dans `prix-mobile/`).
+- Différences : sans outils TVA et HR helper, installable (manifest, sw.js et icônes dans `prix-mobile/`). Mise en page téléphone (barre d'onglets en bas, une colonne) seulement sous 820 px de large ; sur ordinateur, mise en page normale.
+- Le script copie aussi `prix/` et `concurrence/` dans `prix-mobile/` (pour que tout reste dans la portée du service worker). Après une modification de ces pages, relancer le script.
+- Hors ligne (`prix-mobile/sw.js`) : pages en cache ; réponses des rpc Supabase (POST) gardées dans le cache `prix-mobile-data` et resservies sans connexion ; à chaque activation, téléchargement d'avance de conso_prix_get (tous les mois), formules, détails, tarif social. Codes postaux hors ligne : `prix-mobile/cp.json` (copie de conso_cp et conso_cp_nom, 28/11/2026 ; à régénérer si ces tables changent). Bandeau jaune « Hors ligne » en haut. Changer `CACHE` (prix-mobile-vN) quand le sw.js change.
 - Une balise `<base href="/conso-estimation-r8m3/">` fait pointer les sous-pages (prix, concurrence, avis) vers celles du simulateur.
 
 ## Concurrence

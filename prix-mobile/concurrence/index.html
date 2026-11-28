@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<!-- Fichier généré par tools/build_prix_mobile.py : ne pas modifier à la main. -->
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="/conso-estimation-r8m3/icon.svg" type="image/svg+xml">
+<link rel="icon" href="/conso-estimation-r8m3/icon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/prix-mobile/icon-180.png">
+<title>Concurrence – fournisseurs d'énergie par région</title>
+<style>
+  :root{--bg:#f5f6f4;--card:#fff;--ink:#1d2a24;--muted:#5d6b64;--line:#dde3df;--accent:#0071b5;--accent-soft:#e5f2fa;
+    --elec:#f6852b;--gas:#009fe3;--elec-bg:#fef3ea;--elec-bd:#f9cfae;--gas-bg:#e6f5fc;--gas-bd:#a9dcf3}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink);font-size:15px;line-height:1.45}
+  header{position:relative;background:linear-gradient(105deg,#00609e 0%,#0080b8 55%,#1f8a80 100%);color:#fff;padding:16px 20px 20px}
+  header::after{content:"";position:absolute;left:0;right:0;bottom:0;height:5px;background:linear-gradient(90deg,var(--elec) 0%,#ffb27a 42%,#62c6ee 58%,var(--gas) 100%)}
+  header h1{margin:0;font-size:20px;font-weight:650;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  header p{margin:4px 0 0;opacity:.9;font-size:13px}
+  header a{color:#fff}
+  .wip{background:#fff3cd;color:#7a5a00;border-radius:999px;font-size:12px;padding:2px 10px;font-weight:600}
+  main{max-width:1100px;margin:0 auto;padding:18px 16px 40px;display:grid;gap:18px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;min-width:0}
+  h2{margin:0 0 6px;font-size:18px}
+  .hint{color:var(--muted);font-size:13px}
+  .tabs{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 10px}
+  .tabs button{font:inherit;border:1px solid var(--line);background:#fff;border-radius:999px;padding:6px 14px;cursor:pointer}
+  .tabs button[aria-selected=true]{background:var(--accent);border-color:var(--accent);color:#fff}
+  .tblwrap{overflow-x:auto}
+  table{border-collapse:collapse;width:100%;font-size:14px}
+  th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font-size:12px;color:var(--muted);font-weight:600}
+  td.num,th.num{text-align:right;white-space:nowrap}
+  .tag{display:inline-block;border-radius:6px;padding:1px 7px;font-size:12px;margin:0 3px 2px 0;border:1px solid}
+  .tag.e{background:var(--elec-bg);border-color:var(--elec-bd);color:#a14d0c}
+  .tag.g{background:var(--gas-bg);border-color:var(--gas-bd);color:#00648f}
+  .tag.u{background:#f1f1f1;border-color:#ddd;color:#666}
+  tr.engie td:first-child{font-weight:650}
+  tr.off td{color:var(--muted)}
+  .src{margin-top:8px}
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .ce{background:var(--elec-bg);border:1px solid var(--elec-bd);border-radius:10px;padding:10px}
+  .cg{background:var(--gas-bg);border:1px solid var(--gas-bd);border-radius:10px;padding:10px}
+  .ce h3,.cg h3{margin:0 0 6px;font-size:15px}
+  .ctl{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;margin:6px 0 8px;font-size:14px}
+  .ctl input[type=number]{width:80px;font:inherit;padding:3px 5px;border:1px solid var(--line);border-radius:6px}
+  .ctl select{font:inherit;padding:3px 5px;border:1px solid var(--line);border-radius:6px;background:#fff}
+  .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px}.dot.e{background:var(--elec)}.dot.g{background:var(--gas)}
+  table.cmp td{white-space:nowrap} table.cmp td:nth-child(7){white-space:normal;min-width:180px}
+  table.cmp tr.engie td{background:rgba(0,113,181,.08)} table.cmp tr.best td:nth-child(6) b{color:#1f7a3a}
+  .tt{font-size:12px;border-radius:6px;padding:1px 6px;border:1px solid #ddd;background:#f6f6f6}
+  .tt.fixe{background:#eaf5ee;border-color:#bfe0c9} .tt.dynamique{background:#f3ecfb;border-color:#d9c7ef}
+  .pr{color:#7a4a00}
+  .mine{background:#f7f9fb;border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:6px 0 12px}
+  .mine h3{margin:0 0 4px;font-size:15px}
+  .mine button{font:inherit;padding:5px 14px;border-radius:8px;border:1px solid var(--accent);background:var(--accent);color:#fff;cursor:pointer}
+  #mOut{margin-top:6px;font-size:14px;color:var(--ink)} #mOut ol{margin:4px 0 0;padding-left:20px} #mOut .sv{color:#1f7a3a;font-weight:650} #mOut .ok{color:#1f7a3a}
+  ul.todo{margin:6px 0 0;padding-left:20px}
+  @media (max-width:760px){.cols{grid-template-columns:1fr}}
+  @media (max-width:820px){main{padding:10px 8px 30px} .card{padding:12px 10px} .ctl{gap:6px 12px} header h1{font-size:18px} .ctl input[type=number]{width:72px}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Concurrence</h1>
+  <p>État des fournisseurs par région et comparaison des contrats connus · <a href="../">← retour au simulateur</a></p>
+</header>
+<main>
+  <section class="card">
+    <h2>Fournisseurs actifs</h2>
+    <div class="tabs" id="regs" role="tablist"></div>
+    <div class="tabs" id="ens" role="tablist">
+      <button type="button" data-en="" aria-selected="true">Électricité et gaz</button>
+      <button type="button" data-en="e">Électricité</button>
+      <button type="button" data-en="g">Gaz</button>
+    </div>
+    <div class="tblwrap"><table><thead><tr><th>Fournisseur</th><th>Énergie</th><th>Téléphone</th><th>Site</th><th>Remarque</th></tr></thead><tbody id="fl"></tbody></table></div>
+    <p class="hint src" id="src"></p>
+    <p class="hint">Avoir une licence ne veut pas dire accepter de nouveaux clients : pour un code postal précis, le comparateur officiel de la région fait foi.</p>
+  </section>
+
+  <section class="card">
+    <h2>Comparaison des contrats <span class="hint" style="font-weight:400">· particuliers</span></h2>
+    <div class="ctl">
+      <label>Gestionnaire de réseau <select id="cGrd"></select></label>
+      <label><span class="dot e"></span>Électricité <input id="cKe" type="number" min="0" step="100" value="3500"> kWh/an</label>
+      <label>Compteur <select id="cCpt"><option value="m">mono-horaire</option><option value="b">bi-horaire</option></select></label>
+      <label id="cNuitL" hidden>dont nuit <input id="cNuit" type="number" min="0" max="100" step="5" value="50"> %</label>
+      <label><span class="dot g"></span>Gaz <input id="cKg" type="number" min="0" step="500" value="17000"> kWh/an</label>
+      <label>Type <select id="cTyp"><option value="fv">fixe et variable</option><option value="">tous</option><option value="fixe">fixe</option><option value="variable">variable</option><option value="dynamique">dynamique</option></select></label>
+      <label class="chk"><input id="cPromo" type="checkbox"> promos de la 1re année</label>
+      <label>Trier par <select id="cSort"><option value="tot">coût tout compris</option><option value="en">coût énergie seule</option></select></label>
+    </div>
+    <div class="mine">
+      <h3>Mon contrat actuel <span class="hint" style="font-weight:400">· est-ce qu'une offre du mois serait plus intéressante ?</span></h3>
+      <div class="ctl">
+        <label><input type="radio" name="mEn" value="e" checked> <span class="dot e"></span>Électricité</label>
+        <label><input type="radio" name="mEn" value="g"> <span class="dot g"></span>Gaz</label>
+        <label>Fournisseur <select id="mFou"></select> <input id="mFouA" maxlength="60" placeholder="nom" style="width:110px" hidden></label>
+        <label>Contrat <input id="mCt" list="mCtL" maxlength="80" placeholder="ex. Easy fixe" style="width:150px"><datalist id="mCtL"></datalist></label>
+        <label>Type <select id="mTyp"><option value="">?</option><option value="fixe">fixe</option><option value="variable">variable</option><option value="dynamique">dynamique</option></select></label>
+      </div>
+      <div class="ctl">
+        <label>Prix de l'énergie <input id="mPx" type="text" inputmode="decimal" placeholder="25,30" style="width:70px"> c€/kWh TVAC</label>
+        <label class="chk"><input id="mVert" type="checkbox"> énergie verte comprise</label>
+        <label>Redevance <input id="mRd" type="text" inputmode="decimal" placeholder="65" style="width:60px"> €/an</label>
+        <label>Souscrit en <input id="mDt" type="month"> <span class="hint">(facultatif)</span></label>
+        <button type="button" id="mGo">Comparer</button>
+      </div>
+      <div id="mOut" class="hint"></div>
+      <p class="hint" style="margin:4px 0 0">Les prix saisis (fournisseur, contrat, prix, date) sont enregistrés anonymement pour comparer les contrats en cours. N'indiquez aucune donnée de client.</p>
+    </div>
+    <p class="hint" id="cmpHint"></p>
+    <div class="ce"><h3>Électricité</h3><div class="tblwrap"><table class="cmp"><thead><tr><th>#</th><th>Fournisseur · contrat</th><th>Type</th><th class="num">Redevance<br>€/an</th><th class="num">Prix c€/kWh<br><span class="hint">(tout compris)</span></th><th class="num">Coût annuel €<br><span class="hint">(tout compris)</span></th><th>Promo · remarque</th></tr></thead><tbody id="cmpE"></tbody></table></div></div>
+    <div class="cg" style="margin-top:14px"><h3>Gaz</h3><div class="tblwrap"><table class="cmp"><thead><tr><th>#</th><th>Fournisseur · contrat</th><th>Type</th><th class="num">Redevance<br>€/an</th><th class="num">Prix c€/kWh<br><span class="hint">(tout compris)</span></th><th class="num">Coût annuel €<br><span class="hint">(tout compris)</span></th><th>Promo · remarque</th></tr></thead><tbody id="cmpG"></tbody></table></div></div>
+    <details class="hint" style="margin-top:10px"><summary>Comment lire ce tableau</summary>
+      <ul class="todo">
+        <li><b>Prix</b> : énergie du fournisseur + énergie verte, TVAC 6 %. Entre parenthèses : le prix « tout compris » avec le réseau et les taxes du gestionnaire choisi (les mêmes chez tous les fournisseurs).</li>
+        <li><b>Coût annuel</b> : redevance + consommation (énergie seule), et entre parenthèses tout compris (réseau, taxes et leurs frais fixes).</li>
+        <li>Les contrats dynamiques (prix au quart d'heure, compteur communicant) sont masqués par défaut : choisissez « tous » ou « dynamique » dans Type.</li>
+        <li><b>Contrats variables et dynamiques</b> : prix estimé sur 12 mois quand la carte le donne (marqué ≈), sinon prix du mois. Dynamique : prix moyen, la facture dépend des heures de consommation (compteur communicant).</li>
+        <li><b>Promos</b> : non comptées par défaut ; cochez « promos de la 1re année » pour les déduire (remises au kWh, en % ou en euros).</li>
+        <li>Sources : cartes tarifaires officielles des fournisseurs (<span id="cMois"></span>). Tarif social, Empower et contrats pour bâtiment vide non repris. À titre indicatif.</li>
+      </ul>
+    </details>
+    <p class="hint">Comparateurs officiels : <a href="https://www.compacwape.be/" target="_blank" rel="noopener">CompaCWaPE</a> (Wallonie), <a href="https://www.brusim.be/" target="_blank" rel="noopener">BruSim</a> (Bruxelles), <a href="https://www.vtest.be/" target="_blank" rel="noopener">V-test</a> (Flandre).</p>
+  </section>
+</main>
+<script>
+  var SB_URL = 'https://gxftbzbvbveocwpdavtt.supabase.co', SB_KEY = 'sb_publishable_9fKWGXevueh6hHJpGQvmhg_EFOd_-dR';
+  function $(id){ return document.getElementById(id); }
+  function esc(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){ return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]; }); }
+  // e = électricité, g = gaz, '?' = à vérifier. Mettre à jour depuis les sites des régulateurs.
+  var REG = {
+    Wallonie: {src: 'Source : CWaPE, liste des fournisseurs titulaires d\'une licence pour les résidentiels (relevée en novembre 2026).', l: [
+      ['ENGIE Electrabel', 'eg', '078 35 33 33', 'https://www.engie.be/'],
+      ['Luminus', 'eg', '078 155 100', 'https://www.luminus.be/'],
+      ['TotalEnergies', 'eg', '078 48 64 64', 'https://totalenergies.be/fr/particuliers'],
+      ['Eneco', 'eg', '010 20 80 00', 'https://eneco.be/fr'],
+      ['Mega (Power Online)', 'eg', '04 268 20 00', 'https://www.mega.be/'],
+      ['Octa+', 'eg', '02 851 02 52', 'https://www.octaplus.be/fr/'],
+      ['Bolt', 'eg', '02 899 33 00', 'https://www.boltenergie.be/fr'],
+      ['Ecofix Gas & Power', 'eg', '02 882 86 86', 'https://www.ecofixgp.be/'],
+      ['Sparki', 'eg', '', ''],
+      ['DATS 24', 'eg', '02 620 81 81', 'https://www.dats24.be/', 'ne vend plus de nouveaux contrats (selon Selectra)'],
+      ['EnergyVision', 'eg', '', 'https://www.energyvision.be/fr-be', 'pas d\'offre commerciale disponible (CWaPE)'],
+      ['Aspiravi Energy', 'e', '056 70 27 36', 'https://www.aspiravi.com/fr/'],
+      ['Cociter', 'e', '080 68 57 38', 'https://www.cociter.be/']
+    ]},
+    Bruxelles: {src: 'Sources : Selectra (septembre 2026) ; Brugel comptait 5 fournisseurs actifs sur le marché résidentiel en décembre 2025. À vérifier sur brugel.brussels.', l: [
+      ['ENGIE Electrabel', 'eg', '078 35 33 33', 'https://www.engie.be/'],
+      ['TotalEnergies', 'eg', '078 48 64 64', 'https://totalenergies.be/fr/particuliers'],
+      ['Luminus', 'eg', '078 155 100', 'https://www.luminus.be/'],
+      ['Bolt', 'eg', '02 899 33 00', 'https://www.boltenergie.be/fr'],
+      ['Sparki', '?', '', ''],
+      ['Brusol (EnergyVision)', 'e', '', '']
+    ]},
+    Flandre: {src: 'Source : Selectra (septembre 2026, 27 fournisseurs). Énergies et contacts à compléter depuis la liste de la Vlaamse Nutsregulator (vlaamsenutsregulator.be/nl/leveranciers).', l: [
+      ['ENGIE Electrabel', 'eg', '078 35 33 33', 'https://www.engie.be/'], ['Luminus', 'eg', '078 155 100', 'https://www.luminus.be/'], ['TotalEnergies', 'eg', '078 48 64 64', 'https://totalenergies.be/'],
+      ['Eneco', 'eg', '', 'https://eneco.be/'], ['Mega', 'eg', '', 'https://www.mega.be/'], ['Octa+', 'eg', '', 'https://www.octaplus.be/'], ['Bolt', 'eg', '', 'https://www.boltenergie.be/'],
+      ['Ecofix', 'eg', '', ''], ['EnergyVision', 'eg', '', ''], ['Ecopower', 'e', '', ''], ['Aspiravi Energy', 'e', '', ''],
+      ['Energie.be', '?', '', ''], ['Frank Energie', '?', '', ''], ['Energy Knights', '?', '', ''], ['Elegant', '?', '', ''], ['Belvus', '?', '', ''],
+      ['DATS 24', '?', '', '', 'ne vend plus de nouveaux contrats (selon Selectra)'], ['Dots', '?', '', ''], ['EBEM', '?', '', ''], ['Evident Energie', '?', '', ''], ['Hoa Energy', '?', '', ''],
+      ['Power2you', '?', '', ''], ['Servolt Energie', '?', '', ''], ['Smappee Smiles', '?', '', ''], ['Sparki', '?', '', ''], ['Trevion', '?', '', ''], ['Wase Wind', '?', '', ''], ['Wind voor A', '?', '', '']
+    ]}
+  };
+  var q = new URLSearchParams(location.search), cur = REG[q.get('r')] ? q.get('r') : 'Wallonie', en = '', T = null;
+  $('regs').innerHTML = Object.keys(REG).map(function(r){ return '<button type="button" data-r="' + r + '">' + r + '</button>'; }).join('');
+  function tags(s){ if (s === '?') return '<span class="tag u">à vérifier</span>'; return (s.indexOf('e') >= 0 ? '<span class="tag e">Électricité</span>' : '') + (s.indexOf('g') >= 0 ? '<span class="tag g">Gaz</span>' : ''); }
+  function drawList(){
+    document.querySelectorAll('#regs button').forEach(function(b){ b.setAttribute('aria-selected', b.dataset.r === cur); });
+    document.querySelectorAll('#ens button').forEach(function(b){ b.setAttribute('aria-selected', b.dataset.en === en); });
+    var R = REG[cur], L = R.l.filter(function(f){ return !en || f[1] === '?' || f[1].indexOf(en) >= 0; });
+    $('fl').innerHTML = L.map(function(f){
+      return '<tr class="' + (/^ENGIE/.test(f[0]) ? 'engie' : '') + (f[4] ? ' off' : '') + '"><td>' + esc(f[0]) + '</td><td>' + tags(f[1]) + '</td><td style="white-space:nowrap">' + (f[2] ? '<a href="tel:' + f[2].replace(/\s/g, '') + '">' + esc(f[2]) + '</a>' : '') + '</td><td>' + (f[3] ? '<a href="' + esc(f[3]) + '" target="_blank" rel="noopener">' + esc(f[3].replace(/^https?:\/\/(www\.)?/, '').replace(/\/.*$/, '')) + '</a>' : '') + '</td><td class="hint">' + esc(f[4] || '') + '</td></tr>';
+    }).join('');
+    $('src').textContent = L.length + ' fournisseur' + (L.length > 1 ? 's' : '') + ' affiché' + (L.length > 1 ? 's' : '') + '. ' + R.src;
+    drawCmp();
+  }
+  function n(x){ return x === null || x === undefined ? null : +x; }
+  function fr(x, d){ return x === null ? '–' : x.toLocaleString('fr-BE', {minimumFractionDigits: d, maximumFractionDigits: d}); }
+  var CJ = null, q2 = new URLSearchParams(location.search);
+  function drawCmp(){
+    var hint = $('cmpHint'); try { mFill(); } catch (e){}
+    if (!T || !CJ){ $('cmpE').innerHTML = $('cmpG').innerHTML = '<tr><td colspan="7" class="hint">Chargement des prix…</td></tr>'; return; }
+    $('cMois').textContent = new Date(CJ.mois + '-01T00:00:00').toLocaleDateString('fr-BE', {month: 'long', year: 'numeric'}) + ', relevé du ' + CJ.maj;
+    var R = CJ.regions[cur], sel = $('cGrd'), gv = sel.value || q2.get('grd') || '';
+    // gestionnaires de la région
+    var G = (T.grd || []).filter(function(g){ return g.region === cur; });
+    var h = G.map(function(g){ return '<option value="' + esc(g.code) + '">' + esc(g.nom) + '</option>'; }).join('');
+    if (sel.dataset.h !== h){ sel.innerHTML = h; sel.dataset.h = h; }
+    sel.value = gv; if (!gv || sel.value !== gv) sel.value = G.length ? (G.filter(function(g){ return /ores|sibelga/.test(g.code); })[0] || G[0]).code : '';
+    $('cNuitL').hidden = $('cCpt').value !== 'b';
+    if (!R){ hint.textContent = ''; $('cmpE').innerHTML = $('cmpG').innerHTML = '<tr><td colspan="7" class="hint">' + esc(cur) + ' : comparaison en préparation (les cartes sont téléchargées, le relevé des prix arrive).</td></tr>'; return; }
+    var promo = $('cPromo').checked, typ = $('cTyp').value, srt = $('cSort').value, grd = sel.value;
+    function find(type, e, cle){ return (T.prix || []).filter(function(p){ return p.type === type && p.energie === e && p.cle === cle && p.region === cur && (type === 'reseau' ? p.segment === '*' : p.segment === 'R'); })[0] || null; }
+    ['e', 'g'].forEach(function(e){
+      var kwh = Math.max(0, +$(e === 'e' ? 'cKe' : 'cKg').value || 0), bi = e === 'e' && $('cCpt').value === 'b', pn = bi ? Math.min(100, Math.max(0, +$('cNuit').value || 0)) / 100 : 0;
+      var rs = grd ? find('reseau', e, grd) : null, tx = find('taxes', e, cur);
+      var netK = null, netF = 0;
+      if (rs && tx){
+        var rj = n(rs.prix_jour) !== null ? n(rs.prix_jour) : n(rs.prix_kwh), rn = n(rs.prix_nuit) !== null ? n(rs.prix_nuit) : n(rs.prix_kwh);
+        netK = ((bi ? rj * (1 - pn) + rn * pn : n(rs.prix_kwh)) + n(tx.prix_kwh)) * 1.06;
+        netF = ((n(rs.fixe_an) || 0) + (n(tx.fixe_an) || 0)) * 1.06;
+      }
+      var rows = (R[e] || []).filter(function(x){ return !typ || x[2] === typ || (typ === 'fv' && x[2] !== 'dynamique'); }).map(function(x){
+        var v = x[9] || 0, j = x[6] !== null ? x[6] : x[5], nt = x[7] !== null ? x[7] : x[5];
+        var unit = (bi && x[2] !== 'dynamique' ? j * (1 - pn) + nt * pn : x[5]) + v;
+        var cost = x[4] + kwh * unit / 100, pr = x[11];
+        if (promo && pr){ var du = (pr.k || 0) + (pr.p ? unit * pr.p / 100 : 0); unit -= du; cost -= du * kwh / 100 + (pr.f || 0); }
+        var tot = netK === null ? null : cost + netF + kwh * netK / 100;
+        return {x: x, unit: unit, cost: cost, tot: tot, all: netK === null ? null : unit + netK};
+      }).sort(function(a, b){ return (srt === 'tot' && a.tot !== null ? a.tot - b.tot : a.cost - b.cost); });
+      var best = rows.length ? rows[0] : null, eng = rows.filter(function(r){ return r.x[0] === 'ENGIE'; });
+      $(e === 'e' ? 'cmpE' : 'cmpG').innerHTML = rows.map(function(r, i){
+        var x = r.x, pr = x[11];
+        return '<tr class="' + (x[0] === 'ENGIE' ? 'engie' : '') + (i === 0 ? ' best' : '') + '"><td class="hint">' + (i + 1) + '</td><td><b>' + esc(x[0]) + '</b> · ' + esc(x[1]) + '</td><td><span class="tt ' + x[2] + '">' + x[2] + '</span> <span class="hint">' + esc(x[3]) + '</span></td>' +
+          '<td class="num">' + fr(x[4], 0) + '</td><td class="num">' + (x[10] ? '≈ ' : '') + fr(r.unit, 2) + (r.all !== null ? ' <span class="hint">(' + fr(r.all, 2) + ')</span>' : '') + '</td>' +
+          '<td class="num"><b>' + fr(Math.round(r.cost), 0) + '</b>' + (r.tot !== null ? ' <span class="hint">(' + fr(Math.round(r.tot), 0) + ')</span>' : '') + '</td>' +
+          '<td class="hint">' + (pr ? '<span class="pr">' + esc(pr.t) + '</span>' + (x[12] ? ' · ' : '') : '') + esc(x[12]) + '</td></tr>';
+      }).join('') || '<tr><td colspan="7" class="hint">Aucun contrat pour ce filtre.</td></tr>';
+      if (e === 'e') hint.innerHTML = rows.length ? 'Moins cher en électricité : <b>' + esc(best.x[0] + ' ' + best.x[1]) + '</b>' + (eng.length && eng[0] === best ? ' (ENGIE est le moins cher)' : eng.length ? ' · meilleur ENGIE : ' + esc(eng[0].x[1]) + ' (+' + fr(Math.round((srt === 'tot' && eng[0].tot !== null ? eng[0].tot - best.tot : eng[0].cost - best.cost)), 0) + ' €/an)' : '') + (netK === null ? ' · <span class="pr">réseau non disponible pour ce gestionnaire</span>' : '') : ''
+      if (e === 'e' && CJ.note_regions && CJ.note_regions[cur]) hint.innerHTML += '<br><span class="hint">' + esc(CJ.note_regions[cur]) + '</span>';
+    });
+  }
+  // ---------- Mon contrat actuel ----------
+  function mEn(){ return document.querySelector('input[name=mEn]:checked').value; }
+  function pn2(v){ v = String(v || '').replace(/\s/g, '').replace(',', '.'); return v === '' || isNaN(+v) ? null : +v; }
+  function mFill(){
+    if (!CJ) return;
+    var R = CJ.regions[cur] || {e: [], g: []}, e = mEn(), fs = [], sel = $('mFou'), v = sel.value;
+    (R[e] || []).forEach(function(x){ if (fs.indexOf(x[0]) < 0) fs.push(x[0]); });
+    var h = '<option value="">Choisir…</option>' + fs.map(function(f){ return '<option>' + esc(f) + '</option>'; }).join('') + '<option value="Autre">Autre…</option>';
+    if (sel.dataset.h !== h){ sel.innerHTML = h; sel.dataset.h = h; sel.value = v; }
+    var cs = (R[e] || []).filter(function(x){ return x[0] === sel.value; }).map(function(x){ return x[1]; });
+    $('mCtL').innerHTML = cs.map(function(c){ return '<option value="' + esc(c) + '">'; }).join('');
+  }
+  var mLast = '';
+  function mCompare(save){
+    var out = $('mOut'), e = mEn(), px = pn2($('mPx').value), rd = pn2($('mRd').value), fou = $('mFou').value;
+    if (fou === 'Autre') fou = $('mFouA').value.trim();
+    if (!fou || px === null || px <= 0 || px > 150){ out.innerHTML = '<span class="pr">Indiquez le fournisseur et le prix de l\'énergie (c€/kWh TVAC).</span>'; return; }
+    var R = CJ.regions[cur]; if (!R){ out.textContent = 'Comparaison indisponible pour cette région.'; return; }
+    var known = (R[e] || []).filter(function(x){ return x[0] === fou && x[1] === $('mCt').value.trim(); })[0];
+    if (rd === null) rd = known ? known[4] : 0;
+    var eng = (R[e] || []).filter(function(x){ return x[0] === 'ENGIE'; })[0], vAvg = e === 'e' && !$('mVert').checked ? (eng ? eng[9] : 0) : 0;
+    var kwh = Math.max(0, +$(e === 'e' ? 'cKe' : 'cKg').value || 0);
+    var mine = rd + kwh * (px + vAvg) / 100;
+    var offers = (R[e] || []).filter(function(x){ return x[2] !== 'dynamique'; }).map(function(x){ return {x: x, c: x[4] + kwh * (x[5] + (x[9] || 0)) / 100}; })
+      .filter(function(o){ return o.c < mine - 1; }).sort(function(a, b){ return a.c - b.c; });
+    var bestE = offers.filter(function(o){ return o.x[0] === 'ENGIE'; })[0];
+    var h = 'Pour ' + fr(kwh, 0) + ' kWh/an, ce contrat coûte environ <b>' + fr(Math.round(mine), 0) + ' €/an</b> (énergie' + (vAvg ? ' + énergie verte' : '') + ', hors réseau et taxes, qui ne changent pas avec le fournisseur).';
+    if (!offers.length) h += '<br><span class="ok">Aucune offre fixe ou variable du mois n\'est moins chère : c\'est un bon contrat.</span>';
+    else {
+      h += '<br>' + offers.length + ' offre' + (offers.length > 1 ? 's' : '') + ' du mois moins chère' + (offers.length > 1 ? 's' : '') + ' (sans promo) :<ol>' + offers.slice(0, 5).map(function(o){
+        return '<li><b>' + esc(o.x[0]) + '</b> · ' + esc(o.x[1]) + ' <span class="hint">(' + o.x[2] + ')</span> : ' + fr(Math.round(o.c), 0) + ' €/an, <span class="sv">−' + fr(Math.round(mine - o.c), 0) + ' €</span></li>';
+      }).join('') + '</ol>';
+      if (bestE && offers.indexOf(bestE) >= 5) h += 'Meilleure offre ENGIE : <b>' + esc(bestE.x[1]) + '</b>, ' + fr(Math.round(bestE.c), 0) + ' €/an (<span class="sv">−' + fr(Math.round(mine - bestE.c), 0) + ' €</span>).';
+      else if (!bestE && fou !== 'ENGIE') h += 'Aucune offre ENGIE du mois n\'est moins chère pour ce profil.';
+    }
+    out.innerHTML = h;
+    if (!save) return;
+    var key = [cur, e, fou, $('mCt').value.trim(), px, rd, $('mDt').value].join('|'); if (key === mLast) return; mLast = key;
+    var dt = $('mDt').value ? $('mDt').value + '-01' : null;
+    fetch(SB_URL + '/rest/v1/rpc/conso_conc_saisir', {method: 'POST', headers: {'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY, 'Content-Type': 'application/json'},
+      body: JSON.stringify({p_region: cur, p_energie: e, p_fournisseur: fou, p_contrat: $('mCt').value.trim() || null, p_type: $('mTyp').value || null, p_prix: px + (vAvg ? 0 : 0), p_redevance: pn2($('mRd').value), p_souscrit: dt, p_conso: kwh})})
+      .then(function(r){ if (r.ok) out.insertAdjacentHTML('beforeend', '<div class="hint ok">✓ Enregistré, merci.</div>'); }).catch(function(){});
+  }
+  document.querySelectorAll('input[name=mEn]').forEach(function(r){ r.addEventListener('change', function(){ mFill(); $('mOut').innerHTML = ''; }); });
+  $('mFou').addEventListener('change', function(){ $('mFouA').hidden = $('mFou').value !== 'Autre'; mFill(); var R = CJ && CJ.regions[cur]; var ct = R ? (R[mEn()] || []).filter(function(x){ return x[0] === $('mFou').value; }) : []; if (ct.length === 1) $('mCt').value = ct[0][1]; });
+  $('mCt').addEventListener('change', function(){ var R = CJ && CJ.regions[cur], k = R ? (R[mEn()] || []).filter(function(x){ return x[0] === $('mFou').value && x[1] === $('mCt').value.trim(); })[0] : null; if (k){ $('mTyp').value = k[2]; if (!$('mRd').value) $('mRd').value = String(k[4]).replace('.', ','); } });
+  $('mGo').addEventListener('click', function(){ mCompare(true); });
+  ['cKe', 'cKg'].forEach(function(id){ $(id).addEventListener('change', function(){ if ($('mOut').innerHTML) mCompare(false); }); });
+  ['cGrd', 'cKe', 'cCpt', 'cNuit', 'cKg', 'cTyp', 'cPromo', 'cSort'].forEach(function(id){ $(id).addEventListener('input', drawCmp); $(id).addEventListener('change', drawCmp); });
+  fetch('/conso-estimation-r8m3/concurrence/cartes.json', {cache: 'no-cache'}).then(function(r){ return r.json(); }).then(function(d){ CJ = d; drawCmp(); }).catch(function(){ CJ = {mois: '', maj: '', regions: {}}; drawCmp(); });
+  $('regs').addEventListener('click', function(e){ var b = e.target.closest('button'); if (b){ cur = b.dataset.r; drawList(); } });
+  $('ens').addEventListener('click', function(e){ var b = e.target.closest('button'); if (b){ en = b.dataset.en; drawList(); } });
+  drawList();
+  fetch(SB_URL + '/rest/v1/rpc/conso_prix_get', {method: 'POST', headers: {'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY, 'Content-Type': 'application/json'}, body: JSON.stringify({p_mois: null})})
+    .then(function(r){ return r.json(); }).then(function(d){ T = d; drawCmp(); })
+    .catch(function(){ T = {prix: []}; drawCmp(); });
+</script>
+<script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('/prix-mobile/sw.js', {scope: '/prix-mobile/'}).catch(function(){});</script>
+</body>
+</html>

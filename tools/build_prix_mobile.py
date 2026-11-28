@@ -24,7 +24,6 @@ def rep(old, new, count=1):
 
 # 1. En-tête : liens relatifs vers le dossier du simulateur, appli installable
 rep('<link rel="icon" href="icon.svg" type="image/svg+xml">',
-    '<base href="/conso-estimation-r8m3/">\n'
     '<link rel="manifest" href="/prix-mobile/manifest.webmanifest">\n'
     '<meta name="theme-color" content="#0071b5">\n'
     '<meta name="apple-mobile-web-app-capable" content="yes">\n'
@@ -33,6 +32,9 @@ rep('<link rel="icon" href="icon.svg" type="image/svg+xml">',
     '<meta name="apple-mobile-web-app-title" content="Simulateur">\n'
     '<link rel="icon" href="icon.svg" type="image/svg+xml">')
 rep('<link rel="apple-touch-icon" href="icon-180.png">', '<link rel="apple-touch-icon" href="/prix-mobile/icon-180.png">')
+rep('href="icon.svg"', 'href="/conso-estimation-r8m3/icon.svg"')
+rep('href="icon-32.png"', 'href="/conso-estimation-r8m3/icon-32.png"')
+rep('<a class="avis" href="avis/">', '<a class="avis" href="/conso-estimation-r8m3/avis/">')
 s = re.sub(r'<meta name="viewport"[^>]*>', '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">', s, count=1)
 
 # 2. Sans les outils TVA et HR helper (masqués : le script de la page les attend)
@@ -41,6 +43,10 @@ rep('<div class="tools">', '<div class="tools" hidden>')
 # 3. Mise en page mobile
 CSS = r'''
   /* ===== Version mobile (prix-mobile) : générée par tools/build_prix_mobile.py ===== */
+  .tools{display:none !important}
+  #offl{display:none;position:sticky;top:0;z-index:50;background:#fff3cd;color:#7a5a00;font-size:12.5px;text-align:center;padding:5px 10px;border-bottom:1px solid #efd98a}
+  #offl.on{display:block}
+  @media (max-width:820px){
   html,body{overflow-x:hidden}
   body{font-size:15px;-webkit-text-size-adjust:100%}
   input,select,textarea{font-size:16px !important}
@@ -72,6 +78,7 @@ CSS = r'''
   .cols,.grid2,.two{grid-template-columns:1fr !important}
   .card.result{position:static !important}
   footer{font-size:11.5px}
+  }
 '''
 rep('</style>', CSS + '</style>')
 
@@ -87,8 +94,24 @@ rep('<script src="../visit.js" data-page="conso"></script>',
     '<script>if (\'serviceWorker\' in navigator) navigator.serviceWorker.register(\'/prix-mobile/sw.js\', {scope: \'/prix-mobile/\'}).catch(function(){});</script>')
 
 # 6. Changement d'onglet : remonter en haut de la zone
+rep('<header>', '<div id="offl" role="status"></div>\n<header>')
+rep('</body>', '<script>(function(){ var o = document.getElementById("offl"); function st(){ var t = ""; try { t = localStorage.getItem("pmSync") || ""; } catch (e){} o.textContent = "Hors ligne : prix en mémoire" + (t ? " (mis à jour le " + t + ")" : "") + "."; o.classList.toggle("on", !navigator.onLine); } addEventListener("online", st); addEventListener("offline", st); st(); if (navigator.serviceWorker) navigator.serviceWorker.addEventListener("message", function(e){ if (e.data && e.data.sync){ try { localStorage.setItem("pmSync", e.data.sync); } catch (er){} st(); } }); })();</script>\n</body>')
 rep('</body>', '<script>document.querySelectorAll(".zbtn[data-zone]").forEach(function(b){ b.addEventListener("click", function(){ window.scrollTo({top: 0, behavior: "smooth"}); }); });</script>\n</body>')
 
 s = s.replace('<!DOCTYPE html>', '<!DOCTYPE html>\n<!-- Fichier généré par tools/build_prix_mobile.py à partir de conso-estimation-r8m3/index.html : ne pas modifier à la main. -->', 1)
 DST.write_text(s, encoding='utf-8')
 print('OK :', DST.relative_to(ROOT))
+
+# Sous-pages (détails de prix, concurrence) copiées dans prix-mobile/ pour être disponibles hors ligne
+HEAD = '<!DOCTYPE html>\n<!-- Fichier généré par tools/build_prix_mobile.py : ne pas modifier à la main. -->'
+SW = "<script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('/prix-mobile/sw.js', {scope: '/prix-mobile/'}).catch(function(){});</script>\n</body>"
+for sub in ('prix', 'concurrence'):
+    t = (ROOT / 'conso-estimation-r8m3' / sub / 'index.html').read_text(encoding='utf-8')
+    t = t.replace('href="../icon.svg"', 'href="/conso-estimation-r8m3/icon.svg"').replace('href="../icon-32.png"', 'href="/conso-estimation-r8m3/icon-32.png"').replace('href="../icon-180.png"', 'href="/prix-mobile/icon-180.png"')
+    t = t.replace("fetch('cartes.json'", "fetch('/conso-estimation-r8m3/concurrence/cartes.json'")
+    t = t.replace('<!DOCTYPE html>', HEAD, 1).replace('</body>', SW, 1)
+    if sub == 'concurrence':
+        t = t.replace('</style>', '  @media (max-width:820px){main{padding:10px 8px 30px} .card{padding:12px 10px} .ctl{gap:6px 12px} header h1{font-size:18px} .ctl input[type=number]{width:72px}}\n</style>', 1)
+    d = ROOT / 'prix-mobile' / sub; d.mkdir(exist_ok=True)
+    (d / 'index.html').write_text(t, encoding='utf-8')
+    print('OK :', (d / 'index.html').relative_to(ROOT))
