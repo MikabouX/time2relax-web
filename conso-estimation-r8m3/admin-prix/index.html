@@ -117,7 +117,7 @@
         <button type="button" id="concAll">Tout télécharger (<span id="concCount">0</span> cartes)</button>
         <span class="msg" id="concMsg"></span>
       </div>
-      <p class="hint" style="margin:6px 0 0">Les cartes arrivent dans votre dossier Téléchargements. <strong>Une seule fois avant :</strong> Chrome → Paramètres → Confidentialité et sécurité → Paramètres des sites → Documents PDF → « Télécharger les PDF » (sinon Chrome les affiche au lieu de les enregistrer) ; Chrome demande aussi d'autoriser les téléchargements multiples. Rangez ensuite les fichiers dans <code>~/Claude/Tarifs/Concurrence/AAAA-MM</code>.</p>
+      <p class="hint" style="margin:6px 0 0">Un seul fichier ZIP arrive dans Téléchargements (Safari l'ouvre automatiquement en dossier). Les cartes introuvables sont listées dans <code>_manquantes.txt</code>. Rangez ensuite le dossier dans <code>~/Claude/Tarifs/Concurrence/AAAA-MM</code>.</p>
       <p class="hint" style="margin:0">Liens construits d'après les adresses publiées par chaque fournisseur : certains peuvent ne pas exister (page d'erreur), le nom ou la référence d'un produit pouvant changer. Mega : cartes sur <a href="https://www.mega.be/" target="_blank" rel="noopener">mega.be</a>.</p>
       <div id="concLinks" class="hint" style="margin-top:6px"></div>
     </details>
@@ -472,16 +472,20 @@
     }).join('');
     $('concCount').textContent = L.length;
     $('concAll').addEventListener('click', function(){
-      // Comme « Tout télécharger » des cartes ENGIE, mais par cadres cachés : les PDF des autres sites ne changent pas la page.
-      var btn = this, urls = Array.prototype.map.call($('concLinks').querySelectorAll('a.conc'), function(x){ return x.href; }), i = 0;
-      btn.disabled = true;
-      (function next(){
-        if (i >= urls.length){ msg('concMsg', urls.length + ' téléchargements lancés. Vérifiez le dossier Téléchargements (les cartes inexistantes ne donnent rien).', 'ok'); btn.disabled = false; return; }
-        var f = document.createElement('iframe'); f.style.display = 'none'; f.src = urls[i]; document.body.appendChild(f);
-        setTimeout(function(){ f.remove(); }, 60000);
-        i++; msg('concMsg', 'Téléchargement ' + i + ' / ' + urls.length + '…');
-        setTimeout(next, 900);
-      })();
+      // Le serveur (fonction conc-cartes) récupère les PDF et renvoie un seul ZIP : marche aussi sur Safari.
+      var btn = this, d = new Date(), mo = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+      var cartes = concCards().map(function(c){ return {url: c[4], name: [c[0], c[1], c[2], c[3]].join(' - ') + '.pdf'}; });
+      btn.disabled = true; msg('concMsg', 'Le serveur récupère ' + cartes.length + ' cartes… (environ 30 secondes)');
+      var go = function(){ return fetch(URL + '/functions/v1/conc-cartes', {method: 'POST', headers: {apikey: KEY, Authorization: 'Bearer ' + S.access, 'Content-Type': 'application/json'}, body: JSON.stringify({cartes: cartes})}); };
+      go().then(function(r){ return r.status === 401 ? renew().then(go) : r; }).then(function(r){
+        if (!r.ok) return r.text().then(function(t){ throw new Error(t || ('erreur ' + r.status)); });
+        var ok = r.headers.get('x-cartes-ok'), ko = +(r.headers.get('x-cartes-manquantes') || 0);
+        return r.blob().then(function(b){
+          var u = window.URL.createObjectURL(b), a = document.createElement('a'); a.href = u; a.download = 'Concurrence ' + mo + '.zip';
+          document.body.appendChild(a); a.click(); a.remove(); setTimeout(function(){ window.URL.revokeObjectURL(u); }, 60000);
+          msg('concMsg', 'Concurrence ' + mo + '.zip : ' + ok + ' cartes' + (ko ? ', ' + ko + ' introuvables (liste dans _manquantes.txt)' : '') + '.', 'ok');
+        });
+      }).catch(function(e){ msg('concMsg', e.message, 'err'); }).then(function(){ btn.disabled = false; });
     });
   })();
   // Lien direct : admin-prix/#cartes ouvre les cartes ENGIE, #concurrence celles de la concurrence.
