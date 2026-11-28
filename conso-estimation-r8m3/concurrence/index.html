@@ -165,7 +165,7 @@
     var G = (T.grd || []).filter(function(g){ return g.region === cur; });
     var h = G.map(function(g){ return '<option value="' + esc(g.code) + '">' + esc(g.nom) + '</option>'; }).join('');
     if (sel.dataset.h !== h){ sel.innerHTML = h; sel.dataset.h = h; }
-    sel.value = gv; if (sel.value !== gv) sel.value = G.length ? (G.filter(function(g){ return /ores|sibelga/.test(g.code); })[0] || G[0]).code : '';
+    sel.value = gv; if (!gv || sel.value !== gv) sel.value = G.length ? (G.filter(function(g){ return /ores|sibelga/.test(g.code); })[0] || G[0]).code : '';
     $('cNuitL').hidden = $('cCpt').value !== 'b';
     if (!R){ hint.textContent = ''; $('cmpE').innerHTML = $('cmpG').innerHTML = '<tr><td colspan="7" class="hint">' + esc(cur) + ' : comparaison en préparation (les cartes sont téléchargées, le relevé des prix arrive).</td></tr>'; return; }
     var promo = $('cPromo').checked, typ = $('cTyp').value, srt = $('cSort').value, grd = sel.value;
@@ -195,7 +195,8 @@
           '<td class="num"><b>' + fr(Math.round(r.cost), 0) + '</b>' + (r.tot !== null ? ' <span class="hint">(' + fr(Math.round(r.tot), 0) + ')</span>' : '') + '</td>' +
           '<td class="hint">' + (pr ? '<span class="pr">' + esc(pr.t) + '</span>' + (x[12] ? ' · ' : '') : '') + esc(x[12]) + '</td></tr>';
       }).join('') || '<tr><td colspan="7" class="hint">Aucun contrat pour ce filtre.</td></tr>';
-      if (e === 'e') hint.innerHTML = rows.length ? 'Moins cher en électricité : <b>' + esc(best.x[0] + ' ' + best.x[1]) + '</b>' + (eng.length ? ' · meilleur ENGIE : ' + esc(eng[0].x[1]) + ' (+' + fr(Math.round((srt === 'tot' && eng[0].tot !== null ? eng[0].tot - best.tot : eng[0].cost - best.cost)), 0) + ' €/an)' : '') + (netK === null ? ' · <span class="pr">réseau non disponible pour ce gestionnaire</span>' : '') : '';
+      if (e === 'e') hint.innerHTML = rows.length ? 'Moins cher en électricité : <b>' + esc(best.x[0] + ' ' + best.x[1]) + '</b>' + (eng.length && eng[0] === best ? ' (ENGIE est le moins cher)' : eng.length ? ' · meilleur ENGIE : ' + esc(eng[0].x[1]) + ' (+' + fr(Math.round((srt === 'tot' && eng[0].tot !== null ? eng[0].tot - best.tot : eng[0].cost - best.cost)), 0) + ' €/an)' : '') + (netK === null ? ' · <span class="pr">réseau non disponible pour ce gestionnaire</span>' : '') : ''
+      if (e === 'e' && CJ.note_regions && CJ.note_regions[cur]) hint.innerHTML += '<br><span class="hint">' + esc(CJ.note_regions[cur]) + '</span>';
     });
   }
   ['cGrd', 'cKe', 'cCpt', 'cNuit', 'cKg', 'cTyp', 'cPromo', 'cSort'].forEach(function(id){ $(id).addEventListener('input', drawCmp); $(id).addEventListener('change', drawCmp); });
