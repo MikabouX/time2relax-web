@@ -42,6 +42,15 @@
   .ce{background:var(--elec-bg);border:1px solid var(--elec-bd);border-radius:10px;padding:10px}
   .cg{background:var(--gas-bg);border:1px solid var(--gas-bd);border-radius:10px;padding:10px}
   .ce h3,.cg h3{margin:0 0 6px;font-size:15px}
+  .ctl{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;margin:6px 0 8px;font-size:14px}
+  .ctl input[type=number]{width:80px;font:inherit;padding:3px 5px;border:1px solid var(--line);border-radius:6px}
+  .ctl select{font:inherit;padding:3px 5px;border:1px solid var(--line);border-radius:6px;background:#fff}
+  .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px}.dot.e{background:var(--elec)}.dot.g{background:var(--gas)}
+  table.cmp td{white-space:nowrap} table.cmp td:nth-child(7){white-space:normal;min-width:180px}
+  table.cmp tr.engie td{background:rgba(0,113,181,.08)} table.cmp tr.best td:nth-child(6) b{color:#1f7a3a}
+  .tt{font-size:12px;border-radius:6px;padding:1px 6px;border:1px solid #ddd;background:#f6f6f6}
+  .tt.fixe{background:#eaf5ee;border-color:#bfe0c9} .tt.dynamique{background:#f3ecfb;border-color:#d9c7ef}
+  .pr{color:#7a4a00}
   ul.todo{margin:6px 0 0;padding-left:20px}
   @media (max-width:760px){.cols{grid-template-columns:1fr}}
 </style>
@@ -66,19 +75,31 @@
   </section>
 
   <section class="card">
-    <h2>Comparaison des contrats</h2>
-    <p class="hint" id="cmpHint">Contrats ENGIE du mois pour la région choisie (prix de l'énergie seule, TVAC 6 % particulier). Les contrats des concurrents viendront à côté.</p>
-    <div class="cols">
-      <div class="ce"><h3>Électricité</h3><div class="tblwrap"><table><thead><tr><th>Contrat ENGIE</th><th class="num">c€/kWh</th><th class="num">€/an</th><th>Concurrents</th></tr></thead><tbody id="cmpE"></tbody></table></div></div>
-      <div class="cg"><h3>Gaz</h3><div class="tblwrap"><table><thead><tr><th>Contrat ENGIE</th><th class="num">c€/kWh</th><th class="num">€/an</th><th>Concurrents</th></tr></thead><tbody id="cmpG"></tbody></table></div></div>
+    <h2>Comparaison des contrats <span class="hint" style="font-weight:400">· particuliers</span></h2>
+    <div class="ctl">
+      <label>Gestionnaire de réseau <select id="cGrd"></select></label>
+      <label><span class="dot e"></span>Électricité <input id="cKe" type="number" min="0" step="100" value="3500"> kWh/an</label>
+      <label>Compteur <select id="cCpt"><option value="m">mono-horaire</option><option value="b">bi-horaire</option></select></label>
+      <label id="cNuitL" hidden>dont nuit <input id="cNuit" type="number" min="0" max="100" step="5" value="50"> %</label>
+      <label><span class="dot g"></span>Gaz <input id="cKg" type="number" min="0" step="500" value="17000"> kWh/an</label>
+      <label>Type <select id="cTyp"><option value="fv">fixe et variable</option><option value="">tous</option><option value="fixe">fixe</option><option value="variable">variable</option><option value="dynamique">dynamique</option></select></label>
+      <label class="chk"><input id="cPromo" type="checkbox"> promos de la 1re année</label>
+      <label>Trier par <select id="cSort"><option value="tot">coût tout compris</option><option value="en">coût énergie seule</option></select></label>
     </div>
-    <p class="hint" style="margin-top:10px"><b>À venir :</b></p>
-    <ul class="todo hint">
-      <li>encoder les cartes tarifaires des principaux concurrents (Luminus, TotalEnergies, Eneco, Mega, Octa+, Bolt…) ;</li>
-      <li>coût annuel total pour la consommation du simulateur, réseau et taxes compris (identiques chez tous les fournisseurs) ;</li>
-      <li>classement fixe / variable / dynamique.</li>
-    </ul>
-    <p class="hint">En attendant, comparateurs officiels : <a href="https://www.compacwape.be/" target="_blank" rel="noopener">CompaCWaPE</a> (Wallonie), <a href="https://www.brusim.be/" target="_blank" rel="noopener">BruSim</a> (Bruxelles), <a href="https://www.vtest.be/" target="_blank" rel="noopener">V-test</a> (Flandre).</p>
+    <p class="hint" id="cmpHint"></p>
+    <div class="ce"><h3>Électricité</h3><div class="tblwrap"><table class="cmp"><thead><tr><th>#</th><th>Fournisseur · contrat</th><th>Type</th><th class="num">Redevance<br>€/an</th><th class="num">Prix c€/kWh<br><span class="hint">(tout compris)</span></th><th class="num">Coût annuel €<br><span class="hint">(tout compris)</span></th><th>Promo · remarque</th></tr></thead><tbody id="cmpE"></tbody></table></div></div>
+    <div class="cg" style="margin-top:14px"><h3>Gaz</h3><div class="tblwrap"><table class="cmp"><thead><tr><th>#</th><th>Fournisseur · contrat</th><th>Type</th><th class="num">Redevance<br>€/an</th><th class="num">Prix c€/kWh<br><span class="hint">(tout compris)</span></th><th class="num">Coût annuel €<br><span class="hint">(tout compris)</span></th><th>Promo · remarque</th></tr></thead><tbody id="cmpG"></tbody></table></div></div>
+    <details class="hint" style="margin-top:10px"><summary>Comment lire ce tableau</summary>
+      <ul class="todo">
+        <li><b>Prix</b> : énergie du fournisseur + énergie verte, TVAC 6 %. Entre parenthèses : le prix « tout compris » avec le réseau et les taxes du gestionnaire choisi (les mêmes chez tous les fournisseurs).</li>
+        <li><b>Coût annuel</b> : redevance + consommation (énergie seule), et entre parenthèses tout compris (réseau, taxes et leurs frais fixes).</li>
+        <li>Les contrats dynamiques (prix au quart d'heure, compteur communicant) sont masqués par défaut : choisissez « tous » ou « dynamique » dans Type.</li>
+        <li><b>Contrats variables et dynamiques</b> : prix estimé sur 12 mois quand la carte le donne (marqué ≈), sinon prix du mois. Dynamique : prix moyen, la facture dépend des heures de consommation (compteur communicant).</li>
+        <li><b>Promos</b> : non comptées par défaut ; cochez « promos de la 1re année » pour les déduire (remises au kWh, en % ou en euros).</li>
+        <li>Sources : cartes tarifaires officielles des fournisseurs (<span id="cMois"></span>). Tarif social, Empower et contrats pour bâtiment vide non repris. À titre indicatif.</li>
+      </ul>
+    </details>
+    <p class="hint">Comparateurs officiels : <a href="https://www.compacwape.be/" target="_blank" rel="noopener">CompaCWaPE</a> (Wallonie), <a href="https://www.brusim.be/" target="_blank" rel="noopener">BruSim</a> (Bruxelles), <a href="https://www.vtest.be/" target="_blank" rel="noopener">V-test</a> (Flandre).</p>
   </section>
 </main>
 <script>
@@ -134,19 +155,51 @@
   }
   function n(x){ return x === null || x === undefined ? null : +x; }
   function fr(x, d){ return x === null ? '–' : x.toLocaleString('fr-BE', {minimumFractionDigits: d, maximumFractionDigits: d}); }
+  var CJ = null, q2 = new URLSearchParams(location.search);
   function drawCmp(){
+    var hint = $('cmpHint');
+    if (!T || !CJ){ $('cmpE').innerHTML = $('cmpG').innerHTML = '<tr><td colspan="7" class="hint">Chargement des prix…</td></tr>'; return; }
+    $('cMois').textContent = new Date(CJ.mois + '-01T00:00:00').toLocaleDateString('fr-BE', {month: 'long', year: 'numeric'}) + ', relevé du ' + CJ.maj;
+    var R = CJ.regions[cur], sel = $('cGrd'), gv = sel.value || q2.get('grd') || '';
+    // gestionnaires de la région
+    var G = (T.grd || []).filter(function(g){ return g.region === cur; });
+    var h = G.map(function(g){ return '<option value="' + esc(g.code) + '">' + esc(g.nom) + '</option>'; }).join('');
+    if (sel.dataset.h !== h){ sel.innerHTML = h; sel.dataset.h = h; }
+    sel.value = gv; if (sel.value !== gv) sel.value = G.length ? (G.filter(function(g){ return /ores|sibelga/.test(g.code); })[0] || G[0]).code : '';
+    $('cNuitL').hidden = $('cCpt').value !== 'b';
+    if (!R){ hint.textContent = ''; $('cmpE').innerHTML = $('cmpG').innerHTML = '<tr><td colspan="7" class="hint">' + esc(cur) + ' : comparaison en préparation (les cartes sont téléchargées, le relevé des prix arrive).</td></tr>'; return; }
+    var promo = $('cPromo').checked, typ = $('cTyp').value, srt = $('cSort').value, grd = sel.value;
+    function find(type, e, cle){ return (T.prix || []).filter(function(p){ return p.type === type && p.energie === e && p.cle === cle && p.region === cur && (type === 'reseau' ? p.segment === '*' : p.segment === 'R'); })[0] || null; }
     ['e', 'g'].forEach(function(e){
-      var tb = $(e === 'e' ? 'cmpE' : 'cmpG');
-      if (!T){ tb.innerHTML = '<tr><td colspan="4" class="hint">Chargement des prix…</td></tr>'; return; }
-      var rows = (T.prix || []).filter(function(p){ return p.type === 'energie' && p.segment === 'R' && p.energie === e && p.region === cur && p.cle !== 'Tarif social'; })
-        .sort(function(a, b){ return a.cle.localeCompare(b.cle, 'fr'); });
-      tb.innerHTML = rows.length ? rows.map(function(p){
-        var k = n(p.prix_kwh) !== null ? n(p.prix_kwh) : n(p.prix_jour), f = n(p.fixe_an);
-        return '<tr><td>' + esc(p.cle) + '</td><td class="num">' + (k === null ? '–' : fr(k * 1.06, 2)) + '</td><td class="num">' + (f === null ? '–' : fr(f * 1.06, 0)) + '</td><td class="hint">à venir</td></tr>';
-      }).join('') : '<tr><td colspan="4" class="hint">Pas de prix ENGIE encodé pour cette région.</td></tr>';
+      var kwh = Math.max(0, +$(e === 'e' ? 'cKe' : 'cKg').value || 0), bi = e === 'e' && $('cCpt').value === 'b', pn = bi ? Math.min(100, Math.max(0, +$('cNuit').value || 0)) / 100 : 0;
+      var rs = grd ? find('reseau', e, grd) : null, tx = find('taxes', e, cur);
+      var netK = null, netF = 0;
+      if (rs && tx){
+        var rj = n(rs.prix_jour) !== null ? n(rs.prix_jour) : n(rs.prix_kwh), rn = n(rs.prix_nuit) !== null ? n(rs.prix_nuit) : n(rs.prix_kwh);
+        netK = ((bi ? rj * (1 - pn) + rn * pn : n(rs.prix_kwh)) + n(tx.prix_kwh)) * 1.06;
+        netF = ((n(rs.fixe_an) || 0) + (n(tx.fixe_an) || 0)) * 1.06;
+      }
+      var rows = (R[e] || []).filter(function(x){ return !typ || x[2] === typ || (typ === 'fv' && x[2] !== 'dynamique'); }).map(function(x){
+        var v = x[9] || 0, j = x[6] !== null ? x[6] : x[5], nt = x[7] !== null ? x[7] : x[5];
+        var unit = (bi && x[2] !== 'dynamique' ? j * (1 - pn) + nt * pn : x[5]) + v;
+        var cost = x[4] + kwh * unit / 100, pr = x[11];
+        if (promo && pr){ var du = (pr.k || 0) + (pr.p ? unit * pr.p / 100 : 0); unit -= du; cost -= du * kwh / 100 + (pr.f || 0); }
+        var tot = netK === null ? null : cost + netF + kwh * netK / 100;
+        return {x: x, unit: unit, cost: cost, tot: tot, all: netK === null ? null : unit + netK};
+      }).sort(function(a, b){ return (srt === 'tot' && a.tot !== null ? a.tot - b.tot : a.cost - b.cost); });
+      var best = rows.length ? rows[0] : null, eng = rows.filter(function(r){ return r.x[0] === 'ENGIE'; });
+      $(e === 'e' ? 'cmpE' : 'cmpG').innerHTML = rows.map(function(r, i){
+        var x = r.x, pr = x[11];
+        return '<tr class="' + (x[0] === 'ENGIE' ? 'engie' : '') + (i === 0 ? ' best' : '') + '"><td class="hint">' + (i + 1) + '</td><td><b>' + esc(x[0]) + '</b> · ' + esc(x[1]) + '</td><td><span class="tt ' + x[2] + '">' + x[2] + '</span> <span class="hint">' + esc(x[3]) + '</span></td>' +
+          '<td class="num">' + fr(x[4], 0) + '</td><td class="num">' + (x[10] ? '≈ ' : '') + fr(r.unit, 2) + (r.all !== null ? ' <span class="hint">(' + fr(r.all, 2) + ')</span>' : '') + '</td>' +
+          '<td class="num"><b>' + fr(Math.round(r.cost), 0) + '</b>' + (r.tot !== null ? ' <span class="hint">(' + fr(Math.round(r.tot), 0) + ')</span>' : '') + '</td>' +
+          '<td class="hint">' + (pr ? '<span class="pr">' + esc(pr.t) + '</span>' + (x[12] ? ' · ' : '') : '') + esc(x[12]) + '</td></tr>';
+      }).join('') || '<tr><td colspan="7" class="hint">Aucun contrat pour ce filtre.</td></tr>';
+      if (e === 'e') hint.innerHTML = rows.length ? 'Moins cher en électricité : <b>' + esc(best.x[0] + ' ' + best.x[1]) + '</b>' + (eng.length ? ' · meilleur ENGIE : ' + esc(eng[0].x[1]) + ' (+' + fr(Math.round((srt === 'tot' && eng[0].tot !== null ? eng[0].tot - best.tot : eng[0].cost - best.cost)), 0) + ' €/an)' : '') + (netK === null ? ' · <span class="pr">réseau non disponible pour ce gestionnaire</span>' : '') : '';
     });
-    if (T && T.mois) $('cmpHint').textContent = 'Contrats ENGIE de ' + new Date(T.mois + 'T00:00:00').toLocaleDateString('fr-BE', {month: 'long', year: 'numeric'}) + ' pour ' + cur + ' (prix de l\'énergie seule, sans réseau ni taxes, TVAC 6 % particulier). Les contrats des concurrents viendront à côté.';
   }
+  ['cGrd', 'cKe', 'cCpt', 'cNuit', 'cKg', 'cTyp', 'cPromo', 'cSort'].forEach(function(id){ $(id).addEventListener('input', drawCmp); $(id).addEventListener('change', drawCmp); });
+  fetch('cartes.json', {cache: 'no-cache'}).then(function(r){ return r.json(); }).then(function(d){ CJ = d; drawCmp(); }).catch(function(){ CJ = {mois: '', maj: '', regions: {}}; drawCmp(); });
   $('regs').addEventListener('click', function(e){ var b = e.target.closest('button'); if (b){ cur = b.dataset.r; drawList(); } });
   $('ens').addEventListener('click', function(e){ var b = e.target.closest('button'); if (b){ en = b.dataset.en; drawList(); } });
   drawList();

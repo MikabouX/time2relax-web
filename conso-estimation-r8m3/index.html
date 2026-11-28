@@ -2098,7 +2098,7 @@
       if (cur) c.classList.add(cur);
     });
   }
-  render = (function(o){ return function(){ o.apply(this, arguments); try { var rg = regionOf('e') || regionOf('g'); $('lnkConc').href = 'concurrence/' + (rg ? '?r=' + encodeURIComponent(rg) : ''); } catch (e){} try { akCalc(); } catch (e){} try { ['cost', 'regOut', 'akOut', 'akRecOut'].forEach(colorLines); } catch (e){} }; })(render);
+  render = (function(o){ return function(){ o.apply(this, arguments); try { var rg = regionOf('e') || regionOf('g'); var gq = $('grdE').value || $('grdG').value; $('lnkConc').href = 'concurrence/' + (rg ? '?r=' + encodeURIComponent(rg) + (gq ? '&grd=' + encodeURIComponent(gq) : '') : ''); } catch (e){} try { akCalc(); } catch (e){} try { ['cost', 'regOut', 'akOut', 'akRecOut'].forEach(colorLines); } catch (e){} }; })(render);
   // Outil 3 : lire une capture d'écran des paiements (lecture dans le navigateur avec Tesseract.js ; l'image ne quitte pas le PC).
   // Chaque ligne : montant payé (1re colonne) − frais de rappel (2e colonne) = acompte. Les services (Home Assistance…)
   // compris dans les paiements sont retirés : montant × nombre de mensualités.
