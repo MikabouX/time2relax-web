@@ -118,7 +118,7 @@
         <span class="msg" id="concMsg"></span>
       </div>
       <p class="hint" style="margin:6px 0 0">Un seul fichier ZIP arrive dans Téléchargements (Safari l'ouvre automatiquement en dossier). Les cartes introuvables sont listées dans <code>_manquantes.txt</code>. Rangez ensuite le dossier dans <code>~/Claude/Tarifs/Concurrence/AAAA-MM</code>.</p>
-      <p class="hint" style="margin:0">Liens construits d'après les adresses publiées par chaque fournisseur : certains peuvent ne pas exister (page d'erreur), le nom ou la référence d'un produit pouvant changer. Mega : le serveur prend toutes les cartes de sa <a href="https://www.mega.be/fr/energie/cartes-tarifaires" target="_blank" rel="noopener">page des cartes tarifaires</a> (environ 58).</p>
+      <p class="hint" style="margin:0">Liens construits d'après les adresses publiées par chaque fournisseur : certains peuvent ne pas exister (page d'erreur), le nom ou la référence d'un produit pouvant changer. Luminus : cartes sur sa <a href="https://www.luminus.be/fr/particuliers/energie/tarifs-et-listes-de-prix/" target="_blank" rel="noopener">page Tarifs et listes de prix</a> (Claude peut les télécharger via Chrome). Mega : le serveur prend toutes les cartes de sa <a href="https://www.mega.be/fr/energie/cartes-tarifaires" target="_blank" rel="noopener">page des cartes tarifaires</a> (environ 58).</p>
       <div id="concLinks" class="hint" style="margin-top:6px"></div>
     </details>
     <details class="sec" id="avBox">
@@ -455,10 +455,16 @@
         L.push(['Octa+', p[1] + (en === 'G' ? ' gaz' : ' élec'), r[1], 'Particuliers', 'https://files.octaplus.be/tariffs/' + en + '_OCTA_' + p[0] + '_RE_' + r[0] + '_FR.pdf']);
       }); });
     });
-    // Luminus : adresse fixe ; son site refuse le serveur, donc liens à ouvrir à la main (hors ZIP)
-    [['ec0c_fr_comfy_elec', 'Comfy élec'], ['ecf0c_fr_comfyflex_elec', 'ComfyFlex élec'], ['ebfl0c_fr_basicflex_elec', 'BasicFlex élec'], ['gbfl0c_fr_basicflex_gas', 'BasicFlex gaz'],
-     ['ebfi2c_fr_basicfix_elec', 'BasicFix élec'], ['exfl2c_fr_maxxflex_elec', 'MaxxFlex élec'], ['exfi2c_fr_maxxfix_elec', 'MaxxFix élec'], ['eec_fr_essential_elec', 'Essential élec']].forEach(function(p){
-      L.push(['Luminus', p[1], 'Toutes', 'Particuliers', 'https://www.luminus.be/-/media/general/pricelists/fr/' + p[0] + '.pdf', 'main']);
+    // Luminus : cartes servies par luminus.be/api-next/get-pricelist (une par région) ; le site refuse le serveur, donc liens à ouvrir à la main (hors ZIP)
+    var LP = [['maxxfix', 'MaxxFix', 'EG'], ['maxxflex', 'MaxxFlex', 'EG'], ['comfy', 'Comfy', 'EG'], ['comfyflex', 'ComfyFlex', 'EG'], ['comfy-plus', 'Comfy+', 'EG'], ['comfyflex-plus', 'ComfyFlex+', 'EG'],
+      ['smartflex', 'SmartFlex', 'E'], ['basicfix', 'BasicFix Online', 'EG'], ['basicflex', 'BasicFlex Online', 'EG'], ['dynamic', 'Dynamic Online', 'E'], ['tarif-social', 'Tarif social', 'EG']];
+    [['Wallonia', 'Wallonie', ''], ['Flanders', 'Flandre', ''], ['Brussels', 'Bruxelles', '&isBrussels=true']].forEach(function(r){
+      LP.forEach(function(p){
+        if (r[0] === 'Brussels' && p[0] !== 'comfy' && p[0] !== 'comfyflex') return;   // Bruxelles : Comfy et ComfyFlex seulement
+        p[2].split('').forEach(function(en){
+          L.push(['Luminus', p[1] + (en === 'G' ? ' gaz' : ' élec'), r[1], 'Particuliers', 'https://www.luminus.be/api-next/get-pricelist?documentSlug=' + p[0] + '&energyType=' + (en === 'G' ? 'gas' : 'electricity') + '&language=fr' + r[2] + '&tabValue=' + r[0], 'main']);
+        });
+      });
     });
     return L;
   }
