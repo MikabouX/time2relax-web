@@ -121,6 +121,11 @@
       <p class="hint" style="margin:0">Liens construits d'après les adresses publiées par chaque fournisseur : certains peuvent ne pas exister (page d'erreur), le nom ou la référence d'un produit pouvant changer. Luminus : cartes sur sa <a href="https://www.luminus.be/fr/particuliers/energie/tarifs-et-listes-de-prix/" target="_blank" rel="noopener">page Tarifs et listes de prix</a> (Claude peut les télécharger via Chrome). Mega : le serveur prend toutes les cartes de sa <a href="https://www.mega.be/fr/energie/cartes-tarifaires" target="_blank" rel="noopener">page des cartes tarifaires</a> (environ 58).</p>
       <div id="concLinks" class="hint" style="margin-top:6px"></div>
     </details>
+    <details class="sec" id="msBox">
+      <summary><strong>Contrats en cours saisis par les collègues</strong> <span class="hint" id="msCount"></span></summary>
+      <div class="row" style="margin-top:8px"><button type="button" id="msCsv" class="sec">Copier (tableur)</button> <span class="msg" id="msMsg"></span></div>
+      <div id="msList" class="hint" style="margin-top:6px;overflow-x:auto"></div>
+    </details>
     <details class="sec" id="avBox">
       <summary><strong>Avis des collègues</strong> <span class="hint" id="avCount"></span></summary>
       <p class="hint" style="margin:6px 0">Un avis qui reçoit une réponse est affiché (anonymement) sur la page des avis. Vider la réponse le retire.</p>
@@ -193,10 +198,30 @@
       $('loginCard').hidden = true; $('app').hidden = false; $('logout').hidden = false; $('who').textContent = S.email;
       var d = new Date(); $('mois').value = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
       loadVisits();
-      loadTs(); loadAvis();
+      loadTs(); loadAvis(); loadMs();
       return load().then(loadProps);
     });
   }
+  // ---------- Contrats en cours saisis (page Concurrence, « Mon contrat actuel ») ----------
+  var MS = [];
+  function loadMs(){
+    return rpc('conso_conc_liste', {p_limite: 1000}).then(function(rows){
+      MS = rows || []; $('msCount').textContent = '(' + MS.length + ')';
+      $('msList').innerHTML = MS.length ? '<table><tr><th>Date</th><th>Région</th><th>Énergie</th><th>Fournisseur</th><th>Contrat</th><th>Type</th><th>c€/kWh</th><th>€/an</th><th>Souscrit</th><th>kWh</th><th></th></tr>' + MS.map(function(r){
+        return '<tr><td>' + escA(String(r.cree).slice(0, 10)) + '</td><td>' + escA(r.region) + '</td><td>' + (r.energie === 'e' ? 'élec' : 'gaz') + '</td><td>' + escA(r.fournisseur) + '</td><td>' + escA(r.contrat || '') + '</td><td>' + escA(r.type || '') + '</td><td>' + escA(String(r.prix_kwh).replace('.', ',')) + '</td><td>' + escA(r.redevance === null ? '' : String(r.redevance).replace('.', ',')) + '</td><td>' + escA(r.souscrit ? String(r.souscrit).slice(0, 7) : '') + '</td><td>' + escA(r.conso === null ? '' : r.conso) + '</td><td><button type="button" class="sec msDel" data-id="' + r.id + '" title="Supprimer cette saisie">×</button></td></tr>';
+      }).join('') + '</table>' : 'Aucune saisie pour l\'instant.';
+    }).catch(function(e){ msg('msMsg', e.message, 'err'); });
+  }
+  $('msList').addEventListener('click', function(e){
+    var b = e.target.closest('.msDel'); if (!b) return;
+    rpc('conso_conc_supprimer', {p_id: +b.dataset.id}).then(loadMs).catch(function(er){ msg('msMsg', er.message, 'err'); });
+  });
+  $('msCsv').addEventListener('click', function(){
+    var t = ['Date\tRégion\tÉnergie\tFournisseur\tContrat\tType\tc€/kWh TVAC\tRedevance €/an\tSouscrit\tkWh'].concat(MS.map(function(r){
+      return [String(r.cree).slice(0, 10), r.region, r.energie === 'e' ? 'élec' : 'gaz', r.fournisseur, r.contrat || '', r.type || '', String(r.prix_kwh).replace('.', ','), r.redevance === null ? '' : String(r.redevance).replace('.', ','), r.souscrit ? String(r.souscrit).slice(0, 7) : '', r.conso === null ? '' : r.conso].join('\t');
+    })).join('\n');
+    navigator.clipboard.writeText(t).then(function(){ msg('msMsg', MS.length + ' lignes copiées : collez dans Excel ou Numbers.', 'ok'); }, function(){ msg('msMsg', 'Copie impossible.', 'err'); });
+  });
   // ---------- Avis et réponses ----------
   function escA(t){ return String(t == null ? '' : t).replace(/[&<>"]/g, function(ch){ return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[ch]; }); }
   function loadAvis(){

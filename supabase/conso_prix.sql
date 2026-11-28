@@ -320,3 +320,57 @@ create or replace function public.conso_detail_get()
 $$;
 revoke all on function public.conso_detail_get() from public;
 grant execute on function public.conso_detail_get() to anon, authenticated;
+
+-- ===== Concurrence : prix des contrats en cours saisis par les collègues (page Concurrence, « Mon contrat actuel ») =====
+-- Aucune donnée de client : fournisseur, contrat, prix, région. Écriture anonyme via conso_conc_saisir ; lecture réservée aux administrateurs.
+create table if not exists public.conso_conc_saisie (
+  id bigint generated always as identity primary key,
+  cree timestamptz not null default now(),
+  region text not null check (region in ('Wallonie', 'Bruxelles', 'Flandre')),
+  energie text not null check (energie in ('e', 'g')),
+  fournisseur text not null check (length(fournisseur) between 1 and 60),
+  contrat text check (contrat is null or length(contrat) <= 80),
+  type text check (type is null or type in ('fixe', 'variable', 'dynamique')),
+  prix_kwh numeric(8,3) not null check (prix_kwh > 0 and prix_kwh < 150),
+  redevance numeric(8,2) check (redevance is null or (redevance >= 0 and redevance < 2000)),
+  souscrit date check (souscrit is null or (souscrit > '2000-01-01' and souscrit <= current_date + 31)),
+  conso integer check (conso is null or (conso >= 0 and conso < 1000000))
+);
+alter table public.conso_conc_saisie enable row level security;
+revoke all on public.conso_conc_saisie from anon, authenticated;
+
+create or replace function public.conso_conc_saisir(p_region text, p_energie text, p_fournisseur text, p_contrat text, p_type text,
+  p_prix numeric, p_redevance numeric, p_souscrit date, p_conso integer)
+returns bigint language plpgsql security definer set search_path = public as $$
+declare v_id bigint;
+begin
+  -- garde-fou simple contre les envois en rafale
+  if (select count(*) from conso_conc_saisie where cree > now() - interval '1 minute') > 30 then
+    raise exception 'trop d''envois, réessayez dans une minute';
+  end if;
+  insert into conso_conc_saisie(region, energie, fournisseur, contrat, type, prix_kwh, redevance, souscrit, conso)
+  values (p_region, p_energie, left(trim(p_fournisseur), 60), nullif(left(trim(coalesce(p_contrat, '')), 80), ''), p_type,
+          round(p_prix, 3), round(p_redevance, 2), p_souscrit, p_conso)
+  returning id into v_id;
+  return v_id;
+end $$;
+revoke all on function public.conso_conc_saisir(text, text, text, text, text, numeric, numeric, date, integer) from public;
+grant execute on function public.conso_conc_saisir(text, text, text, text, text, numeric, numeric, date, integer) to anon, authenticated;
+
+create or replace function public.conso_conc_liste(p_limite integer default 500)
+returns setof public.conso_conc_saisie language plpgsql security definer set search_path = public as $$
+begin
+  if not t2r_is_admin() then raise exception 'réservé aux administrateurs'; end if;
+  return query select * from conso_conc_saisie order by cree desc limit greatest(1, least(p_limite, 5000));
+end $$;
+revoke all on function public.conso_conc_liste(integer) from public;
+grant execute on function public.conso_conc_liste(integer) to authenticated;
+
+create or replace function public.conso_conc_supprimer(p_id bigint)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  if not t2r_is_admin() then raise exception 'réservé aux administrateurs'; end if;
+  delete from conso_conc_saisie where id = p_id;
+end $$;
+revoke all on function public.conso_conc_supprimer(bigint) from public;
+grant execute on function public.conso_conc_supprimer(bigint) to authenticated;

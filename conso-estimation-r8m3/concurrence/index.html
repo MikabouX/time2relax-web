@@ -51,6 +51,10 @@
   .tt{font-size:12px;border-radius:6px;padding:1px 6px;border:1px solid #ddd;background:#f6f6f6}
   .tt.fixe{background:#eaf5ee;border-color:#bfe0c9} .tt.dynamique{background:#f3ecfb;border-color:#d9c7ef}
   .pr{color:#7a4a00}
+  .mine{background:#f7f9fb;border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:6px 0 12px}
+  .mine h3{margin:0 0 4px;font-size:15px}
+  .mine button{font:inherit;padding:5px 14px;border-radius:8px;border:1px solid var(--accent);background:var(--accent);color:#fff;cursor:pointer}
+  #mOut{margin-top:6px;font-size:14px;color:var(--ink)} #mOut ol{margin:4px 0 0;padding-left:20px} #mOut .sv{color:#1f7a3a;font-weight:650} #mOut .ok{color:#1f7a3a}
   ul.todo{margin:6px 0 0;padding-left:20px}
   @media (max-width:760px){.cols{grid-template-columns:1fr}}
 </style>
@@ -85,6 +89,25 @@
       <label>Type <select id="cTyp"><option value="fv">fixe et variable</option><option value="">tous</option><option value="fixe">fixe</option><option value="variable">variable</option><option value="dynamique">dynamique</option></select></label>
       <label class="chk"><input id="cPromo" type="checkbox"> promos de la 1re année</label>
       <label>Trier par <select id="cSort"><option value="tot">coût tout compris</option><option value="en">coût énergie seule</option></select></label>
+    </div>
+    <div class="mine">
+      <h3>Mon contrat actuel <span class="hint" style="font-weight:400">· est-ce qu'une offre du mois serait plus intéressante ?</span></h3>
+      <div class="ctl">
+        <label><input type="radio" name="mEn" value="e" checked> <span class="dot e"></span>Électricité</label>
+        <label><input type="radio" name="mEn" value="g"> <span class="dot g"></span>Gaz</label>
+        <label>Fournisseur <select id="mFou"></select> <input id="mFouA" maxlength="60" placeholder="nom" style="width:110px" hidden></label>
+        <label>Contrat <input id="mCt" list="mCtL" maxlength="80" placeholder="ex. Easy fixe" style="width:150px"><datalist id="mCtL"></datalist></label>
+        <label>Type <select id="mTyp"><option value="">?</option><option value="fixe">fixe</option><option value="variable">variable</option><option value="dynamique">dynamique</option></select></label>
+      </div>
+      <div class="ctl">
+        <label>Prix de l'énergie <input id="mPx" type="text" inputmode="decimal" placeholder="25,30" style="width:70px"> c€/kWh TVAC</label>
+        <label class="chk"><input id="mVert" type="checkbox"> énergie verte comprise</label>
+        <label>Redevance <input id="mRd" type="text" inputmode="decimal" placeholder="65" style="width:60px"> €/an</label>
+        <label>Souscrit en <input id="mDt" type="month"> <span class="hint">(facultatif)</span></label>
+        <button type="button" id="mGo">Comparer</button>
+      </div>
+      <div id="mOut" class="hint"></div>
+      <p class="hint" style="margin:4px 0 0">Les prix saisis (fournisseur, contrat, prix, date) sont enregistrés anonymement pour comparer les contrats en cours. N'indiquez aucune donnée de client.</p>
     </div>
     <p class="hint" id="cmpHint"></p>
     <div class="ce"><h3>Électricité</h3><div class="tblwrap"><table class="cmp"><thead><tr><th>#</th><th>Fournisseur · contrat</th><th>Type</th><th class="num">Redevance<br>€/an</th><th class="num">Prix c€/kWh<br><span class="hint">(tout compris)</span></th><th class="num">Coût annuel €<br><span class="hint">(tout compris)</span></th><th>Promo · remarque</th></tr></thead><tbody id="cmpE"></tbody></table></div></div>
@@ -157,7 +180,7 @@
   function fr(x, d){ return x === null ? '–' : x.toLocaleString('fr-BE', {minimumFractionDigits: d, maximumFractionDigits: d}); }
   var CJ = null, q2 = new URLSearchParams(location.search);
   function drawCmp(){
-    var hint = $('cmpHint');
+    var hint = $('cmpHint'); try { mFill(); } catch (e){}
     if (!T || !CJ){ $('cmpE').innerHTML = $('cmpG').innerHTML = '<tr><td colspan="7" class="hint">Chargement des prix…</td></tr>'; return; }
     $('cMois').textContent = new Date(CJ.mois + '-01T00:00:00').toLocaleDateString('fr-BE', {month: 'long', year: 'numeric'}) + ', relevé du ' + CJ.maj;
     var R = CJ.regions[cur], sel = $('cGrd'), gv = sel.value || q2.get('grd') || '';
@@ -199,6 +222,54 @@
       if (e === 'e' && CJ.note_regions && CJ.note_regions[cur]) hint.innerHTML += '<br><span class="hint">' + esc(CJ.note_regions[cur]) + '</span>';
     });
   }
+  // ---------- Mon contrat actuel ----------
+  function mEn(){ return document.querySelector('input[name=mEn]:checked').value; }
+  function pn2(v){ v = String(v || '').replace(/\s/g, '').replace(',', '.'); return v === '' || isNaN(+v) ? null : +v; }
+  function mFill(){
+    if (!CJ) return;
+    var R = CJ.regions[cur] || {e: [], g: []}, e = mEn(), fs = [], sel = $('mFou'), v = sel.value;
+    (R[e] || []).forEach(function(x){ if (fs.indexOf(x[0]) < 0) fs.push(x[0]); });
+    var h = '<option value="">Choisir…</option>' + fs.map(function(f){ return '<option>' + esc(f) + '</option>'; }).join('') + '<option value="Autre">Autre…</option>';
+    if (sel.dataset.h !== h){ sel.innerHTML = h; sel.dataset.h = h; sel.value = v; }
+    var cs = (R[e] || []).filter(function(x){ return x[0] === sel.value; }).map(function(x){ return x[1]; });
+    $('mCtL').innerHTML = cs.map(function(c){ return '<option value="' + esc(c) + '">'; }).join('');
+  }
+  var mLast = '';
+  function mCompare(save){
+    var out = $('mOut'), e = mEn(), px = pn2($('mPx').value), rd = pn2($('mRd').value), fou = $('mFou').value;
+    if (fou === 'Autre') fou = $('mFouA').value.trim();
+    if (!fou || px === null || px <= 0 || px > 150){ out.innerHTML = '<span class="pr">Indiquez le fournisseur et le prix de l\'énergie (c€/kWh TVAC).</span>'; return; }
+    var R = CJ.regions[cur]; if (!R){ out.textContent = 'Comparaison indisponible pour cette région.'; return; }
+    var known = (R[e] || []).filter(function(x){ return x[0] === fou && x[1] === $('mCt').value.trim(); })[0];
+    if (rd === null) rd = known ? known[4] : 0;
+    var eng = (R[e] || []).filter(function(x){ return x[0] === 'ENGIE'; })[0], vAvg = e === 'e' && !$('mVert').checked ? (eng ? eng[9] : 0) : 0;
+    var kwh = Math.max(0, +$(e === 'e' ? 'cKe' : 'cKg').value || 0);
+    var mine = rd + kwh * (px + vAvg) / 100;
+    var offers = (R[e] || []).filter(function(x){ return x[2] !== 'dynamique'; }).map(function(x){ return {x: x, c: x[4] + kwh * (x[5] + (x[9] || 0)) / 100}; })
+      .filter(function(o){ return o.c < mine - 1; }).sort(function(a, b){ return a.c - b.c; });
+    var bestE = offers.filter(function(o){ return o.x[0] === 'ENGIE'; })[0];
+    var h = 'Pour ' + fr(kwh, 0) + ' kWh/an, ce contrat coûte environ <b>' + fr(Math.round(mine), 0) + ' €/an</b> (énergie' + (vAvg ? ' + énergie verte' : '') + ', hors réseau et taxes, qui ne changent pas avec le fournisseur).';
+    if (!offers.length) h += '<br><span class="ok">Aucune offre fixe ou variable du mois n\'est moins chère : c\'est un bon contrat.</span>';
+    else {
+      h += '<br>' + offers.length + ' offre' + (offers.length > 1 ? 's' : '') + ' du mois moins chère' + (offers.length > 1 ? 's' : '') + ' (sans promo) :<ol>' + offers.slice(0, 5).map(function(o){
+        return '<li><b>' + esc(o.x[0]) + '</b> · ' + esc(o.x[1]) + ' <span class="hint">(' + o.x[2] + ')</span> : ' + fr(Math.round(o.c), 0) + ' €/an, <span class="sv">−' + fr(Math.round(mine - o.c), 0) + ' €</span></li>';
+      }).join('') + '</ol>';
+      if (bestE && offers.indexOf(bestE) >= 5) h += 'Meilleure offre ENGIE : <b>' + esc(bestE.x[1]) + '</b>, ' + fr(Math.round(bestE.c), 0) + ' €/an (<span class="sv">−' + fr(Math.round(mine - bestE.c), 0) + ' €</span>).';
+      else if (!bestE && fou !== 'ENGIE') h += 'Aucune offre ENGIE du mois n\'est moins chère pour ce profil.';
+    }
+    out.innerHTML = h;
+    if (!save) return;
+    var key = [cur, e, fou, $('mCt').value.trim(), px, rd, $('mDt').value].join('|'); if (key === mLast) return; mLast = key;
+    var dt = $('mDt').value ? $('mDt').value + '-01' : null;
+    fetch(SB_URL + '/rest/v1/rpc/conso_conc_saisir', {method: 'POST', headers: {'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY, 'Content-Type': 'application/json'},
+      body: JSON.stringify({p_region: cur, p_energie: e, p_fournisseur: fou, p_contrat: $('mCt').value.trim() || null, p_type: $('mTyp').value || null, p_prix: px + (vAvg ? 0 : 0), p_redevance: pn2($('mRd').value), p_souscrit: dt, p_conso: kwh})})
+      .then(function(r){ if (r.ok) out.insertAdjacentHTML('beforeend', '<div class="hint ok">✓ Enregistré, merci.</div>'); }).catch(function(){});
+  }
+  document.querySelectorAll('input[name=mEn]').forEach(function(r){ r.addEventListener('change', function(){ mFill(); $('mOut').innerHTML = ''; }); });
+  $('mFou').addEventListener('change', function(){ $('mFouA').hidden = $('mFou').value !== 'Autre'; mFill(); var R = CJ && CJ.regions[cur]; var ct = R ? (R[mEn()] || []).filter(function(x){ return x[0] === $('mFou').value; }) : []; if (ct.length === 1) $('mCt').value = ct[0][1]; });
+  $('mCt').addEventListener('change', function(){ var R = CJ && CJ.regions[cur], k = R ? (R[mEn()] || []).filter(function(x){ return x[0] === $('mFou').value && x[1] === $('mCt').value.trim(); })[0] : null; if (k){ $('mTyp').value = k[2]; if (!$('mRd').value) $('mRd').value = String(k[4]).replace('.', ','); } });
+  $('mGo').addEventListener('click', function(){ mCompare(true); });
+  ['cKe', 'cKg'].forEach(function(id){ $(id).addEventListener('change', function(){ if ($('mOut').innerHTML) mCompare(false); }); });
   ['cGrd', 'cKe', 'cCpt', 'cNuit', 'cKg', 'cTyp', 'cPromo', 'cSort'].forEach(function(id){ $(id).addEventListener('input', drawCmp); $(id).addEventListener('change', drawCmp); });
   fetch('cartes.json', {cache: 'no-cache'}).then(function(r){ return r.json(); }).then(function(d){ CJ = d; drawCmp(); }).catch(function(){ CJ = {mois: '', maj: '', regions: {}}; drawCmp(); });
   $('regs').addEventListener('click', function(e){ var b = e.target.closest('button'); if (b){ cur = b.dataset.r; drawList(); } });
