@@ -61,7 +61,20 @@ Deno.serve(async (req) => {
       if (!found.length) pageMiss.push("Mega : aucune carte trouvée sur mega.be/fr/energie/cartes-tarifaires (page à vérifier)");
     } catch { pageMiss.push("Mega : page mega.be/fr/energie/cartes-tarifaires injoignable"); }
   }
-  list = list.filter((c) => { try { const u = new URL(c.url); return u.protocol === "https:" && HOSTS.includes(u.hostname); } catch { return false; } }).slice(0, 150);
+  if (pages.includes("bolt")) {   // Bolt : le numéro de version des cartes variables change, on lit la page des cartes tarifaires
+    try {
+      const h = await (await fetch("https://www.boltenergie.be/fr/listes-des-prix", { headers: { "User-Agent": "Mozilla/5.0 (Time2Relax simulateur)" }, signal: AbortSignal.timeout(20000) })).text();
+      const found = [...new Set([...h.matchAll(/https:\/\/files\.boltenergie\.be\/pricelists\/(?:var|fix)\/[a-z_]+_fr_\d+\.pdf/g)].map((m) => m[0]))];
+      const P: Record<string, string> = { bolt: "Variable", online: "Online", fix: "Fixe", plenty: "Plenty", plenty_online: "Plenty Online", plenty_fix: "Plenty Fixe" };
+      for (const u of found) {
+        const m = u.match(/\/([a-z_]+)_(res|pro)_(el|ng)_fr_\d+\.pdf$/); if (!m) continue;
+        list = list.filter((c) => !c.url.includes("files.boltenergie.be/pricelists/fix/" + m[1] + "_" + m[2] + "_" + m[3] + "_fr_"));   // pas de doublon avec la liste de la page admin
+        list.push({ url: u, name: ["Bolt", (P[m[1]] || m[1]) + (m[3] === "ng" ? " gaz" : " élec"), "Toutes", m[2] === "pro" ? "Professionnels" : "Particuliers"].join(" - ") + ".pdf" });
+      }
+      if (!found.length) pageMiss.push("Bolt : aucune carte trouvée sur boltenergie.be/fr/listes-des-prix (page à vérifier)");
+    } catch { pageMiss.push("Bolt : page boltenergie.be/fr/listes-des-prix injoignable"); }
+  }
+  list = list.filter((c) => { try { const u = new URL(c.url); return u.protocol === "https:" && HOSTS.includes(u.hostname); } catch { return false; } }).slice(0, 250);
   if (!list.length && !pageMiss.length) return new Response("aucune carte", { status: 400, headers: CORS });
 
   const files: { name: string; data: Uint8Array }[] = [], miss: string[] = [...pageMiss];
@@ -77,7 +90,7 @@ Deno.serve(async (req) => {
       } catch { miss.push(c.name); }
     }
   }
-  await Promise.all(Array.from({ length: 6 }, worker));
+  await Promise.all(Array.from({ length: 8 }, worker));
   if (miss.length) files.push({ name: "_manquantes.txt", data: new TextEncoder().encode("Cartes introuvables (adresse à corriger) :\n" + miss.join("\n") + "\n") });
   files.sort((a, b) => a.name.localeCompare(b.name));
   return new Response(zip(files), { headers: { ...CORS, "Content-Type": "application/zip", "x-cartes-ok": String(files.length - (miss.length ? 1 : 0)), "x-cartes-manquantes": String(miss.length) } });

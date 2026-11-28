@@ -444,20 +444,27 @@
         L.push(['Eneco', p[1], 'Toutes', s[1], 'https://cdn.eneco.be/downloads/fr/general/tk/' + s[0] + YY + MM + '_FR_ENECO_' + p[0] + '.pdf']);
       });
     });
-    // Bolt Fixe : fix_{res|pro}_{el|ng}_fr_AAAAMM
+    // Bolt Fixe : fix_{res|pro}_{el|ng}_fr_AAAAMM (le serveur ajoute les autres cartes Bolt en lisant boltenergie.be/fr/listes-des-prix)
     [['res', 'Particuliers'], ['pro', 'Professionnels']].forEach(function(s){ [['el', 'élec'], ['ng', 'gaz']].forEach(function(e){
       L.push(['Bolt', 'Fixe ' + e[1], 'Toutes', s[1], 'https://files.boltenergie.be/pricelists/fix/fix_' + s[0] + '_' + e[0] + '_fr_' + Y + MM + '.pdf']);
     }); });
-    // Octa+ : adresse fixe, carte du mois en cours
-    // (Octa+ ne publie pas ces cartes pour Bruxelles ; Flow n'est plus mis à jour depuis décembre 2025)
-    [['FLUX', 'Flux', 'E'], ['SMARTVARIABLE', 'Smart Variable', 'EG'], ['Fixed', 'Fixed', 'EG'], ['DYNAMIC', 'Dynamic', 'E']].forEach(function(p){
-      p[2].split('').forEach(function(en){ [['WL', 'Wallonie'], ['VL', 'Flandre']].forEach(function(r){
-        L.push(['Octa+', p[1] + (en === 'G' ? ' gaz' : ' élec'), r[1], 'Particuliers', 'https://files.octaplus.be/tariffs/' + en + '_OCTA_' + p[0] + '_RE_' + r[0] + '_FR.pdf']);
-      }); });
+    // Octa+ : adresse fixe, carte du mois en cours (gamme relevée sur octaplus.be/fr/electricite-gaz-naturel/tarifs, novembre 2026)
+    [['RE', 'Particuliers', [['WL', 'Wallonie'], ['VL', 'Flandre']], [['SMARTVARIABLE', 'Smart Variable', 'EG'], ['BASICONLINE', 'Basic Online', 'EG'], ['BOOSTFLEX', 'Boost Flex', 'EG'], ['BOOSTFIX', 'Boost Fix', 'EG'], ['ECOBOOSTFLEX', 'Eco Boost Flex', 'EG'], ['ECOBOOSTFIX', 'Eco Boost Fix', 'EG'], ['DYNAMIC', 'Dynamic', 'E'], ['ECODYNAMIC', 'Eco Dynamic', 'E']]],
+     ['PR', 'Professionnels', [['WL', 'Wallonie'], ['VL', 'Flandre'], ['BR', 'Bruxelles']], [['SMARTVARIABLE', 'Smart Variable', 'EG'], ['BOOSTFLEX', 'Boost Flex', 'EG'], ['ECOBOOSTFLEX', 'Eco Boost Flex', 'EG'], ['DYNAMIC', 'Dynamic', 'E'], ['ECODYNAMIC', 'Eco Dynamic', 'E']]]].forEach(function(sg){
+      sg[3].forEach(function(p){ p[2].split('').forEach(function(en){ sg[2].forEach(function(r){
+        L.push(['Octa+', p[1] + (en === 'G' ? ' gaz' : ' élec'), r[1], sg[1], 'https://files.octaplus.be/tariffs/' + en + '_OCTA_' + p[0] + '_' + sg[0] + '_' + r[0] + '_FR.pdf']);
+      }); }); });
     });
     // Luminus : cartes servies par luminus.be/api-next/get-pricelist (une par région) ; le site refuse le serveur, donc liens à ouvrir à la main (hors ZIP)
     var LP = [['maxxfix', 'MaxxFix', 'EG'], ['maxxflex', 'MaxxFlex', 'EG'], ['comfy', 'Comfy', 'EG'], ['comfyflex', 'ComfyFlex', 'EG'], ['comfy-plus', 'Comfy+', 'EG'], ['comfyflex-plus', 'ComfyFlex+', 'EG'],
       ['smartflex', 'SmartFlex', 'E'], ['basicfix', 'BasicFix Online', 'EG'], ['basicflex', 'BasicFlex Online', 'EG'], ['dynamic', 'Dynamic Online', 'E'], ['tarif-social', 'Tarif social', 'EG']];
+    var LPP = [['maxxfix-pro', 'MaxxFix Pro', 'EG'], ['maxxflex-pro', 'MaxxFlex Pro', 'EG'], ['comfy-pro', 'Comfy Pro', 'EG'], ['comfyflex-pro', 'ComfyFlex Pro', 'EG'], ['comfy-pro-plus', 'Comfy+ Pro', 'EG'], ['comfyflex-pro-plus', 'ComfyFlex+ Pro', 'EG'],
+      ['smartflex-pro', 'SmartFlex Pro', 'E'], ['basicfix-pro', 'BasicFix Online Pro', 'EG'], ['basicflex-pro', 'BasicFlex Online Pro', 'EG'], ['dynamic-pro', 'Dynamic Online Pro', 'E']];
+    [['Wallonia', 'Wallonie'], ['Flanders', 'Flandre'], ['Brussels', 'Bruxelles']].forEach(function(r){
+      LPP.forEach(function(p){ p[2].split('').forEach(function(en){
+        L.push(['Luminus', p[1] + (en === 'G' ? ' gaz' : ' élec'), r[1], 'Professionnels', 'https://www.luminus.be/api-next/get-pricelist?documentSlug=' + p[0] + '&energyType=' + (en === 'G' ? 'gas' : 'electricity') + '&language=fr&tabValue=' + r[0], 'main']);
+      }); });
+    });
     [['Wallonia', 'Wallonie', ''], ['Flanders', 'Flandre', ''], ['Brussels', 'Bruxelles', '&isBrussels=true']].forEach(function(r){
       LP.forEach(function(p){
         if (r[0] === 'Brussels' && p[0] !== 'comfy' && p[0] !== 'comfyflex') return;   // Bruxelles : Comfy et ComfyFlex seulement
@@ -476,13 +483,13 @@
         return '<li><a class="' + (c[5] ? 'concM' : 'conc') + '" href="' + esc(c[4]) + '" target="_blank" rel="noopener">' + esc(c[1]) + '</a> · ' + esc(c[2]) + ' · ' + esc(c[3]) + '</li>';
       }).join('') + '</ul>';
     }).join('');
-    $('concCount').textContent = L.filter(function(c){ return !c[5]; }).length + ' + Mega';
+    $('concCount').textContent = L.filter(function(c){ return !c[5]; }).length + ' + Mega + Bolt';
     $('concAll').addEventListener('click', function(){
       // Le serveur (fonction conc-cartes) récupère les PDF et renvoie un seul ZIP : marche aussi sur Safari.
       var btn = this, d = new Date(), mo = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
       var cartes = concCards().filter(function(c){ return !c[5]; }).map(function(c){ return {url: c[4], name: [c[0], c[1], c[2], c[3]].join(' - ') + '.pdf'}; });
       btn.disabled = true; msg('concMsg', 'Le serveur récupère ' + cartes.length + ' cartes… (environ 30 secondes)');
-      var go = function(){ return fetch(URL + '/functions/v1/conc-cartes', {method: 'POST', headers: {apikey: KEY, Authorization: 'Bearer ' + S.access, 'Content-Type': 'application/json'}, body: JSON.stringify({cartes: cartes, pages: ['mega']})}); };
+      var go = function(){ return fetch(URL + '/functions/v1/conc-cartes', {method: 'POST', headers: {apikey: KEY, Authorization: 'Bearer ' + S.access, 'Content-Type': 'application/json'}, body: JSON.stringify({cartes: cartes, pages: ['mega', 'bolt']})}); };
       go().then(function(r){ return r.status === 401 ? renew().then(go) : r; }).then(function(r){
         if (!r.ok) return r.text().then(function(t){ throw new Error(t || ('erreur ' + r.status)); });
         var ok = r.headers.get('x-cartes-ok'), ko = +(r.headers.get('x-cartes-manquantes') || 0);
