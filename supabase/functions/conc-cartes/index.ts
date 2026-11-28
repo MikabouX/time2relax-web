@@ -42,12 +42,29 @@ Deno.serve(async (req) => {
   const adm = await fetch(url + "/rest/v1/rpc/t2r_is_admin", { method: "POST", headers: { apikey: anon, Authorization: auth, "Content-Type": "application/json" }, body: "{}" });
   if (!adm.ok || (await adm.json()) !== true) return new Response("réservé aux administrateurs", { status: 403, headers: CORS });
 
-  let list: { url: string; name: string }[] = [];
-  try { list = (await req.json()).cartes || []; } catch { /* vide */ }
+  let list: { url: string; name: string }[] = [], pages: string[] = [];
+  try { const j = await req.json(); list = j.cartes || []; pages = j.pages || []; } catch { /* vide */ }
+  const pageMiss: string[] = [];
+  if (pages.includes("mega")) {   // Mega : noms de fichiers imprévisibles, on lit la page des cartes tarifaires
+    try {
+      const h = await (await fetch("https://www.mega.be/fr/energie/cartes-tarifaires", { headers: { "User-Agent": "Mozilla/5.0 (Time2Relax simulateur)" }, signal: AbortSignal.timeout(20000) })).text();
+      const found = [...new Set([...h.matchAll(/https:\/\/my\.mega\.be\/resources\/tarif\/[A-Za-z0-9._-]+\.pdf/g)].map((m) => m[0]))];
+      const REG: Record<string, string> = { BX: "Bruxelles", VL: "Flandre", WL: "Wallonie" };
+      for (const u of found) {
+        const f = u.split("/").pop()!.replace(/\.pdf$/, ""), p = f.split("-");   // Mega-FR-EL-B2C-WL-112026-Smart2011-Fixed
+        if (p[1] !== "FR") continue;
+        let prod = p.slice(6).join(" ").replace(/\d{4}/g, "").replace(/\s+/g, " ").trim();
+        prod = prod.replace(/ Fix$/, " Fixed").replace(/ Green$/, "").replace(/ Var$/, "");
+        if (!/Fixed|Dynamic|Impact/.test(prod)) prod += " Flex";
+        list.push({ url: u, name: ["Mega", prod + (p[2] === "NG" ? " gaz" : " élec"), REG[p[4]] || p[4], p[3] === "B2B" ? "Professionnels" : "Particuliers"].join(" - ") + ".pdf" });
+      }
+      if (!found.length) pageMiss.push("Mega : aucune carte trouvée sur mega.be/fr/energie/cartes-tarifaires (page à vérifier)");
+    } catch { pageMiss.push("Mega : page mega.be/fr/energie/cartes-tarifaires injoignable"); }
+  }
   list = list.filter((c) => { try { const u = new URL(c.url); return u.protocol === "https:" && HOSTS.includes(u.hostname); } catch { return false; } }).slice(0, 150);
-  if (!list.length) return new Response("aucune carte", { status: 400, headers: CORS });
+  if (!list.length && !pageMiss.length) return new Response("aucune carte", { status: 400, headers: CORS });
 
-  const files: { name: string; data: Uint8Array }[] = [], miss: string[] = [];
+  const files: { name: string; data: Uint8Array }[] = [], miss: string[] = [...pageMiss];
   let i = 0;
   async function worker() {
     while (i < list.length) {

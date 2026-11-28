@@ -112,13 +112,13 @@
       <div id="cardLinks" class="hint" style="margin-top:6px"></div>
     </details>
     <details class="sec" id="concBox">
-      <summary><strong>Cartes tarifaires de la concurrence (mois en cours)</strong> <span class="hint">(TotalEnergies, Eneco, Bolt, Octa+, Luminus)</span></summary>
+      <summary><strong>Cartes tarifaires de la concurrence (mois en cours)</strong> <span class="hint">(TotalEnergies, Eneco, Bolt, Octa+, Mega, Luminus)</span></summary>
       <div class="row" style="margin-top:8px">
         <button type="button" id="concAll">Tout télécharger (<span id="concCount">0</span> cartes)</button>
         <span class="msg" id="concMsg"></span>
       </div>
       <p class="hint" style="margin:6px 0 0">Un seul fichier ZIP arrive dans Téléchargements (Safari l'ouvre automatiquement en dossier). Les cartes introuvables sont listées dans <code>_manquantes.txt</code>. Rangez ensuite le dossier dans <code>~/Claude/Tarifs/Concurrence/AAAA-MM</code>.</p>
-      <p class="hint" style="margin:0">Liens construits d'après les adresses publiées par chaque fournisseur : certains peuvent ne pas exister (page d'erreur), le nom ou la référence d'un produit pouvant changer. Mega : cartes sur <a href="https://www.mega.be/" target="_blank" rel="noopener">mega.be</a>.</p>
+      <p class="hint" style="margin:0">Liens construits d'après les adresses publiées par chaque fournisseur : certains peuvent ne pas exister (page d'erreur), le nom ou la référence d'un produit pouvant changer. Mega : le serveur prend toutes les cartes de sa <a href="https://www.mega.be/fr/energie/cartes-tarifaires" target="_blank" rel="noopener">page des cartes tarifaires</a> (environ 58).</p>
       <div id="concLinks" class="hint" style="margin-top:6px"></div>
     </details>
     <details class="sec" id="avBox">
@@ -470,13 +470,13 @@
         return '<li><a class="' + (c[5] ? 'concM' : 'conc') + '" href="' + esc(c[4]) + '" target="_blank" rel="noopener">' + esc(c[1]) + '</a> · ' + esc(c[2]) + ' · ' + esc(c[3]) + '</li>';
       }).join('') + '</ul>';
     }).join('');
-    $('concCount').textContent = L.filter(function(c){ return !c[5]; }).length;
+    $('concCount').textContent = L.filter(function(c){ return !c[5]; }).length + ' + Mega';
     $('concAll').addEventListener('click', function(){
       // Le serveur (fonction conc-cartes) récupère les PDF et renvoie un seul ZIP : marche aussi sur Safari.
       var btn = this, d = new Date(), mo = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
       var cartes = concCards().filter(function(c){ return !c[5]; }).map(function(c){ return {url: c[4], name: [c[0], c[1], c[2], c[3]].join(' - ') + '.pdf'}; });
       btn.disabled = true; msg('concMsg', 'Le serveur récupère ' + cartes.length + ' cartes… (environ 30 secondes)');
-      var go = function(){ return fetch(URL + '/functions/v1/conc-cartes', {method: 'POST', headers: {apikey: KEY, Authorization: 'Bearer ' + S.access, 'Content-Type': 'application/json'}, body: JSON.stringify({cartes: cartes})}); };
+      var go = function(){ return fetch(URL + '/functions/v1/conc-cartes', {method: 'POST', headers: {apikey: KEY, Authorization: 'Bearer ' + S.access, 'Content-Type': 'application/json'}, body: JSON.stringify({cartes: cartes, pages: ['mega']})}); };
       go().then(function(r){ return r.status === 401 ? renew().then(go) : r; }).then(function(r){
         if (!r.ok) return r.text().then(function(t){ throw new Error(t || ('erreur ' + r.status)); });
         var ok = r.headers.get('x-cartes-ok'), ko = +(r.headers.get('x-cartes-manquantes') || 0);
