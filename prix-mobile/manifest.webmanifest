@@ -1,0 +1,16 @@
+{
+  "name": "Simulateur énergie",
+  "short_name": "Simulateur",
+  "description": "Estimation de consommation, détails de prix, acompte, régularisation et concurrence (électricité et gaz).",
+  "id": "/prix-mobile/",
+  "start_url": "/prix-mobile/",
+  "scope": "/prix-mobile/",
+  "display": "standalone",
+  "background_color": "#f5f6f4",
+  "theme_color": "#0071b5",
+  "lang": "fr",
+  "icons": [
+    { "src": "/prix-mobile/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/prix-mobile/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

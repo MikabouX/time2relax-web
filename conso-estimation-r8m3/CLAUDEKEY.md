@@ -66,3 +66,12 @@ https://time2relax.app/conso-estimation-r8m3/ (page non référencée). Une seul
 - Facteur de conversion gaz par zone (aujourd'hui 11,6 kWh/m³ moyen).
 - Fiches pros Bruxelles de novembre (repris d'octobre avec la nouvelle accise).
 - Mise à jour annuelle des profils Synergrid.
+
+## Version mobile (time2relax.app/prix-mobile/)
+- Fichier généré : `prix-mobile/index.html`. Après chaque modification de `conso-estimation-r8m3/index.html`, lancer `python3 tools/build_prix_mobile.py` puis committer les deux.
+- Différences : sans outils TVA et HR helper, onglets en barre fixe en bas, une colonne, installable (manifest, sw.js et icônes dans `prix-mobile/`).
+- Une balise `<base href="/conso-estimation-r8m3/">` fait pointer les sous-pages (prix, concurrence, avis) vers celles du simulateur.
+
+## Concurrence
+- Page `conso-estimation-r8m3/concurrence/` ; données dans `concurrence/cartes.json` (prix TVAC relevés sur les cartes, par région, élec et gaz ; ENGIE repris des cartes ENGIE).
+- Cartes du mois : admin-prix/#concurrence → « Tout télécharger » (fonction Supabase `conc-cartes`, ZIP) ; Luminus à prendre via Chrome (son site refuse le serveur).
